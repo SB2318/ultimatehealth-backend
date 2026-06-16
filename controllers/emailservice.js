@@ -3057,6 +3057,49 @@ module.exports = {
   sendResolvedMailToConvict,
   sendWarningMailToVictimOnReportDismissOrIgnore,
   sendDismissedOrIgnoreMailToConvict,
+const sendContactUsMail = async ({ name, email, subject, message }) => {
+  const mailOptions = {
+    from: `"UltimateHealth Contact" <${process.env.EMAIL_USER}>`,
+    to: "ultimate.health25@gmail.com",
+    replyTo: email,
+    subject: `[Contact Us] ${subject}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 24px; border: 1px solid #e0e0e0; border-radius: 8px;">
+        <h2 style="color: #2d6a4f;">New Contact Us Message</h2>
+        <hr style="border: none; border-top: 1px solid #e0e0e0;" />
+        <table style="width: 100%; font-size: 15px; line-height: 1.8;">
+          <tr>
+            <td style="font-weight: bold; width: 120px; color: #555;">Name</td>
+            <td>${name}</td>
+          </tr>
+          <tr>
+            <td style="font-weight: bold; color: #555;">Email</td>
+            <td><a href="mailto:${email}">${email}</a></td>
+          </tr>
+          <tr>
+            <td style="font-weight: bold; color: #555;">Subject</td>
+            <td>${subject}</td>
+          </tr>
+        </table>
+        <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 16px 0;" />
+        <p style="font-weight: bold; color: #555;">Message</p>
+        <p style="background: #f9f9f9; padding: 16px; border-radius: 6px; white-space: pre-wrap;">${message}</p>
+        <hr style="border: none; border-top: 1px solid #e0e0e0; margin-top: 24px;" />
+        <p style="font-size: 12px; color: #aaa;">This email was sent via the UltimateHealth Contact Us form. Reply directly to respond to the sender.</p>
+      </div>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return true;
+  } catch (err) {
+    console.error("Error sending contact us email:", err);
+    return false;
+  }
+};
+
+module.exports = {
   sendWarningMailToConvict,
   sendRemoveContentMailToConvict,
   sendBlockConvictMail,
@@ -3070,4 +3113,5 @@ module.exports = {
   sendPodcastDiscardEmail,
   sendOtpMail,
   sendContributorVerificationEmail,
+  sendContactUsMail,
 };

@@ -1,8 +1,8 @@
 const expressAsyncHandler = require('express-async-handler');
 const ContactUs = require('../models/ContactUs');
+const { sendContactUsMail } = require('./emailservice');
 const validator = require('validator');
 
-// Submit contact form
 const submitContactForm = expressAsyncHandler(async (req, res) => {
     const { name, email, subject, message } = req.body;
 
@@ -15,14 +15,10 @@ const submitContactForm = expressAsyncHandler(async (req, res) => {
     }
 
     try {
-        const newContact = new ContactUs({
-            name,
-            email,
-            subject,
-            message
-        });
-
+        const newContact = new ContactUs({ name, email, subject, message });
         await newContact.save();
+
+        await sendContactUsMail({ name, email, subject, message });
 
         res.status(200).json({ message: 'Your message has been received. We will contact you shortly.' });
     } catch (err) {
@@ -31,6 +27,4 @@ const submitContactForm = expressAsyncHandler(async (req, res) => {
     }
 });
 
-module.exports = {
-    submitContactForm
-};
+module.exports = { submitContactForm };
