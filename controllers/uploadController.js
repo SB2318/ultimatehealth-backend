@@ -868,6 +868,44 @@ const deleteImprovementRecordFromPocketbase = expressAsyncHandler(
 
 
 
+const deletePocketbaseRecord = expressAsyncHandler(
+    async (req, res) => {
+        const { collectionName, recordId } = req.params;
+
+        if (!collectionName || !recordId) {
+            return res.status(400).json({ message: 'Missing required fields: collectionName or recordId' });
+        }
+
+        try {
+            const pb = await getPocketbaseClient();
+            await authenticateAdmin(pb);
+
+            let record;
+            try {
+                record = await pb.collection(collectionName).getOne(recordId);
+            } catch (err) {
+                return res.status(404).json({ message: 'Record not found in PocketBase' });
+            }
+
+            if (!record) {
+                return res.status(404).json({ message: 'Record not found' });
+            }
+
+            // delete record
+            await pb.collection(collectionName).delete(recordId);
+
+            return res.status(200).json({
+                status: true,
+                message: `Record ${recordId} deleted successfully from ${collectionName}`,
+            });
+
+        } catch (err) {
+            console.error(`Error deleting record from pocketbase [${collectionName} - ${recordId}]:`, err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
+    }
+);
+
 module.exports = {
     uploadFile,
     uploadAgreementPDF,
@@ -880,5 +918,6 @@ module.exports = {
     uploadImprovementFileToPocketbase,
     publishImprovementFileFromPocketbase,
     deleteImprovementRecordFromPocketbase,
+    deletePocketbaseRecord,
     deleteFileFn
 };

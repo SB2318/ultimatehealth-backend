@@ -27,7 +27,7 @@ uploadRoute.get('/article/get-improve-content', authenticateToken, controller.ge
 
 uploadRoute.delete('/delete-improvement/:record_id', authenticateToken, controller.deleteImprovementRecordFromPocketbase);
 
-   
+uploadRoute.delete('/delete-pocketbase-record/:collectionName/:recordId', authenticateToken, controller.deletePocketbaseRecord);
 
 module.exports = uploadRoute;
 
