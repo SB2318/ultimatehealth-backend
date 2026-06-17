@@ -3034,29 +3034,6 @@ const sendNewArticleEmail = (email, title, authorName, articleLink) => {
     }
   });
 };
-
-
-module.exports = {
-  sendNewArticleEmail,
-  sendVerificationEmail,
-  verifyEmail,
-  Sendverifymail,
-  resendVerificationEmail,
-  sendArticleFeedbackEmail,
-  pickArticleMail,
-  pickPodcastMail,
-  sendArticleForReviewEmail,
-  sendArticlePublishedEmail,
-  sendArticleDiscardEmail,
-  sendMailArticleDiscardByAdmin,
-  sendMailOnEditRequestApproval,
-  sendReportUndertakenEmail,
-  sendInitialReportMailtoConvict,
-  sendInitialReportMailtoVictim,
-  sendResolvedMailToVictim,
-  sendResolvedMailToConvict,
-  sendWarningMailToVictimOnReportDismissOrIgnore,
-  sendDismissedOrIgnoreMailToConvict,
 const sendContactUsMail = async ({ name, email, subject, message }) => {
   const mailOptions = {
     from: `"UltimateHealth Contact" <${process.env.EMAIL_USER}>`,
@@ -3100,6 +3077,27 @@ const sendContactUsMail = async ({ name, email, subject, message }) => {
 };
 
 module.exports = {
+  sendNewArticleEmail,
+  sendContactUsMail,
+  sendVerificationEmail,
+  verifyEmail,
+  Sendverifymail,
+  resendVerificationEmail,
+  sendArticleFeedbackEmail,
+  pickArticleMail,
+  pickPodcastMail,
+  sendArticleForReviewEmail,
+  sendArticlePublishedEmail,
+  sendArticleDiscardEmail,
+  sendMailArticleDiscardByAdmin,
+  sendMailOnEditRequestApproval,
+  sendReportUndertakenEmail,
+  sendInitialReportMailtoConvict,
+  sendInitialReportMailtoVictim,
+  sendResolvedMailToVictim,
+  sendResolvedMailToConvict,
+  sendWarningMailToVictimOnReportDismissOrIgnore,
+  sendDismissedOrIgnoreMailToConvict,
   sendWarningMailToConvict,
   sendRemoveContentMailToConvict,
   sendBlockConvictMail,
@@ -3113,5 +3111,6 @@ module.exports = {
   sendPodcastDiscardEmail,
   sendOtpMail,
   sendContributorVerificationEmail,
-  sendContactUsMail,
 };
+
+
