@@ -144,7 +144,7 @@ const profileImageParamSchema = z.object({
 
 const userProfileQuerySchema = z
     .object({
-        id: mongoIdSchema.optional(),
+        id: mongoIdSchema.optional().or(z.literal('')),
 
         handle: z
             .string()
@@ -155,12 +155,13 @@ const userProfileQuerySchema = z
                 /^[a-zA-Z0-9_]+$/,
                 'Handle can only contain letters, numbers, and underscores'
             )
-            .optional(),
+            .optional()
+            .or(z.literal('')),
     })
     .refine(
         (data) => {
-            const hasUserId = !!data.id
-            const hasUserHandle = !!data.handle
+            const hasUserId = !!data.id && data.id.trim() !== ''
+            const hasUserHandle = !!data.handle && data.handle.trim() !== ''
 
             return hasUserId !== hasUserHandle // XOR
         },

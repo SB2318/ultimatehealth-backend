@@ -145,8 +145,6 @@ router.get(
 
 router.get(
     '/user/getuserprofile',
-    authenticate,
-    authorize(ROLES.USER, ROLES.DOCTOR),
     validateQuery(userProfileQuerySchema),
     getUserProfile
 )

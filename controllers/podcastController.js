@@ -242,7 +242,7 @@ const getPodcastById = expressAsyncHandler(
 
 const searchPodcast = expressAsyncHandler(
     async (req, res) => {
-        const { q, page = 1, limit = 10 } = req.query;
+        const { q, page = 1, limit = 100 } = req.query;
         if (!q) {
             return res.status(400).json({ message: 'Search query is required' });
         }
@@ -251,7 +251,7 @@ const searchPodcast = expressAsyncHandler(
 
             const regex = new RegExp(q, 'i');
             // Find all article title matches with the rejex
-            const matchingArticles = await Article.find({ title: regex }).select('_id title').lean().exec();
+            const matchingArticles = await Article.find({ title: regex , status: statusEnum.statusEnum.PUBLISHED}).select('_id title').lean().exec();
             const articleIds = matchingArticles.map(a => a._id);
 
             const matchPodcasts = await Podcast.
@@ -261,8 +261,8 @@ const searchPodcast = expressAsyncHandler(
                             { article_id: { $in: articleIds } },
                             { title: regex },
                             { description: regex },
-
-                        ]
+                        ],
+                        status: statusEnum.statusEnum.PUBLISHED
                     }
                 )
                 .select('_id title cover_image description article_id tags viewUsers duration')
@@ -283,7 +283,8 @@ const searchPodcast = expressAsyncHandler(
                         { title: regex },
                         { description: regex },
 
-                    ]
+                    ],
+                    status: statusEnum.statusEnum.PUBLISHED
                 });
                 const totalPages = Math.ceil(totalPodcasts / Number(limit));
                 res.status(200).json({ matchPodcasts, totalPages });

@@ -1360,4 +1360,65 @@ router.get('/user-articles',authenticateToken,articleController.getAllArticlesFo
 router.get('/get-improvement/:reqid', authenticateToken, articleController.getImprovementById);
 
 
+/**
+ * @openapi
+ * /articles/trust:
+ *   post:
+ *     summary: Trust or untrust an article
+ *     tags:
+ *       - Articles
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - article_id
+ *             properties:
+ *               article_id:
+ *                 type: number
+ *                 description: ID of the article to trust/untrust
+ *     responses:
+ *       '200':
+ *         description: Successfully trusted/untrusted
+ *       '400':
+ *         description: Bad request
+ *       '401':
+ *         description: Unauthorized
+ *       '404':
+ *         description: Article or user not found
+ *       '500':
+ *         description: Internal server error
+ */
+router.post('/articles/trust', authenticateToken, articleController.trustArticle);
+
+/**
+ * @openapi
+ * /articles/trusted-users:
+ *   get:
+ *     summary: Get users who trusted an article
+ *     tags:
+ *       - Articles
+ *     parameters:
+ *       - in: query
+ *         name: article_id
+ *         required: true
+ *         schema:
+ *           type: number
+ *         description: ID of the article
+ *     responses:
+ *       '200':
+ *         description: Successfully retrieved trusted users
+ *       '400':
+ *         description: Bad request
+ *       '404':
+ *         description: Article not found
+ *       '500':
+ *         description: Internal server error
+ */
+router.get('/articles/trusted-users', articleController.getTrustedUsers);
+
 module.exports = router;

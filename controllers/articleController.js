@@ -1136,3 +1136,89 @@ module.exports.getImprovementById = expressAsyncHandler(
 
 
 
+
+// Trust or Untrust an Article
+module.exports.trustArticle = expressAsyncHandler(
+  async (req, res) => {
+    try {
+      const { article_id } = req.body;
+
+      if (!article_id) {
+        return res.status(400).json({ message: "Article ID is required" });
+      }
+
+      const user = await User.findById(req.userId);
+      const articleDb = await Article.findById(Number(article_id));
+
+      if (!user || !articleDb || articleDb.is_removed) {
+        return res.status(404).json({ error: 'User or Article not found' });
+      }
+
+      if (user.isBlockUser || user.isBannedUser) {
+        return res.status(403).json({ error: 'User is blocked or banned' });
+      }
+
+      if (articleDb.status !== statusEnum.statusEnum.PUBLISHED) {
+        return res.status(400).json({ message: 'Article is not published' });
+      }
+
+      const trustedArticlesSet = new Set(user.trustedArticles);
+      const trustUsersSet = new Set(articleDb.trustUsers.map(id => id.toString()));
+
+      let isTrusted;
+
+      if (trustedArticlesSet.has(articleDb._id)) {
+        // Untrust
+        trustedArticlesSet.delete(articleDb._id);
+        trustUsersSet.delete(user._id.toString());
+        isTrusted = false;
+      } else {
+        // Trust
+        trustedArticlesSet.add(articleDb._id);
+        trustUsersSet.add(user._id.toString());
+        isTrusted = true;
+      }
+
+      user.trustedArticles = Array.from(trustedArticlesSet);
+      articleDb.trustUsers = Array.from(trustUsersSet);
+
+      await Promise.all([user.save(), articleDb.save()]);
+
+      return res.status(200).json({ 
+        message: isTrusted ? 'Article trusted successfully' : 'Article untrusted successfully',
+        isTrusted
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
+// Get trusted users for an article
+module.exports.getTrustedUsers = expressAsyncHandler(
+  async (req, res) => {
+    try {
+      const { article_id } = req.query;
+
+      if (!article_id) {
+        return res.status(400).json({ message: "Article ID is required" });
+      }
+
+      const articleDb = await Article.findById(Number(article_id))
+        .populate('trustUsers', 'user_name user_handle Profile_image bio')
+        .exec();
+
+      if (!articleDb || articleDb.is_removed) {
+        return res.status(404).json({ error: 'Article not found' });
+      }
+
+      return res.status(200).json({ 
+        trustUsers: articleDb.trustUsers 
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);

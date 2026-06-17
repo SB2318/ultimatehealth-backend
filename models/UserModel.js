@@ -129,6 +129,12 @@ const userSchema = new mongoose.Schema({
         default: []
     },
 
+    trustedArticles: {
+        type: [Number],
+        ref: 'Article',
+        default: []
+    },
+
     improvements: {
         type: [Number],
         ref: 'Article',

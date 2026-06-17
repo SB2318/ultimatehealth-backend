@@ -143,6 +143,12 @@ const articleSchema = new Schema({
     default: []
   }],
 
+  trustUsers: [{
+    type: Schema.Types.ObjectId,
+    ref: 'User', 
+    default: []
+  }],
+  
   status :{
     type: String,
     enum: ['unassigned', 'in-progress', 'review-pending',  'published', 'discarded','awaiting-user'],

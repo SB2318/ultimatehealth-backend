@@ -24,6 +24,7 @@ const db = require("./config/database");
 const userRoutes = require("./routes/usersRoutes");
 const specializationRoutes = require("./routes/SpecializationsRoutes");
 const articleRoutes = require("./routes/articleRoutes");
+const glossaryRoutes = require("./routes/glossaryRoutes");
 const languageRoutes = require("./routes/languageRoute");
 const analyticsRoute = require('./routes/analyticsRoute');
 const uploadRoute = require('./routes/uploadRoute');
@@ -94,6 +95,7 @@ app.use(cors({
 app.use("/api", userRoutes);
 app.use("/api", specializationRoutes);
 app.use("/api", articleRoutes);
+app.use("/api/glossary", glossaryRoutes);
 app.use("/api", uploadRoute);
 app.use("/api/analytics", analyticsRoute);
 app.use("/api", notificationRoute);
@@ -1410,3 +1412,4 @@ io.on('connection', (socket) => {
 // Error handling middleware
 app.use(errorHandler);
 module.exports = app;
+
