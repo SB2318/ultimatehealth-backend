@@ -6,6 +6,11 @@ const conversationSchema = new mongoose.Schema({
     ref: "User", 
     required: true 
   },
+  characterName: {
+    type: String,
+    required: true,
+    default: "general"
+  },
   createdAt: { type: Date, default: Date.now }
 });
 

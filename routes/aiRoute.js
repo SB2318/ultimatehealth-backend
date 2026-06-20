@@ -2,7 +2,7 @@ const express = require("express");
 const authToken = require("../middleware/authentcatetoken"); // user token
 const router = express.Router();
 
-const { startConversation,loadConversations, startPPLXConversation } = require('../controllers/aiChatController');
+const { startConversation,loadConversations, startPPLXConversation, getCharacters } = require('../controllers/aiChatController');
 /**
  * @swagger
  * /gemini/send:
@@ -23,6 +23,10 @@ const { startConversation,loadConversations, startPPLXConversation } = require('
  *               text:
  *                 type: string
  *                 example: "Hello, tell me about Gemini"
+ *               character:
+ *                 type: string
+ *                 description: ID of the character to chat with
+ *                 example: "fitness_coach"
  *     responses:
  *       200:
  *         description: Gemini's reply
@@ -46,6 +50,12 @@ router.post("/send", authToken, startConversation);
  *     tags: [ChatBot]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: character
+ *         schema:
+ *           type: string
+ *         description: ID of the character to load history for (default is 'general')
  *     responses:
  *       200:
  *         description: Array of messages
@@ -62,5 +72,28 @@ router.post("/send", authToken, startConversation);
  *                     $ref: '#/components/schemas/Message'
  */
 router.get("/messages", authToken, loadConversations);
+
+/**
+ * @swagger
+ * /gemini/characters:
+ *   get:
+ *     summary: Get all available AI characters
+ *     tags: [ChatBot]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Array of characters
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 characters:
+ *                   type: array
+ */
+router.get("/characters", authToken, getCharacters);
 
 module.exports = router;

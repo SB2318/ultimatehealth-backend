@@ -11,17 +11,30 @@ dotenv.config();
 const PPLX_URL = "https://api.perplexity.ai/chat/completions";
 const MODEL = "sonar-pro";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 const MAX_DAY_LIMIT = 5;
 
+// Fallback across 5 API keys for robustness
+const geminiKeys = [
+    process.env.GEMINI_API_KEY_1 || process.env.GEMINI_API_KEY,
+    process.env.GEMINI_API_KEY_2,
+    process.env.GEMINI_API_KEY_3,
+    process.env.GEMINI_API_KEY_4,
+    process.env.GEMINI_API_KEY_5
+].filter(Boolean);
+
+// Character configurations
+const characterPrompts = {
+    general: "You are the official personalized health assistant for UltimateHealth. Provide concise, actionable personal health suggestion tips. Keep your answers short and friendly.",
+    fitness_coach: "You are an expert Fitness Coach for UltimateHealth. Motivate the user, provide workout tips, and focus on physical fitness, strength, and endurance. Keep answers energetic and actionable.",
+    nutritionist: "You are a professional Nutritionist for UltimateHealth. Provide dietary advice, healthy recipes, and tips for balanced eating. Do not provide medical diagnoses. Keep answers concise.",
+    mental_wellness: "You are a Mental Wellness Guide for UltimateHealth. Provide calming, supportive advice on stress management, mindfulness, and mental well-being. Keep answers empathetic and soothing."
+};
 
 const startConversation = expressAsyncHandler(
     async (req, res) => {
         try {
             const userId = req.userId;
-            // console.log("User id", req.userId);
-            const { text } = req.body;
+            const { text, character = 'general' } = req.body;
 
             if (!text) {
                 return res.status(400).json({ message: "Text is required" });
@@ -29,55 +42,50 @@ const startConversation = expressAsyncHandler(
 
             let user = await User.findById(userId);
 
-
-            if (!user.conversationId) {
-                const newConv = await Conversation.create({ userId });
-                user.conversationId = newConv._id;
-                await user.save();
+            // Find or create conversation for the specific character
+            let conv = await Conversation.findOne({ userId, characterName: character });
+            if (!conv) {
+                conv = await Conversation.create({ userId, characterName: character });
             }
-
-            const conversationId = user.conversationId;
+            const conversationId = conv._id;
 
             const startOfDay = new Date();
-            startOfDay.setHours(0, 0, 0, 0)
+            startOfDay.setHours(0, 0, 0, 0);
             const endOfDay = new Date();
             endOfDay.setHours(23, 59, 59, 999);
+            
             let messages = await Message.find({
                 conversationId: conversationId,
                 role: 'model',
                 createdAt: { $gte: startOfDay, $lte: endOfDay }
             });
 
-            if (messages.length > MAX_DAY_LIMIT) {
+            if (messages.length >= MAX_DAY_LIMIT) {
                 return res.status(429).json({
                     success: false,
-                    error: "Daily quota exceeded",
+                    error: "Daily quota exceeded for this character",
                     remaining: 0
                 });
             }
 
-            // 2. Save user message
-           await Message.create({
+            // Save user message
+            await Message.create({
                 role: "user",
                 text,
                 conversationId
             });
 
-            //await userMsg.save();
             const history = await Message.find({ conversationId }).sort({ _id: 1 });
 
-            // 4. Generate assistant reply via Gemini
-            const reply = await generateReply(history);
+            // Generate assistant reply via Gemini with key rotation
+            const reply = await generateReplyWithRotation(history, character);
 
-            // 5. Save assistant message
+            // Save assistant message
             const newMsg = await Message.create({
                 role: "model",
                 text: reply,
                 conversationId
             });
-
-           // await newMsg.save();
-         //  console.log("saved reply", newMsg);
 
             return res.status(200).json({
                 success: true,
@@ -89,26 +97,44 @@ const startConversation = expressAsyncHandler(
             res.status(500).json({ success: false, error: err.message });
         }
     }
-)
+);
 
-async function generateReply(history) {
+async function generateReplyWithRotation(history, character) {
     const formattedMessages = history.map(m => ({
         role: m.role === "user" ? "user" : "model",
         parts: [{ text: m.text }]
     }));
 
-    const chat = model.startChat({
-        history: formattedMessages
-    });
+    const systemInstruction = characterPrompts[character] || characterPrompts['general'];
 
-    const result = await chat.sendMessage("Continue the conversation");
-    return result.response.text();
+    for (let i = 0; i < geminiKeys.length; i++) {
+        try {
+            const genAI = new GoogleGenerativeAI(geminiKeys[i]);
+            const model = genAI.getGenerativeModel({ 
+                model: "gemini-1.5-flash",
+                systemInstruction: systemInstruction 
+            });
+            
+            const chat = model.startChat({
+                history: formattedMessages
+            });
+
+            const result = await chat.sendMessage("Continue the conversation");
+            return result.response.text();
+        } catch (err) {
+            console.error(`Gemini key ${i+1} failed:`, err.message);
+            // If it's the last key, throw the error
+            if (i === geminiKeys.length - 1) {
+                throw new Error("All AI API keys exhausted or rate limited.");
+            }
+        }
+    }
 }
 
 const startPPLXConversation = expressAsyncHandler(async (req, res) => {
     try {
         const userId = req.userId;
-        const { text } = req.body;
+        const { text, character = 'general' } = req.body;
 
         if (!text) {
             return res.status(400).json({ message: "Text is required" });
@@ -116,18 +142,15 @@ const startPPLXConversation = expressAsyncHandler(async (req, res) => {
 
         let user = await User.findById(userId);
 
-        if (!user.conversationId) {
-            const newConv = await Conversation.create({ userId });
-            user.conversationId = newConv._id;
-            await user.save();
+        let conv = await Conversation.findOne({ userId, characterName: character });
+        if (!conv) {
+            conv = await Conversation.create({ userId, characterName: character });
         }
-
-        const conversationId = user.conversationId;
+        const conversationId = conv._id;
 
         // Daily limit check
         const startOfDay = new Date();
         startOfDay.setHours(0, 0, 0, 0);
-
         const endOfDay = new Date();
         endOfDay.setHours(23, 59, 59, 999);
 
@@ -137,30 +160,24 @@ const startPPLXConversation = expressAsyncHandler(async (req, res) => {
             createdAt: { $gte: startOfDay, $lte: endOfDay }
         });
 
-        if (modelMessagesToday.length > MAX_DAY_LIMIT) {
+        if (modelMessagesToday.length >= MAX_DAY_LIMIT) {
             return res.status(429).json({
                 success: false,
-                error: "Daily quota exceeded",
+                error: "Daily quota exceeded for this character",
                 remaining: 0
             });
         }
 
-        // Save user message
         await Message.create({
             role: "user",
             text,
             conversationId
         });
 
-        // Fetch full history
-        const history = await Message
-            .find({ conversationId })
-            .sort({ _id: 1 });
+        const history = await Message.find({ conversationId }).sort({ _id: 1 });
 
-        // Generate AI reply using Perplexity
-        const reply = await generatePPLXReply(history);
+        const reply = await generatePPLXReply(history, character);
 
-        // Save model reply
         const newMsg = await Message.create({
             role: "model",
             text: reply,
@@ -178,9 +195,7 @@ const startPPLXConversation = expressAsyncHandler(async (req, res) => {
     }
 });
 
-
-async function generatePPLXReply(history) {
-
+async function generatePPLXReply(history, character) {
     let messages = history.map(m => ({
         role: m.role === "model" ? "assistant" : "user",
         content: m.text
@@ -200,9 +215,10 @@ async function generatePPLXReply(history) {
         });
     }
 
+    const systemInstruction = characterPrompts[character] || characterPrompts['general'];
     cleaned.unshift({
         role: "system",
-        content: "You are a helpful AI assistant. Respond concisely and naturally."
+        content: systemInstruction
     });
 
     const response = await fetch(PPLX_URL, {
@@ -221,35 +237,29 @@ async function generatePPLXReply(history) {
     return data?.choices?.[0]?.message?.content || "Unable to generate response.";
 }
 
-
-
-
 const loadConversations = expressAsyncHandler(
     async (req, res) => {
         try {
             const userId = req.userId;
-           // console.log("req", req.userId);
+            const character = req.query.character || 'general';
 
             const user = await User.findById(userId);
 
-           // console.log("User Conversation Id", user);
-            if (!user || !user.conversationId) {
+            const conv = await Conversation.findOne({ userId, characterName: character });
+            if (!conv) {
                 return res.status(200).json({ messages: [] });
             }
 
             const messages = await Message.find({
-                conversationId: user.conversationId
+                conversationId: conv._id
             });
 
-          console.log("Messages length", messages.length);
             const enhancedMessages = messages.map(msg => {
                 const m = msg.toObject();
-
                 if (m.role === "user") {
                     m.userHandle = user.user_handle;       
                     m.profileImage = user.Profile_image;   
                 }
-
                 return m;
             });
 
@@ -259,10 +269,42 @@ const loadConversations = expressAsyncHandler(
             res.status(500).json({ success: false, error: err.message });
         }
     }
-)
+);
+
+const getCharacters = expressAsyncHandler(async (req, res) => {
+    const characters = [
+        {
+            id: 'general',
+            name: 'UltimateHealth Assistant',
+            tagline: 'Your personal health suggestion guide',
+            avatarUrl: 'https://ui-avatars.com/api/?name=Health+Assistant&background=0D8ABC&color=fff'
+        },
+        {
+            id: 'fitness_coach',
+            name: 'Coach Alex',
+            tagline: 'Expert in physical fitness, strength, and endurance',
+            avatarUrl: 'https://ui-avatars.com/api/?name=Coach+Alex&background=FF5722&color=fff'
+        },
+        {
+            id: 'nutritionist',
+            name: 'Dr. Sarah',
+            tagline: 'Professional Nutritionist for dietary advice',
+            avatarUrl: 'https://ui-avatars.com/api/?name=Dr+Sarah&background=4CAF50&color=fff'
+        },
+        {
+            id: 'mental_wellness',
+            name: 'Guide Maya',
+            tagline: 'Mental Wellness Guide for stress and mindfulness',
+            avatarUrl: 'https://ui-avatars.com/api/?name=Guide+Maya&background=9C27B0&color=fff'
+        }
+    ];
+
+    res.json({ success: true, characters });
+});
 
 module.exports = {
     startConversation,
     loadConversations,
     startPPLXConversation,
-}
+    getCharacters,
+};
