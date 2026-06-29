@@ -380,7 +380,12 @@ module.exports.login = expressAsyncHandler(async (req, res) => {
 
     await loginUser(user, refreshToken, fcmToken);
 
-    const isMobile = req.headers['x-client-type'] === 'mobile';
+    const userAgent = req.headers['user-agent']?.toLowerCase() || '';
+    const isMobile = req.headers['x-client-type']?.toLowerCase() === 'mobile' || 
+                     userAgent.includes('okhttp') || 
+                     userAgent.includes('dart') ||
+                     userAgent.includes('alamofire') ||
+                     userAgent.includes('cfnetwork');
 
     if (!isMobile) {
       res.cookie("accessToken", accessToken, {

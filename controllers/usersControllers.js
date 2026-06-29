@@ -184,7 +184,13 @@ module.exports.login = expressAsyncHandler(async (req, res) => {
   console.log("Login Request Headers:", req.headers);
   console.log("X-Client-Type received:", req.headers['x-client-type']);
 
-  const isMobile = req.headers['x-client-type']?.toLowerCase() === 'mobile';
+  const userAgent = req.headers['user-agent']?.toLowerCase() || '';
+  const isMobile = req.headers['x-client-type']?.toLowerCase() === 'mobile' || 
+                   userAgent.includes('okhttp') || 
+                   userAgent.includes('dart') ||
+                   userAgent.includes('alamofire') ||
+                   userAgent.includes('cfnetwork');
+                   
   console.log("isMobile evaluated to:", isMobile);
 
   if (!isMobile) {
