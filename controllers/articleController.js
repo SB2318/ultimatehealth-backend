@@ -175,7 +175,7 @@ module.exports.getAllArticles = expressAsyncHandler(
 
       const skip = (Number(page) - 1) * parseInt(limit);
 
-      const articles = await Article.find(query)
+      let articles = await Article.find(query)
         .populate('tags')
         //.populate('mentionedUsers', 'user_handle user_name Profile_image')
         .populate({
