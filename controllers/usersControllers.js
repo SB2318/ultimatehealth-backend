@@ -181,7 +181,11 @@ module.exports.login = expressAsyncHandler(async (req, res) => {
 
   await loginUser(user._id, refreshToken, jti, fcmToken);
 
+  console.log("Login Request Headers:", req.headers);
+  console.log("X-Client-Type received:", req.headers['x-client-type']);
+
   const isMobile = req.headers['x-client-type']?.toLowerCase() === 'mobile';
+  console.log("isMobile evaluated to:", isMobile);
 
   if (!isMobile) {
     res.cookie("refreshToken", refreshToken, {
