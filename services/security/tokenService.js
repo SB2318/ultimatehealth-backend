@@ -153,8 +153,9 @@ const verifyToken = (token) => {
 
 
 const hashToken = (token) => {
+    const secret = process.env.TOKEN_SECRET || "fallback_default_secret_key_123";
     return crypto
-        .createHmac('sha256', process.env.TOKEN_SECRET)
+        .createHmac('sha256', secret)
         .update(token)
         .digest('hex');
 };
