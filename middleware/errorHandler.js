@@ -64,7 +64,10 @@ function errorHandler(err, req, res, _next) {
     // }
   }
 
-  console.log(err);
+  if (statusCode === 500) {
+    console.error(err);
+  }
+  
   // ── Production Safety ────────────────────────────────────
   if (process.env.NODE_ENV === "PRODUCTION" && !isAppError(err)) {
     message = "Internal server error";
