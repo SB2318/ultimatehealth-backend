@@ -181,7 +181,7 @@ module.exports.login = expressAsyncHandler(async (req, res) => {
 
   await loginUser(user._id, refreshToken, jti, fcmToken);
 
-  const isMobile = req.headers['x-client-type'] === 'mobile';
+  const isMobile = req.headers['x-client-type']?.toLowerCase() === 'mobile';
 
   if (!isMobile) {
     res.cookie("refreshToken", refreshToken, {
@@ -192,6 +192,11 @@ module.exports.login = expressAsyncHandler(async (req, res) => {
     });
   }
 
+  const accessToken = generateAccessToken({
+    userId: user._id,
+    role: user.isDoctor ? "doctor" : "user",
+  });
+
   const responsePayload = {
     user: {
       _id: user._id,
@@ -200,7 +205,8 @@ module.exports.login = expressAsyncHandler(async (req, res) => {
       isDoctor: user.isDoctor,
       isVerified: user.isVerified,
       user_handle: user.user_handle,
-    }
+    },
+    accessToken
   };
 
   if (isMobile) {
