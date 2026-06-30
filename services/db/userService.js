@@ -149,40 +149,158 @@ const getMyProfile = async (userId) => {
         .lean()
 }
 
-const getPublicProfile = async (userId, userHandle) => {
-    const ARTICLE_SELECT =
-        '_id title slug coverImage createdAt status tags author'
+// const getPublicProfile = async (userId, userHandle) => {
+//     const ARTICLE_SELECT =
+//         '_id title slug coverImage createdAt status tags author'
 
-    const TAG_POPULATE = {
-        path: 'tags',
-        select: '_id name slug',
-    }
+//     const TAG_POPULATE = {
+//         path: 'tags',
+//         select: '_id name slug',
+//     }
+
+//     const USER_PUBLIC_SELECT = `
+//   _id
+//   user_id
+//   user_name
+//   user_handle
+//   isDoctor
+//   specialization
+//   qualification
+//   Years_of_experience
+//   contact_detail
+//   Profile_image
+//   followers
+//   followings
+//   followerCount
+//   followingCount
+//   articles
+//   repostArticles
+//   improvements
+//   isBlockUser
+//   isBannedUser
+// `
+
+//     const query = userId
+//         ? User.findById(userId)
+//         : User.findOne({ user_handle: userHandle })
+//     const user = await query
+//         .select(USER_PUBLIC_SELECT)
+//         .populate([
+//             {
+//                 path: 'articles',
+//                 match: { status: 'published' },
+//                 select: ARTICLE_SELECT,
+//                 options: { sort: { createdAt: -1 }, limit: 10 },
+//                 populate: TAG_POPULATE,
+//             },
+//             {
+//                 path: 'repostArticles',
+//                 select: ARTICLE_SELECT,
+//                 options: { sort: { createdAt: -1 }, limit: 10 },
+//                 populate: TAG_POPULATE,
+//             },
+//             {
+//                 path: 'improvements',
+//                 select: ARTICLE_SELECT,
+//                 options: { sort: { createdAt: -1 }, limit: 10 },
+//                 populate: TAG_POPULATE,
+//             },
+//         ])
+//         .lean()
+
+//     if (!user) return null
+
+//     if (user.isBlockUser || user.isBannedUser) {
+//         throwError(
+//             HTTP_STATUS.FORBIDDEN,
+//             ERROR_CODES.ACCESS_DENIED,
+//             'User is blocked or banned'
+//         )
+//     }
+
+//     if (!user.isDoctor) {
+//         delete user.specialization
+//         delete user.qualification
+//         delete user.Years_of_experience
+//     }
+//     delete user.isBannedUser
+//     delete user.isBlockUser
+
+//     return user
+// }
+
+const getPublicProfile = async (userId, userHandle) => {
+    const ARTICLE_SELECT = `
+        _id
+        title
+        slug
+        coverImage
+        createdAt
+        status
+        tags
+        author
+        authorId
+        mentionedUsers
+        likedUsers
+    `
+
+    const ARTICLE_POPULATE = [
+        {
+            path: 'tags',
+            select: '_id name slug',
+        },
+        {
+            path: 'mentionedUsers',
+            select: 'user_handle user_name Profile_image',
+            match: {
+                isBlockUser: false,
+                isBannedUser: false,
+            },
+        },
+        {
+            path: 'likedUsers',
+            select: 'Profile_image user_name user_handle',
+            match: {
+                isBlockUser: false,
+                isBannedUser: false,
+            },
+        },
+        {
+            path: 'authorId',
+            select: 'Profile_image user_name user_handle',
+            match: {
+                isBlockUser: false,
+                isBannedUser: false,
+            },
+        },
+    ]
 
     const USER_PUBLIC_SELECT = `
-  _id
-  user_id
-  user_name
-  user_handle
-  isDoctor
-  specialization
-  qualification
-  Years_of_experience
-  contact_detail
-  Profile_image
-  followers
-  followings
-  followerCount
-  followingCount
-  articles
-  repostArticles
-  improvements
-  isBlockUser
-  isBannedUser
-`
+        _id
+        user_id
+        user_name
+        user_handle
+        isDoctor
+        specialization
+        qualification
+        Years_of_experience
+        contact_detail
+        Profile_image
+        followers
+        followings
+        followerCount
+        followingCount
+        articles
+        repostArticles
+        improvements
+        isBlockUser
+        isBannedUser
+    `
 
     const query = userId
         ? User.findById(userId)
         : User.findOne({ user_handle: userHandle })
+
     const user = await query
         .select(USER_PUBLIC_SELECT)
         .populate([
@@ -191,19 +309,19 @@ const getPublicProfile = async (userId, userHandle) => {
                 match: { status: 'published' },
                 select: ARTICLE_SELECT,
                 options: { sort: { createdAt: -1 }, limit: 10 },
-                populate: TAG_POPULATE,
+                populate: ARTICLE_POPULATE,
             },
             {
                 path: 'repostArticles',
                 select: ARTICLE_SELECT,
                 options: { sort: { createdAt: -1 }, limit: 10 },
-                populate: TAG_POPULATE,
+                populate: ARTICLE_POPULATE,
             },
             {
                 path: 'improvements',
                 select: ARTICLE_SELECT,
                 options: { sort: { createdAt: -1 }, limit: 10 },
-                populate: TAG_POPULATE,
+                populate: ARTICLE_POPULATE,
             },
         ])
         .lean()
@@ -223,12 +341,12 @@ const getPublicProfile = async (userId, userHandle) => {
         delete user.qualification
         delete user.Years_of_experience
     }
+
     delete user.isBannedUser
     delete user.isBlockUser
 
     return user
 }
-
 const checkExistingUser = async ({ email, user_handle }) => {
     const existingUser = await User.exists({
         $or: [{ email }, { user_handle }],

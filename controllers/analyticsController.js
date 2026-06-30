@@ -109,42 +109,102 @@ module.exports.getTotalLikeAndViewReceivedByUser = expressAsyncHandler(
   }
 )
 
-module.exports.getMostViewedArticles = expressAsyncHandler(
+// module.exports.getMostViewedArticles = expressAsyncHandler(
 
-  async (req, res) => {
+//   async (req, res) => {
 
-    const { userId } = req.params;
+//     const { userId } = req.params;
 
-    if (!userId) {
-      res.status(400).json({ message: 'user id is required' });
-    }
-    try {
+//     if (!userId) {
+//       res.status(400).json({ message: 'user id is required' });
+//     }
+//     try {
 
-      const user = await User.findById(userId)
-        //.sort({ 'viewUsers.length': -1 }) // Sort by viewCount in descending order
-        //.limit(5)
-        .populate('articles')
-        .select('imageUtils title viewUsers lastUpdated')
-        .exec();
+//       const user = await User.findById(userId)
+//         //.sort({ 'viewUsers.length': -1 }) // Sort by viewCount in descending order
+//         //.limit(5)
+//         .populate('articles')
+//         .select('imageUtils title viewUsers lastUpdated')
+//         .exec();
 
-      if (!user) {
-        return res.status(404).json({ message: 'User not found' });
-      }
+//       if (!user) {
+//         return res.status(404).json({ message: 'User not found' });
+//       }
 
-      const sortedArticles = (user.articles || []).sort((a, b) => (b.viewUsers?.length || 0) - (a.viewUsers?.length || 0));
+//       const sortedArticles = (user.articles || []).sort((a, b) => (b.viewUsers?.length || 0) - (a.viewUsers?.length || 0));
 
-      // Limit to top 5 articles
-      const topArticles = sortedArticles.slice(0, 5);
+//       // Limit to top 5 articles
+//       const topArticles = sortedArticles.slice(0, 5);
 
-      return res.status(200).json(topArticles);
+//       return res.status(200).json(topArticles);
 
-    } catch (err) {
-      console.log('Most View Article Error', err);
+//     } catch (err) {
+//       console.log('Most View Article Error', err);
 
-    }
+//     }
+//   }
+// )
+
+module.exports.getMostViewedArticles = expressAsyncHandler(async (req, res) => {
+  const { userId } = req.params;
+
+  if (!userId) {
+    return res.status(400).json({ message: 'user id is required' });
   }
-)
 
+  try {
+    const user = await User.findById(userId)
+      .populate({
+        path: 'articles',
+        populate: [
+          {
+            path: 'tags',
+          },
+          {
+            path: 'mentionedUsers',
+            select: 'user_handle user_name Profile_image',
+            match: {
+              isBlockUser: false,
+              isBannedUser: false,
+            },
+          },
+          {
+            path: 'likedUsers',
+            select: 'Profile_image user_name user_handle',
+            match: {
+              isBlockUser: false,
+              isBannedUser: false,
+            },
+          },
+          {
+            path: 'authorId',
+            select: 'Profile_image user_name user_handle',
+            match: {
+              isBlockUser: false,
+              isBannedUser: false,
+            },
+          },
+        ],
+      })
+      .exec();
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const sortedArticles = (user.articles || []).sort(
+      (a, b) => (b.viewUsers?.length || 0) - (a.viewUsers?.length || 0)
+    );
+
+
+    const topArticles = sortedArticles.slice(0, 5);
+
+    return res.status(200).json(topArticles);
+  } catch (err) {
+    console.log('Most View Article Error', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+});
 exports.getDailyReadDataForGraphs = expressAsyncHandler(
   async (req, res) => {
     //const { userId } = req.user;
