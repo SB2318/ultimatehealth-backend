@@ -235,9 +235,7 @@ module.exports.getprofile = expressAsyncHandler(async (req, res) => {
       "User not found",
     );
   }
-  sendSuccess(res, HTTP_STATUS.OK, "User profile fetched successfully.", {
-    user,
-  });
+  sendSuccess(res, HTTP_STATUS.OK, "User profile fetched successfully.", user);
 });
 
 module.exports.getUserProfile = expressAsyncHandler(async (req, res) => {
