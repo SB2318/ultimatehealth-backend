@@ -673,8 +673,8 @@ module.exports.follow = expressAsyncHandler(async (req, res) => {
   }
 
   const isAlreadyFollowing = user.followings
-    ?.map((id) => Number(id))
-    .includes(Number(userToFollow._id));
+    ?.map((id) => id.toString())
+    .includes(userToFollow._id.toString());
 
   if (isAlreadyFollowing) {
     await unfollowUser(user._id, userToFollow._id);
