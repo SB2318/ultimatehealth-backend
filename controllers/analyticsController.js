@@ -156,6 +156,7 @@ module.exports.getMostViewedArticles = expressAsyncHandler(async (req, res) => {
     const user = await User.findById(userId)
       .populate({
         path: 'articles',
+        match: { is_removed: false, status: 'published' },
         populate: [
           {
             path: 'tags',
