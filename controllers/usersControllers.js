@@ -314,6 +314,7 @@ module.exports.sendOTPForForgotPassword = expressAsyncHandler(
       const successMessage =
         "If an account exists, OTP has been sent to your email.";
 
+        console.log("Account found:", account);
       if (!account) {
         return sendSuccess(res, HTTP_STATUS.OK, successMessage);
       }

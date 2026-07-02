@@ -834,18 +834,19 @@ const deleteImprovementRecordFromPocketbase = expressAsyncHandler(
 
             const pb = await getPocketbaseClient();
             await authenticateAdmin(pb);
-
+            // edit_requests
+            // content
 
             let improvementRecord;
             try {
                 improvementRecord = await pb.collection('edit_requests').getOne(record_id);
             } catch (err) {
-                return;
+                return res.status(404).json({ message: 'Record not found in edit_requests' });
             }
             // const improvementRecord = await pb.collection('edit_requests').getOne(record_id);
 
             if (!improvementRecord) {
-                return res.status(404).json({ message: 'Record not found' });
+                return res.status(404).json({ message: 'Record not found in edit_requests' });
             }
 
             // delete record
