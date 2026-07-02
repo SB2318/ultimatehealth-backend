@@ -332,7 +332,11 @@ module.exports.sendOTPForForgotPassword = expressAsyncHandler(
         Date.now() - new Date(account.otpLastSentAt).getTime() < cooldownMs
       ) {
         console.log(`OTP resend requested too soon for ${email}`);
-        return sendSuccess(res, HTTP_STATUS.OK, successMessage);
+        throwError(
+          429,
+          "TOO_MANY_REQUESTS",
+          "Please wait before requesting a new OTP."
+        );
       }
 
       const otp = generateOtp(); // 6 digit
