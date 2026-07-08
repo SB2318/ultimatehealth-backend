@@ -29,6 +29,8 @@ const router = express.Router();
  *               type: number
  *             caloriesBurned:
  *               type: number
+ *             breathingSessionMinutes:
+ *               type: number
  *         createdAt:
  *           type: string
  *           format: date-time
@@ -66,6 +68,9 @@ const router = express.Router();
  *                   sleepHours:
  *                     type: number
  *                     example: 7.5
+ *                   breathingSessionMinutes:
+ *                     type: number
+ *                     example: 5
  *     responses:
  *       200:
  *         description: Successfully logged metrics

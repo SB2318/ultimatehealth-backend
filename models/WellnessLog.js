@@ -31,6 +31,10 @@ const wellnessLogSchema = new mongoose.Schema({
         caloriesBurned: {
             type: Number,
             default: 0
+        },
+        breathingSessionMinutes: {
+            type: Number,
+            default: 0
         }
     },
     createdAt: {
