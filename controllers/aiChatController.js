@@ -1,10 +1,10 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
 const expressAsyncHandler = require("express-async-handler");
 const dotenv = require('dotenv');
 
 const User = require('../models/UserModel');
 const Conversation = require('../models/ai/Conversation');
 const Message = require('../models/ai/Message');
+const { generateWithKeyRotation } = require('../services/geminiService');
 
 dotenv.config();
 
@@ -12,15 +12,6 @@ const PPLX_URL = "https://api.perplexity.ai/chat/completions";
 const MODEL = "sonar-pro";
 
 const MAX_DAY_LIMIT = 5;
-
-// Fallback across 5 API keys for robustness
-const geminiKeys = [
-    process.env.GEMINI_API_KEY_1 || process.env.GEMINI_API_KEY,
-    process.env.GEMINI_API_KEY_2,
-    process.env.GEMINI_API_KEY_3,
-    process.env.GEMINI_API_KEY_4,
-    process.env.GEMINI_API_KEY_5
-].filter(Boolean);
 
 // Character configurations
 const characterPrompts = {
@@ -107,28 +98,11 @@ async function generateReplyWithRotation(history, character) {
 
     const systemInstruction = characterPrompts[character] || characterPrompts['general'];
 
-    for (let i = 0; i < geminiKeys.length; i++) {
-        try {
-            const genAI = new GoogleGenerativeAI(geminiKeys[i]);
-            const model = genAI.getGenerativeModel({ 
-                model: "gemini-2.5-flash",
-                systemInstruction: systemInstruction 
-            });
-            
-            const chat = model.startChat({
-                history: formattedMessages
-            });
-
-            const result = await chat.sendMessage("Continue the conversation");
-            return result.response.text();
-        } catch (err) {
-            console.error(`Gemini key ${i+1} failed:`, err.message);
-            // If it's the last key, throw the error
-            if (i === geminiKeys.length - 1) {
-                throw new Error("All AI API keys exhausted or rate limited.");
-            }
-        }
-    }
+    return generateWithKeyRotation({
+        systemInstruction,
+        history: formattedMessages,
+        message: "Continue the conversation",
+    });
 }
 
 const startPPLXConversation = expressAsyncHandler(async (req, res) => {
