@@ -40,6 +40,7 @@ const aiRoute = require('./routes/aiRoute');
 const shareRoute = require('./routes/shareRoute');
 const contactRoutes = require('./routes/contactRoutes');
 const newsletterRoutes = require('./routes/newsletterRoutes');
+const wellnessRoutes = require('./routes/wellnessRoute');
 const {
     sendPostNotification,
     sendPostLikeNotification,
@@ -111,6 +112,7 @@ app.use("/api/gemini", aiRoute);
 app.use("/api", shareRoute );
 app.use("/api", contactRoutes);
 app.use("/api", newsletterRoutes);
+app.use("/api/wellness", wellnessRoutes);
 
 // Swagger
 //app.use('/docs/swagger.json', express.static('./swagger.json'));
