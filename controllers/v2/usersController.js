@@ -245,30 +245,52 @@ module.exports.sendOTPForForgotPassword = expressAsyncHandler(
 );
 
 module.exports.verifyOtpForForgotPassword = expressAsyncHandler(
-  async (req, res) => {
-    const { email, newPassword } = req.body;
-    const user = await findUserByEmail(email);
-    if (!user) {
-      throwError(
-        HTTP_STATUS.NOT_FOUND,
-        ERROR_CODES.RESOURCE_NOT_FOUND,
-        "User not found",
-      );
+    async (req, res) => {
+        const { email, otp, newPassword } = req.body
+
+        if (!email || !otp || !newPassword) {
+            throwError(
+                HTTP_STATUS.BAD_REQUEST,
+                ERROR_CODES.VALIDATION_ERROR,
+                'Email, OTP, and new password are required.'
+            )
+        }
+
+        const user = await findUserByEmail(email)
+        if (!user) {
+            throwError(
+                HTTP_STATUS.NOT_FOUND,
+                ERROR_CODES.RESOURCE_NOT_FOUND,
+                'User not found'
+            )
+        }
+
+        // Verify OTP
+        const hashedInput = await hashToken(otp)
+        if (hashedInput !== user.otp || user.otpExpires < Date.now()) {
+            throwError(
+                HTTP_STATUS.BAD_REQUEST,
+                ERROR_CODES.VALIDATION_ERROR,
+                'Invalid or expired OTP.'
+            )
+        }
+
+        const isPasswordSame = await isSamePassword(user.password, newPassword)
+        if (isPasswordSame) {
+            throwError(
+                HTTP_STATUS.BAD_REQUEST,
+                ERROR_CODES.VALIDATION_ERROR,
+                'New password should not be same as old password.'
+            )
+        }
+
+        // Clear used OTP
+        await updateUserOtp(user, null, null)
+
+        await updateUserPassword(user, newPassword)
+
+        sendSuccess(res, HTTP_STATUS.OK, 'Password reset successful.')
     }
-    const isPasswordSame = await isSamePassword(user.password, newPassword);
-
-    if (isPasswordSame) {
-      throwError(
-        HTTP_STATUS.BAD_REQUEST,
-        ERROR_CODES.VALIDATION_ERROR,
-        "New password should not be same as old password.",
-      );
-    }
-
-    await updateUserPassword(user, newPassword);
-
-    sendSuccess(res, HTTP_STATUS.OK, "Password reset successful.");
-  },
 );
 
 module.exports.checkOtp = expressAsyncHandler(async (req, res) => {
