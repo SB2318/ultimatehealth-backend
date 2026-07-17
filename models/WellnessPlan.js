@@ -12,24 +12,51 @@ const wellnessPlanSchema = new mongoose.Schema({
         default: true
     },
     goals: {
+        // Movement
         dailySteps: {
-            type: Number,
-            default: 0
-        },
-        dailyWaterMl: {
-            type: Number,
-            default: 0
-        },
-        dailySleepHours: {
             type: Number,
             default: 0
         },
         dailyActiveMinutes: {
             type: Number,
             default: 0
+        },
+        dailyCaloriesBurned: {
+            type: Number,
+            default: 0
+        },
+        // Recovery & Rest
+        dailySleepHours: {
+            type: Number,
+            default: 0
+        },
+        dailyBreathingMinutes: {
+            type: Number,
+            default: 0
+        },
+        // Nutrition & Hydration
+        dailyWaterMl: {
+            type: Number,
+            default: 0
         }
     },
+    // 7 specific, actionable daily tasks across all wellness domains
     dailyTasks: {
+        type: [String],
+        default: []
+    },
+    // Top 2 clinical domains that need the most improvement this week
+    focusAreas: {
+        type: [String],
+        default: []
+    },
+    // 1-2 sentence clinical rationale explaining the plan's primary focus
+    weeklyInsight: {
+        type: String,
+        default: ''
+    },
+    // Clinical warnings (e.g. severely low sleep, sedentary risk). Empty if no concerns.
+    warnings: {
         type: [String],
         default: []
     },
@@ -60,3 +87,4 @@ wellnessPlanSchema.pre('save', function(next) {
 const WellnessPlan = mongoose.model('WellnessPlan', wellnessPlanSchema);
 
 module.exports = WellnessPlan;
+
