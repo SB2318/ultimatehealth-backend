@@ -1,14 +1,5 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-// Fallback across 5 API keys for robustness
-const geminiKeys = [
-    process.env.GEMINI_API_KEY_1 || process.env.GEMINI_API_KEY,
-    process.env.GEMINI_API_KEY_2,
-    process.env.GEMINI_API_KEY_3,
-    process.env.GEMINI_API_KEY_4,
-    process.env.GEMINI_API_KEY_5
-].filter(Boolean);
-
 /**
  * Sends a single message to Gemini, rotating across all configured API keys
  * until one succeeds. Shared by aiChatController and wellnessController so
@@ -27,6 +18,15 @@ async function generateWithKeyRotation({
     history = [],
     message,
 }) {
+    // Evaluate keys dynamically so dotenv.config() in index.js has time to run
+    const geminiKeys = [
+        process.env.GEMINI_API_KEY_1 || process.env.GEMINI_API_KEY,
+        process.env.GEMINI_API_KEY_2,
+        process.env.GEMINI_API_KEY_3,
+        process.env.GEMINI_API_KEY_4,
+        process.env.GEMINI_API_KEY_5
+    ].filter(Boolean);
+
     if (geminiKeys.length === 0) {
         throw new Error("No Gemini API keys configured.");
     }
@@ -51,4 +51,4 @@ async function generateWithKeyRotation({
     }
 }
 
-module.exports = { generateWithKeyRotation, geminiKeys };
+module.exports = { generateWithKeyRotation };

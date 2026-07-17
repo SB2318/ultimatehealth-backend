@@ -136,7 +136,8 @@ app.get("/hello", (req, res) => {
     res.send('Hello World');
 });
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, "public", "home.html"));
+    //res.sendFile(path.join(__dirname, "public", "home.html"));
+    res.redirect(302, 'https://uhsocial.in/frontend/v2');
 });
 
 app.get('/.well-known/assetlinks.json', (req, res) => {
