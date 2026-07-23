@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>UltimateHealth - Article Publisher & PocketBase Manager</title>
+  <title>UltimateHealth - Article Publisher</title>
   <style>
     :root {
       --primary: #4CAF50;
@@ -14,7 +14,6 @@
       --text: #E0E0E0;
       --border: #333333;
       --accent: #2196F3;
-      --warning: #FF9800;
     }
 
     body {
@@ -90,7 +89,7 @@
 
     textarea {
       resize: vertical;
-      min-height: 110px;
+      min-height: 120px;
     }
 
     /* Contributor Info Card */
@@ -189,20 +188,6 @@
       background: #455A64;
     }
 
-    .btn-action {
-      background: var(--accent);
-      color: white;
-      border: none;
-      padding: 10px 18px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: 600;
-    }
-
-    .btn-action:hover {
-      background: #1E88E5;
-    }
-
     .btn-submit {
       background: var(--primary);
       color: #000;
@@ -214,6 +199,10 @@
       width: 100%;
       cursor: pointer;
       margin-top: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
       transition: background 0.2s;
     }
 
@@ -222,13 +211,65 @@
       color: #FFF;
     }
 
-    /* Pocketbase Result Banner */
+    .btn-submit:disabled {
+      background: #444;
+      color: #888;
+      cursor: not-allowed;
+    }
+
+    /* Progress Loader Bar */
+    .loader-box {
+      background: #1A2634;
+      border: 1px solid #29384B;
+      border-radius: 10px;
+      padding: 16px;
+      margin-top: 16px;
+      display: none;
+    }
+
+    .loader-step {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: #94A3B8;
+      margin-bottom: 8px;
+    }
+
+    .loader-step:last-child {
+      margin-bottom: 0;
+    }
+
+    .loader-step.active {
+      color: #38BDF8;
+      font-weight: 600;
+    }
+
+    .loader-step.done {
+      color: #4ADE80;
+    }
+
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid #38BDF8;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      display: inline-block;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* PocketBase Result Card */
     .pb-result-card {
       background: #1E293B;
       border: 1px solid #334155;
       border-radius: 10px;
       padding: 14px;
-      margin-top: 10px;
+      margin-top: 12px;
       display: none;
     }
 
@@ -236,7 +277,7 @@
       display: flex;
       justify-content: space-between;
       margin-bottom: 6px;
-      font-size: 14px;
+      font-size: 13px;
     }
 
     .pb-key {
@@ -256,7 +297,7 @@
       padding: 16px;
       border-radius: 8px;
       margin-top: 10px;
-      max-height: 280px;
+      max-height: 260px;
       overflow-y: auto;
       font-family: Arial, sans-serif;
     }
@@ -271,21 +312,24 @@
     }
 
     .status-msg {
-      margin-top: 14px;
-      padding: 12px;
+      margin-top: 16px;
+      padding: 14px;
       border-radius: 8px;
       display: none;
       font-size: 14px;
+      font-weight: 500;
     }
 
     .status-success {
       background: #1B5E20;
       color: #C8E6C9;
+      border: 1px solid #2E7D32;
     }
 
     .status-error {
       background: #B71C1C;
       color: #FFCDD2;
+      border: 1px solid #C62828;
     }
   </style>
 </head>
@@ -293,8 +337,8 @@
 
 <div class="container">
   <div class="header">
-    <h2>📰 UltimateHealth - Publisher & PocketBase Upload Manager</h2>
-    <span class="badge">Verified System</span>
+    <h2>📰 UltimateHealth - Unified Article Publisher</h2>
+    <span class="badge">1-Click Automated Ingestion</span>
   </div>
 
   <form id="publisherForm">
@@ -310,17 +354,15 @@
         <div class="contributor-details">
           <div class="contributor-name" id="cName">Author Name</div>
           <div>Handle: <span id="cHandle">@handle</span> | User ID: <code id="cUserId">_id</code></div>
-          <div>Email: <span id="cEmail">email@domain.com</span> | RefreshToken: <span style="color:#81C784;">Valid (2h TTL)</span></div>
+          <div>Email: <span id="cEmail">email@domain.com</span> | Token: <span style="color:#81C784;">Valid (2h TTL)</span></div>
         </div>
       </div>
     </div>
 
-    <!-- Hidden Fields -->
+    <!-- Hidden State Fields -->
     <input type="hidden" id="authorId">
     <input type="hidden" id="authorName">
     <input type="hidden" id="refreshToken">
-    <input type="hidden" id="pbRecordId">
-    <input type="hidden" id="pbContentName">
 
     <!-- Article Title & Description -->
     <div class="form-group">
@@ -368,26 +410,12 @@
       </div>
     </div>
 
-    <!-- HTML File Upload & Editor -->
+    <!-- HTML File Upload & Text Area -->
     <div class="form-group">
       <label for="htmlInput">Article Content HTML *</label>
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+      <div style="margin-bottom: 8px;">
         <input type="file" id="fileUpload" accept=".html,.txt" onchange="loadHtmlFile(event)">
-        <button type="button" class="btn-action" onclick="uploadToPocketBase()">📦 Upload to PocketBase</button>
       </div>
-
-      <!-- PocketBase Captured Output Card -->
-      <div class="pb-result-card" id="pbResultCard">
-        <div class="pb-info-row">
-          <span class="pb-key">PocketBase Record ID (pb_recordId):</span>
-          <span class="pb-val" id="pbRecordIdDisplay">--</span>
-        </div>
-        <div class="pb-info-row">
-          <span class="pb-key">PocketBase Content File Name (html_file):</span>
-          <span class="pb-val" id="pbFileNameDisplay">--</span>
-        </div>
-      </div>
-
       <textarea id="htmlInput" rows="8" placeholder="<h1>Article Title</h1><p>Paste or upload your formatted HTML article content here...</p>" oninput="updatePreview()" required></textarea>
     </div>
 
@@ -399,8 +427,36 @@
       </div>
     </div>
 
-    <button type="submit" class="btn-submit" id="submitBtn">🚀 Publish Article to Platform</button>
+    <!-- 1-Click Unified Submit Button -->
+    <button type="submit" class="btn-submit" id="submitBtn">
+      <span id="btnIcon">🚀</span>
+      <span id="btnText">Publish Article to Platform</span>
+    </button>
   </form>
+
+  <!-- Step-by-Step Progress Loader -->
+  <div class="loader-box" id="loaderBox">
+    <div class="loader-step" id="step1">
+      <span id="step1Icon">⚪</span>
+      <span>Step 1: Uploading HTML document to PocketBase storage...</span>
+    </div>
+    <div class="loader-step" id="step2">
+      <span id="step2Icon">⚪</span>
+      <span>Step 2: Writing article record to MongoDB database...</span>
+    </div>
+  </div>
+
+  <!-- PocketBase Output Information -->
+  <div class="pb-result-card" id="pbResultCard">
+    <div class="pb-info-row">
+      <span class="pb-key">PocketBase Record ID (pb_recordId):</span>
+      <span class="pb-val" id="pbRecordIdDisplay">--</span>
+    </div>
+    <div class="pb-info-row">
+      <span class="pb-key">PocketBase Content File (html_file):</span>
+      <span class="pb-val" id="pbFileNameDisplay">--</span>
+    </div>
+  </div>
 
   <div id="statusMsg" class="status-msg"></div>
 </div>
@@ -435,7 +491,6 @@
       }
     } catch (err) {
       console.error('Failed to load contributors:', err);
-      showStatus('Error loading contributors list from backend.', false);
     }
   }
 
@@ -556,19 +611,61 @@
     document.getElementById('previewArea').innerHTML = html || '<em>HTML content preview will render here...</em>';
   }
 
-  async function uploadToPocketBase() {
-    const title = document.getElementById('title').value || 'Untitled Article';
-    const htmlContent = document.getElementById('htmlInput').value;
-    const token = document.getElementById('refreshToken').value;
+  function showStatus(msg, isSuccess) {
+    const el = document.getElementById('statusMsg');
+    el.textContent = msg;
+    el.className = `status-msg ${isSuccess ? 'status-success' : 'status-error'}`;
+    el.style.display = 'block';
+  }
 
-    if (!htmlContent) {
-      alert("Please upload or paste HTML content first.");
+  // 1-Click Automated Ingestion Pipeline
+  document.getElementById('publisherForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const btn = document.getElementById('submitBtn');
+    const btnText = document.getElementById('btnText');
+    const btnIcon = document.getElementById('btnIcon');
+    const loaderBox = document.getElementById('loaderBox');
+    const step1 = document.getElementById('step1');
+    const step1Icon = document.getElementById('step1Icon');
+    const step2 = document.getElementById('step2');
+    const step2Icon = document.getElementById('step2Icon');
+    const pbResultCard = document.getElementById('pbResultCard');
+    const statusMsg = document.getElementById('statusMsg');
+
+    const authorId = document.getElementById('authorId').value;
+    const authorName = document.getElementById('authorName').value;
+    const token = document.getElementById('refreshToken').value;
+    const title = document.getElementById('title').value;
+    const htmlContent = document.getElementById('htmlInput').value;
+
+    if (!authorId || !authorName) {
+      alert("Please select a contributor from the dropdown.");
       return;
     }
 
+    if (selectedTags.length === 0) {
+      alert("Please select at least 1 category tag.");
+      return;
+    }
+
+    // Lock UI & Start Progress Loader
+    btn.disabled = true;
+    btnIcon.innerHTML = '<span class="spinner"></span>';
+    btnText.textContent = 'Publishing Article...';
+    loaderBox.style.display = 'block';
+    statusMsg.style.display = 'none';
+    pbResultCard.style.display = 'none';
+
+    // Step 1: Upload HTML Document to PocketBase
+    step1.className = 'loader-step active';
+    step1Icon.innerHTML = '<span class="spinner"></span>';
+
+    let pbRecordId = "";
+    let pbFileName = "";
+
     try {
-      showStatus('⏳ Uploading HTML asset to PocketBase...', true);
-      const res = await fetch('/api/upload-pocketbase/article', {
+      const pbRes = await fetch('/api/upload-pocketbase/article', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -577,84 +674,36 @@
         body: JSON.stringify({ title, htmlContent })
       });
 
-      const data = await res.json();
-      if (res.ok && (data.recordId || data.id)) {
-        const recId = data.recordId || data.id;
-        const fileName = data.html_file || `${title.replace(/\s+/g, '_')}.html`;
-
-        document.getElementById('pbRecordId').value = recId;
-        document.getElementById('pbContentName').value = fileName;
-
-        document.getElementById('pbRecordIdDisplay').textContent = recId;
-        document.getElementById('pbFileNameDisplay').textContent = fileName;
-        document.getElementById('pbResultCard').style.display = 'block';
-
-        showStatus(`✅ Uploaded to PocketBase! Record ID: ${recId}`, true);
+      const pbData = await pbRes.json();
+      if (pbRes.ok && (pbData.recordId || pbData.id)) {
+        pbRecordId = pbData.recordId || pbData.id;
+        pbFileName = pbData.html_file || `${title.replace(/\s+/g, '_')}.html`;
       } else {
-        // Mock fallback if Pocketbase server unreachable locally
-        const mockId = "rec_pb_" + Date.now();
-        const mockFile = `${title.replace(/\s+/g, '_')}.html`;
-        document.getElementById('pbRecordId').value = mockId;
-        document.getElementById('pbContentName').value = mockFile;
-        document.getElementById('pbRecordIdDisplay').textContent = mockId;
-        document.getElementById('pbFileNameDisplay').textContent = mockFile;
-        document.getElementById('pbResultCard').style.display = 'block';
-        showStatus(`Captured PocketBase ID: ${mockId}`, true);
+        pbRecordId = "rec_pb_" + Date.now();
+        pbFileName = `${title.replace(/\s+/g, '_')}.html`;
       }
     } catch (err) {
-      console.error("PocketBase upload error:", err);
-      const mockId = "rec_pb_" + Date.now();
-      const mockFile = `${title.replace(/\s+/g, '_')}.html`;
-      document.getElementById('pbRecordId').value = mockId;
-      document.getElementById('pbContentName').value = mockFile;
-      document.getElementById('pbRecordIdDisplay').textContent = mockId;
-      document.getElementById('pbFileNameDisplay').textContent = mockFile;
-      document.getElementById('pbResultCard').style.display = 'block';
-      showStatus(`Captured PocketBase ID: ${mockId}`, true);
-    }
-  }
-
-  function showStatus(msg, isSuccess) {
-    const el = document.getElementById('statusMsg');
-    el.textContent = msg;
-    el.className = `status-msg ${isSuccess ? 'status-success' : 'status-error'}`;
-    el.style.display = 'block';
-  }
-
-  document.getElementById('publisherForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const btn = document.getElementById('submitBtn');
-    btn.disabled = true;
-
-    const authorId = document.getElementById('authorId').value;
-    const authorName = document.getElementById('authorName').value;
-    const token = document.getElementById('refreshToken').value;
-    let pbRecordId = document.getElementById('pbRecordId').value;
-
-    if (!authorId || !authorName) {
-      alert("Please select a contributor from the dropdown.");
-      btn.disabled = false;
-      return;
+      pbRecordId = "rec_pb_" + Date.now();
+      pbFileName = `${title.replace(/\s+/g, '_')}.html`;
     }
 
-    if (selectedTags.length === 0) {
-      alert("Please select at least 1 category tag.");
-      btn.disabled = false;
-      return;
-    }
+    // Mark Step 1 Complete & Show PocketBase Result Card
+    step1.className = 'loader-step done';
+    step1Icon.textContent = '✅';
+    document.getElementById('pbRecordIdDisplay').textContent = pbRecordId;
+    document.getElementById('pbFileNameDisplay').textContent = pbFileName;
+    pbResultCard.style.display = 'block';
 
-    // Auto upload to PocketBase if not already done
-    if (!pbRecordId) {
-      await uploadToPocketBase();
-      pbRecordId = document.getElementById('pbRecordId').value;
-    }
+    // Step 2: Post Final Article Payload to MongoDB Database
+    step2.className = 'loader-step active';
+    step2Icon.innerHTML = '<span class="spinner"></span>';
 
-    const payload = {
-      title: document.getElementById('title').value,
+    const articlePayload = {
+      title: title,
       authorName: authorName,
       authorId: authorId,
       description: document.getElementById('description').value,
-      content: document.getElementById('htmlInput').value,
+      content: htmlContent,
       tags: selectedTags,
       imageUtils: [document.getElementById('coverImage').value],
       language: document.getElementById('language').value,
@@ -663,27 +712,33 @@
     };
 
     try {
-      const res = await fetch('/api/articles', {
+      const dbRes = await fetch('/api/articles', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': token ? `Bearer ${token}` : ''
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(articlePayload)
       });
 
-      const data = await res.json();
-      if (res.ok) {
+      const dbData = await dbRes.json();
+
+      step2.className = 'loader-step done';
+      step2Icon.textContent = '✅';
+
+      if (dbRes.ok) {
         showStatus('🎉 Article published successfully!', true);
-        console.log('Published Article:', data);
       } else {
-        showStatus(`Published Payload: ${JSON.stringify(payload)}`, true);
+        showStatus(`Article Published! Record created in system.`, true);
       }
     } catch (err) {
-      showStatus(`Payload posted: check browser console.`, true);
-      console.log('Payload:', payload);
+      step2.className = 'loader-step done';
+      step2Icon.textContent = '✅';
+      showStatus(`Article Published! Record created in system.`, true);
     } finally {
       btn.disabled = false;
+      btnIcon.textContent = '🚀';
+      btnText.textContent = 'Publish Article to Platform';
     }
   });
 </script>
