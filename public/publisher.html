@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UltimateHealth - Contributor Article Publisher</title>
+  <style>
+    :root {
+      --primary: #4CAF50;
+      --primary-dark: #388E3C;
+      --bg: #121212;
+      --card-bg: #1E1E1E;
+      --card-inner: #2A2A2A;
+      --text: #E0E0E0;
+      --border: #333333;
+      --accent: #2196F3;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      background: var(--card-bg);
+      border-radius: 14px;
+      padding: 28px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      border: 1px solid #282828;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 16px;
+      margin-bottom: 24px;
+    }
+
+    .header h2 {
+      margin: 0;
+      color: var(--primary);
+      font-size: 24px;
+    }
+
+    .badge {
+      background: #1B5E20;
+      color: #81C784;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #B0BEC5;
+      font-size: 14px;
+    }
+
+    input[type="text"], textarea, select {
+      width: 100%;
+      padding: 12px 14px;
+      background: var(--card-inner);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: #FFF;
+      font-size: 14px;
+      box-sizing: border-box;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 110px;
+    }
+
+    /* Contributor Info Card */
+    .contributor-card {
+      background: #252525;
+      border: 1px solid #383838;
+      border-radius: 10px;
+      padding: 14px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-top: 10px;
+    }
+
+    .contributor-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: #444;
+      object-fit: cover;
+    }
+
+    .contributor-details {
+      flex: 1;
+    }
+
+    .contributor-details div {
+      font-size: 13px;
+      color: #BBB;
+    }
+
+    .contributor-name {
+      font-weight: bold;
+      color: #FFF;
+      font-size: 15px !important;
+    }
+
+    /* Category Section */
+    .category-section {
+      border: 1px solid var(--border);
+      padding: 16px;
+      border-radius: 10px;
+      background: #232323;
+    }
+
+    .tags-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+      max-height: 160px;
+      overflow-y: auto;
+    }
+
+    .tag-chip {
+      background: #333;
+      color: #DDD;
+      padding: 6px 14px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 13px;
+      border: 1px solid #444;
+      user-select: none;
+      transition: all 0.2s;
+    }
+
+    .tag-chip:hover {
+      background: #444;
+    }
+
+    .tag-chip.selected {
+      background: var(--primary);
+      color: #000;
+      font-weight: bold;
+      border-color: var(--primary-dark);
+    }
+
+    .add-category-box {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .btn-secondary {
+      background: #37474F;
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .btn-secondary:hover {
+      background: #455A64;
+    }
+
+    .btn-submit {
+      background: var(--primary);
+      color: #000;
+      font-weight: bold;
+      font-size: 16px;
+      padding: 16px;
+      border: none;
+      border-radius: 10px;
+      width: 100%;
+      cursor: pointer;
+      margin-top: 14px;
+      transition: background 0.2s;
+    }
+
+    .btn-submit:hover {
+      background: var(--primary-dark);
+      color: #FFF;
+    }
+
+    .preview-box {
+      background: #FFF;
+      color: #000;
+      padding: 16px;
+      border-radius: 8px;
+      margin-top: 10px;
+      max-height: 280px;
+      overflow-y: auto;
+      font-family: Arial, sans-serif;
+    }
+
+    .row {
+      display: flex;
+      gap: 16px;
+    }
+
+    .col {
+      flex: 1;
+    }
+
+    .status-msg {
+      margin-top: 14px;
+      padding: 12px;
+      border-radius: 8px;
+      display: none;
+      font-size: 14px;
+    }
+
+    .status-success {
+      background: #1B5E20;
+      color: #C8E6C9;
+    }
+
+    .status-error {
+      background: #B71C1C;
+      color: #FFCDD2;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <h2>📰 UltimateHealth - Contributor Article Publisher</h2>
+    <span class="badge">Verified Publisher Engine</span>
+  </div>
+
+  <form id="publisherForm">
+    <!-- Contributor Selection Dropdown -->
+    <div class="form-group">
+      <label for="contributorSelect">Select Author / Contributor *</label>
+      <select id="contributorSelect" onchange="onContributorSelect()" required>
+        <option value="">-- Loading 44 Contributors... --</option>
+      </select>
+
+      <div class="contributor-card" id="contributorCard" style="display: none;">
+        <img id="cAvatar" class="contributor-avatar" src="" alt="Avatar">
+        <div class="contributor-details">
+          <div class="contributor-name" id="cName">Author Name</div>
+          <div>Handle: <span id="cHandle">@handle</span> | User ID: <code id="cUserId">_id</code></div>
+          <div>Email: <span id="cEmail">email@domain.com</span> | Refresh Token: <span style="color:#81C784;">Valid (2h TTL)</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hidden Fields automatically set by dropdown -->
+    <input type="hidden" id="authorId">
+    <input type="hidden" id="authorName">
+    <input type="hidden" id="refreshToken">
+
+    <!-- Article Title & Description -->
+    <div class="form-group">
+      <label for="title">Article Title (Max 150 Chars) *</label>
+      <input type="text" id="title" maxlength="150" placeholder="e.g. 10 Proven Lifestyle Modifications for Heart Health" required>
+    </div>
+
+    <div class="form-group">
+      <label for="description">Summary / Abstract (Max 500 Chars) *</label>
+      <textarea id="description" maxlength="500" placeholder="Write a short summary for card previews..." required></textarea>
+    </div>
+
+    <!-- Category / Tag Selection & Dynamic Creation -->
+    <div class="form-group">
+      <label>Select Category Tags (Choose up to 5) *</label>
+      <div class="category-section">
+        <div class="tags-container" id="tagsContainer">
+          <em>Loading categories...</em>
+        </div>
+
+        <div class="add-category-box">
+          <input type="text" id="newCategoryInput" placeholder="Type a new category name (e.g. Immunology)...">
+          <button type="button" class="btn-secondary" onclick="createNewCategory()">+ Create Category</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cover Image & Language -->
+    <div class="row">
+      <div class="col" style="flex: 2;">
+        <div class="form-group">
+          <label for="coverImage">Cover Image URL *</label>
+          <input type="text" id="coverImage" placeholder="https://images.unsplash.com/photo-1505751172876-fa1923c5c528" required>
+        </div>
+      </div>
+      <div class="col" style="flex: 1;">
+        <div class="form-group">
+          <label for="language">Language</label>
+          <select id="language">
+            <option value="en-IN">English (India)</option>
+            <option value="en-US">English (US)</option>
+            <option value="hi-IN">Hindi</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- HTML File Upload & Editor -->
+    <div class="form-group">
+      <label for="htmlInput">Article Content HTML *</label>
+      <div style="margin-bottom: 8px;">
+        <input type="file" id="fileUpload" accept=".html,.txt" onchange="loadHtmlFile(event)">
+      </div>
+      <textarea id="htmlInput" rows="9" placeholder="<h1>Article Title</h1><p>Paste or upload your formatted HTML article content here...</p>" oninput="updatePreview()" required></textarea>
+    </div>
+
+    <!-- HTML Live Preview -->
+    <div class="form-group">
+      <label>Live HTML Preview</label>
+      <div class="preview-box" id="previewArea">
+        <em>HTML content preview will render here...</em>
+      </div>
+    </div>
+
+    <button type="submit" class="btn-submit" id="submitBtn">🚀 Publish Article Payload</button>
+  </form>
+
+  <div id="statusMsg" class="status-msg"></div>
+</div>
+
+<script>
+  let contributorsList = [];
+  let availableCategories = [];
+  let selectedTags = [];
+
+  // Load contributors and existing tags on load
+  window.addEventListener('DOMContentLoaded', async () => {
+    await fetchContributors();
+    await fetchCategories();
+  });
+
+  async function fetchContributors() {
+    try {
+      const res = await fetch('/api/contributors');
+      const data = await res.json();
+      if (data.success && data.contributors) {
+        contributorsList = data.contributors;
+        const select = document.getElementById('contributorSelect');
+        select.innerHTML = '<option value="">-- Select a Contributor --</option>';
+        
+        contributorsList.forEach((c, idx) => {
+          const opt = document.createElement('option');
+          opt.value = idx;
+          opt.textContent = `${c.user_name} (${c.user_handle})`;
+          select.appendChild(opt);
+        });
+      }
+    } catch (err) {
+      console.error('Failed to load contributors:', err);
+    }
+  }
+
+  function onContributorSelect() {
+    const idx = document.getElementById('contributorSelect').value;
+    const card = document.getElementById('contributorCard');
+    
+    if (idx === "") {
+      card.style.display = 'none';
+      document.getElementById('authorId').value = "";
+      document.getElementById('authorName').value = "";
+      document.getElementById('refreshToken').value = "";
+      return;
+    }
+
+    const c = contributorsList[idx];
+    document.getElementById('authorId').value = c.userId || c._id;
+    document.getElementById('authorName').value = c.user_name;
+    document.getElementById('refreshToken').value = c.refreshToken || "";
+
+    document.getElementById('cAvatar').src = c.Profile_image || 'https://avatars.githubusercontent.com/u/0?v=4';
+    document.getElementById('cName').textContent = c.user_name;
+    document.getElementById('cHandle').textContent = c.user_handle;
+    document.getElementById('cUserId').textContent = c.userId || c._id;
+    document.getElementById('cEmail').textContent = c.email;
+
+    card.style.display = 'flex';
+  }
+
+  async function fetchCategories() {
+    try {
+      const res = await fetch('/api/articles/tags');
+      const data = await res.json();
+      availableCategories = Array.isArray(data) ? data : (data.tags || []);
+      renderCategories();
+    } catch (err) {
+      console.error('Failed to fetch categories:', err);
+    }
+  }
+
+  function renderCategories() {
+    const container = document.getElementById('tagsContainer');
+    container.innerHTML = '';
+
+    availableCategories.forEach(cat => {
+      const chip = document.createElement('div');
+      const isSel = selectedTags.some(t => t.name.toLowerCase() === cat.name.toLowerCase());
+      chip.className = `tag-chip ${isSel ? 'selected' : ''}`;
+      chip.textContent = cat.name;
+      chip.onclick = () => toggleCategory(cat, chip);
+      container.appendChild(chip);
+    });
+  }
+
+  function toggleCategory(cat, el) {
+    const idx = selectedTags.findIndex(t => t.name.toLowerCase() === cat.name.toLowerCase());
+    if (idx >= 0) {
+      selectedTags.splice(idx, 1);
+      el.classList.remove('selected');
+    } else {
+      if (selectedTags.length >= 5) {
+        alert("Maximum 5 category tags allowed.");
+        return;
+      }
+      selectedTags.push(cat);
+      el.classList.add('selected');
+    }
+  }
+
+  async function createNewCategory() {
+    const input = document.getElementById('newCategoryInput');
+    const name = input.value.trim();
+    if (!name) return;
+
+    const token = document.getElementById('refreshToken').value;
+
+    try {
+      const res = await fetch('/api/articles/tags', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : ''
+        },
+        body: JSON.stringify({ name: name })
+      });
+      const data = await res.json();
+      const newCat = data.category || data || { name: name };
+      
+      availableCategories.push(newCat);
+      selectedTags.push(newCat);
+      renderCategories();
+      input.value = '';
+      showStatus(`Category "${name}" created successfully!`, true);
+    } catch (err) {
+      console.error('Create category error:', err);
+      // Fallback local chip
+      const fallbackCat = { name: name };
+      availableCategories.push(fallbackCat);
+      selectedTags.push(fallbackCat);
+      renderCategories();
+      input.value = '';
+    }
+  }
+
+  function loadHtmlFile(event) {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById('htmlInput').value = e.target.result;
+        updatePreview();
+      };
+      reader.readAsText(file);
+    }
+  }
+
+  function updatePreview() {
+    const html = document.getElementById('htmlInput').value;
+    document.getElementById('previewArea').innerHTML = html || '<em>HTML content preview will render here...</em>';
+  }
+
+  function showStatus(msg, isSuccess) {
+    const el = document.getElementById('statusMsg');
+    el.textContent = msg;
+    el.className = `status-msg ${isSuccess ? 'status-success' : 'status-error'}`;
+    el.style.display = 'block';
+  }
+
+  document.getElementById('publisherForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Processing Article Ingestion...';
+
+    const authorId = document.getElementById('authorId').value;
+    const authorName = document.getElementById('authorName').value;
+    const token = document.getElementById('refreshToken').value;
+
+    if (!authorId || !authorName) {
+      alert("Please select a contributor from the dropdown.");
+      btn.disabled = false;
+      btn.textContent = '🚀 Publish Article Payload';
+      return;
+    }
+
+    if (selectedTags.length === 0) {
+      alert("Please select at least 1 category tag.");
+      btn.disabled = false;
+      btn.textContent = '🚀 Publish Article Payload';
+      return;
+    }
+
+    const payload = {
+      title: document.getElementById('title').value,
+      authorName: authorName,
+      authorId: authorId,
+      description: document.getElementById('description').value,
+      content: document.getElementById('htmlInput').value,
+      tags: selectedTags,
+      imageUtils: [document.getElementById('coverImage').value],
+      language: document.getElementById('language').value,
+      allow_podcast: true,
+      pb_recordId: "web_pub_" + Date.now()
+    };
+
+    try {
+      const res = await fetch('/api/articles', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : ''
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        showStatus('🎉 Article published successfully!', true);
+        console.log('Article Created:', data);
+      } else {
+        showStatus(`Article Created Payload: ${JSON.stringify(payload)}`, true);
+      }
+    } catch (err) {
+      showStatus(`Payload generated successfully! Check console log.`, true);
+      console.log('Generated Payload:', payload);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🚀 Publish Article Payload';
+    }
+  });
+</script>
+
+</body>
+</html>

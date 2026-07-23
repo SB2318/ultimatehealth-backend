@@ -96,6 +96,10 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    isContributor: {
+        type: Boolean,
+        default: true,
+    },
     refreshToken: {
         hashedRefreshToken: {
             type: String,

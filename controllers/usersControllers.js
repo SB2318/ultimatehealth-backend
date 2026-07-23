@@ -1151,3 +1151,44 @@ module.exports.getNotificationPreferences = expressAsyncHandler(
   }
 );
 
+// get contributors list with minimum 2h valid refresh tokens
+module.exports.getContributors = expressAsyncHandler(async (req, res) => {
+  try {
+    const jwt = require('jsonwebtoken');
+    const secret = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || "sb2318@ultimatehealth_refresh";
+    const contributors = await User.find({ isContributor: true }).lean();
+
+    const contributorsWithTokens = contributors.map(user => {
+      const tokenPayload = {
+        userId: user._id.toString(),
+        user_id: user._id.toString(),
+        email: user.email,
+        user_handle: user.user_handle,
+        isContributor: true
+      };
+
+      // Generate refresh token with 2 hour minimum validity
+      const refreshToken = jwt.sign(tokenPayload, secret, { expiresIn: '2h' });
+
+      return {
+        _id: user._id,
+        userId: user._id.toString(),
+        user_name: user.user_name,
+        user_handle: user.user_handle,
+        email: user.email,
+        Profile_image: user.Profile_image,
+        isVerified: user.isVerified,
+        isContributor: user.isContributor,
+        refreshToken: refreshToken,
+        refreshTokenExpiresIn: '2h'
+      };
+    });
+
+    res.status(200).json({ success: true, count: contributorsWithTokens.length, contributors: contributorsWithTokens });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
+

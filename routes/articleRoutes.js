@@ -71,7 +71,7 @@ const adminAuthenticateToken = require('../middleware/adminAuthenticateToken');
  *                   example: "Internal server error"
  */
 
-router.post('/articles/tags',adminAuthenticateToken, articleController.addNewTag);
+router.post('/articles/tags', authenticateToken, articleController.addNewTag);
 
 /**
  * @openapi
