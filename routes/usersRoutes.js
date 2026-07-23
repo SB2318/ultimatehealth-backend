@@ -29,7 +29,8 @@ const {
   updateUserProfessionalDetails,
   checkUserHandle,
   updateNotificationPreferences,
-  getNotificationPreferences
+  getNotificationPreferences,
+  getContributors
 } = require("../controllers/usersControllers");
 const {
     verifyEmail,
@@ -262,6 +263,9 @@ router.post("/user/check-user-handle", checkUserHandle);
 
 router.put("/user/notification-preferences", authenticateToken, updateNotificationPreferences);
 router.get("/user/notification-preferences", authenticateToken, getNotificationPreferences);
+
+router.get("/contributors", getContributors);
+router.get("/user/contributors", getContributors);
 
 
 

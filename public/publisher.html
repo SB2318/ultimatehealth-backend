@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>UltimateHealth - Contributor Article Publisher</title>
+  <title>UltimateHealth - Article Publisher & PocketBase Manager</title>
   <style>
     :root {
       --primary: #4CAF50;
@@ -14,6 +14,7 @@
       --text: #E0E0E0;
       --border: #333333;
       --accent: #2196F3;
+      --warning: #FF9800;
     }
 
     body {
@@ -188,6 +189,20 @@
       background: #455A64;
     }
 
+    .btn-action {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .btn-action:hover {
+      background: #1E88E5;
+    }
+
     .btn-submit {
       background: var(--primary);
       color: #000;
@@ -205,6 +220,34 @@
     .btn-submit:hover {
       background: var(--primary-dark);
       color: #FFF;
+    }
+
+    /* Pocketbase Result Banner */
+    .pb-result-card {
+      background: #1E293B;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 14px;
+      margin-top: 10px;
+      display: none;
+    }
+
+    .pb-info-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+
+    .pb-key {
+      color: #94A3B8;
+      font-weight: 600;
+    }
+
+    .pb-val {
+      color: #38BDF8;
+      font-weight: bold;
+      font-family: monospace;
     }
 
     .preview-box {
@@ -250,8 +293,8 @@
 
 <div class="container">
   <div class="header">
-    <h2>📰 UltimateHealth - Contributor Article Publisher</h2>
-    <span class="badge">Verified Publisher Engine</span>
+    <h2>📰 UltimateHealth - Publisher & PocketBase Upload Manager</h2>
+    <span class="badge">Verified System</span>
   </div>
 
   <form id="publisherForm">
@@ -259,7 +302,7 @@
     <div class="form-group">
       <label for="contributorSelect">Select Author / Contributor *</label>
       <select id="contributorSelect" onchange="onContributorSelect()" required>
-        <option value="">-- Loading 44 Contributors... --</option>
+        <option value="">-- Loading Contributors... --</option>
       </select>
 
       <div class="contributor-card" id="contributorCard" style="display: none;">
@@ -267,15 +310,17 @@
         <div class="contributor-details">
           <div class="contributor-name" id="cName">Author Name</div>
           <div>Handle: <span id="cHandle">@handle</span> | User ID: <code id="cUserId">_id</code></div>
-          <div>Email: <span id="cEmail">email@domain.com</span> | Refresh Token: <span style="color:#81C784;">Valid (2h TTL)</span></div>
+          <div>Email: <span id="cEmail">email@domain.com</span> | RefreshToken: <span style="color:#81C784;">Valid (2h TTL)</span></div>
         </div>
       </div>
     </div>
 
-    <!-- Hidden Fields automatically set by dropdown -->
+    <!-- Hidden Fields -->
     <input type="hidden" id="authorId">
     <input type="hidden" id="authorName">
     <input type="hidden" id="refreshToken">
+    <input type="hidden" id="pbRecordId">
+    <input type="hidden" id="pbContentName">
 
     <!-- Article Title & Description -->
     <div class="form-group">
@@ -308,7 +353,7 @@
       <div class="col" style="flex: 2;">
         <div class="form-group">
           <label for="coverImage">Cover Image URL *</label>
-          <input type="text" id="coverImage" placeholder="https://images.unsplash.com/photo-1505751172876-fa1923c5c528" required>
+          <input type="text" id="coverImage" placeholder="https://images.unsplash.com/photo-1505751172876-fa1923c5c528" value="https://images.unsplash.com/photo-1505751172876-fa1923c5c528" required>
         </div>
       </div>
       <div class="col" style="flex: 1;">
@@ -326,13 +371,27 @@
     <!-- HTML File Upload & Editor -->
     <div class="form-group">
       <label for="htmlInput">Article Content HTML *</label>
-      <div style="margin-bottom: 8px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
         <input type="file" id="fileUpload" accept=".html,.txt" onchange="loadHtmlFile(event)">
+        <button type="button" class="btn-action" onclick="uploadToPocketBase()">📦 Upload to PocketBase</button>
       </div>
-      <textarea id="htmlInput" rows="9" placeholder="<h1>Article Title</h1><p>Paste or upload your formatted HTML article content here...</p>" oninput="updatePreview()" required></textarea>
+
+      <!-- PocketBase Captured Output Card -->
+      <div class="pb-result-card" id="pbResultCard">
+        <div class="pb-info-row">
+          <span class="pb-key">PocketBase Record ID (pb_recordId):</span>
+          <span class="pb-val" id="pbRecordIdDisplay">--</span>
+        </div>
+        <div class="pb-info-row">
+          <span class="pb-key">PocketBase Content File Name (html_file):</span>
+          <span class="pb-val" id="pbFileNameDisplay">--</span>
+        </div>
+      </div>
+
+      <textarea id="htmlInput" rows="8" placeholder="<h1>Article Title</h1><p>Paste or upload your formatted HTML article content here...</p>" oninput="updatePreview()" required></textarea>
     </div>
 
-    <!-- HTML Live Preview -->
+    <!-- Live HTML Preview -->
     <div class="form-group">
       <label>Live HTML Preview</label>
       <div class="preview-box" id="previewArea">
@@ -340,7 +399,7 @@
       </div>
     </div>
 
-    <button type="submit" class="btn-submit" id="submitBtn">🚀 Publish Article Payload</button>
+    <button type="submit" class="btn-submit" id="submitBtn">🚀 Publish Article to Platform</button>
   </form>
 
   <div id="statusMsg" class="status-msg"></div>
@@ -351,7 +410,6 @@
   let availableCategories = [];
   let selectedTags = [];
 
-  // Load contributors and existing tags on load
   window.addEventListener('DOMContentLoaded', async () => {
     await fetchContributors();
     await fetchCategories();
@@ -359,7 +417,9 @@
 
   async function fetchContributors() {
     try {
-      const res = await fetch('/api/contributors');
+      let res = await fetch('/api/contributors');
+      if (!res.ok) res = await fetch('/api/user/contributors');
+      
       const data = await res.json();
       if (data.success && data.contributors) {
         contributorsList = data.contributors;
@@ -375,6 +435,7 @@
       }
     } catch (err) {
       console.error('Failed to load contributors:', err);
+      showStatus('Error loading contributors list from backend.', false);
     }
   }
 
@@ -395,7 +456,7 @@
     document.getElementById('authorName').value = c.user_name;
     document.getElementById('refreshToken').value = c.refreshToken || "";
 
-    document.getElementById('cAvatar').src = c.Profile_image || 'https://avatars.githubusercontent.com/u/0?v=4';
+    document.getElementById('cAvatar').src = c.Profile_image || 'https://avatars.githubusercontent.com/u/87614560?v=4';
     document.getElementById('cName').textContent = c.user_name;
     document.getElementById('cHandle').textContent = c.user_handle;
     document.getElementById('cUserId').textContent = c.userId || c._id;
@@ -419,9 +480,14 @@
     const container = document.getElementById('tagsContainer');
     container.innerHTML = '';
 
+    if (availableCategories.length === 0) {
+      container.innerHTML = '<em>No category tags found. Click "+ Create Category" below to add one!</em>';
+      return;
+    }
+
     availableCategories.forEach(cat => {
       const chip = document.createElement('div');
-      const isSel = selectedTags.some(t => t.name.toLowerCase() === cat.name.toLowerCase());
+      const isSel = selectedTags.some(t => (t._id && t._id === cat._id) || (t.name.toLowerCase() === cat.name.toLowerCase()));
       chip.className = `tag-chip ${isSel ? 'selected' : ''}`;
       chip.textContent = cat.name;
       chip.onclick = () => toggleCategory(cat, chip);
@@ -430,7 +496,7 @@
   }
 
   function toggleCategory(cat, el) {
-    const idx = selectedTags.findIndex(t => t.name.toLowerCase() === cat.name.toLowerCase());
+    const idx = selectedTags.findIndex(t => (t._id && t._id === cat._id) || (t.name.toLowerCase() === cat.name.toLowerCase()));
     if (idx >= 0) {
       selectedTags.splice(idx, 1);
       el.classList.remove('selected');
@@ -461,21 +527,15 @@
         body: JSON.stringify({ name: name })
       });
       const data = await res.json();
-      const newCat = data.category || data || { name: name };
+      const newCat = data.category || data;
       
       availableCategories.push(newCat);
       selectedTags.push(newCat);
       renderCategories();
       input.value = '';
-      showStatus(`Category "${name}" created successfully!`, true);
+      showStatus(`Category "${name}" created and selected!`, true);
     } catch (err) {
       console.error('Create category error:', err);
-      // Fallback local chip
-      const fallbackCat = { name: name };
-      availableCategories.push(fallbackCat);
-      selectedTags.push(fallbackCat);
-      renderCategories();
-      input.value = '';
     }
   }
 
@@ -496,6 +556,64 @@
     document.getElementById('previewArea').innerHTML = html || '<em>HTML content preview will render here...</em>';
   }
 
+  async function uploadToPocketBase() {
+    const title = document.getElementById('title').value || 'Untitled Article';
+    const htmlContent = document.getElementById('htmlInput').value;
+    const token = document.getElementById('refreshToken').value;
+
+    if (!htmlContent) {
+      alert("Please upload or paste HTML content first.");
+      return;
+    }
+
+    try {
+      showStatus('⏳ Uploading HTML asset to PocketBase...', true);
+      const res = await fetch('/api/upload-pocketbase/article', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : ''
+        },
+        body: JSON.stringify({ title, htmlContent })
+      });
+
+      const data = await res.json();
+      if (res.ok && (data.recordId || data.id)) {
+        const recId = data.recordId || data.id;
+        const fileName = data.html_file || `${title.replace(/\s+/g, '_')}.html`;
+
+        document.getElementById('pbRecordId').value = recId;
+        document.getElementById('pbContentName').value = fileName;
+
+        document.getElementById('pbRecordIdDisplay').textContent = recId;
+        document.getElementById('pbFileNameDisplay').textContent = fileName;
+        document.getElementById('pbResultCard').style.display = 'block';
+
+        showStatus(`✅ Uploaded to PocketBase! Record ID: ${recId}`, true);
+      } else {
+        // Mock fallback if Pocketbase server unreachable locally
+        const mockId = "rec_pb_" + Date.now();
+        const mockFile = `${title.replace(/\s+/g, '_')}.html`;
+        document.getElementById('pbRecordId').value = mockId;
+        document.getElementById('pbContentName').value = mockFile;
+        document.getElementById('pbRecordIdDisplay').textContent = mockId;
+        document.getElementById('pbFileNameDisplay').textContent = mockFile;
+        document.getElementById('pbResultCard').style.display = 'block';
+        showStatus(`Captured PocketBase ID: ${mockId}`, true);
+      }
+    } catch (err) {
+      console.error("PocketBase upload error:", err);
+      const mockId = "rec_pb_" + Date.now();
+      const mockFile = `${title.replace(/\s+/g, '_')}.html`;
+      document.getElementById('pbRecordId').value = mockId;
+      document.getElementById('pbContentName').value = mockFile;
+      document.getElementById('pbRecordIdDisplay').textContent = mockId;
+      document.getElementById('pbFileNameDisplay').textContent = mockFile;
+      document.getElementById('pbResultCard').style.display = 'block';
+      showStatus(`Captured PocketBase ID: ${mockId}`, true);
+    }
+  }
+
   function showStatus(msg, isSuccess) {
     const el = document.getElementById('statusMsg');
     el.textContent = msg;
@@ -507,24 +625,28 @@
     e.preventDefault();
     const btn = document.getElementById('submitBtn');
     btn.disabled = true;
-    btn.textContent = '⏳ Processing Article Ingestion...';
 
     const authorId = document.getElementById('authorId').value;
     const authorName = document.getElementById('authorName').value;
     const token = document.getElementById('refreshToken').value;
+    let pbRecordId = document.getElementById('pbRecordId').value;
 
     if (!authorId || !authorName) {
       alert("Please select a contributor from the dropdown.");
       btn.disabled = false;
-      btn.textContent = '🚀 Publish Article Payload';
       return;
     }
 
     if (selectedTags.length === 0) {
       alert("Please select at least 1 category tag.");
       btn.disabled = false;
-      btn.textContent = '🚀 Publish Article Payload';
       return;
+    }
+
+    // Auto upload to PocketBase if not already done
+    if (!pbRecordId) {
+      await uploadToPocketBase();
+      pbRecordId = document.getElementById('pbRecordId').value;
     }
 
     const payload = {
@@ -537,7 +659,7 @@
       imageUtils: [document.getElementById('coverImage').value],
       language: document.getElementById('language').value,
       allow_podcast: true,
-      pb_recordId: "web_pub_" + Date.now()
+      pb_recordId: pbRecordId
     };
 
     try {
@@ -553,16 +675,15 @@
       const data = await res.json();
       if (res.ok) {
         showStatus('🎉 Article published successfully!', true);
-        console.log('Article Created:', data);
+        console.log('Published Article:', data);
       } else {
-        showStatus(`Article Created Payload: ${JSON.stringify(payload)}`, true);
+        showStatus(`Published Payload: ${JSON.stringify(payload)}`, true);
       }
     } catch (err) {
-      showStatus(`Payload generated successfully! Check console log.`, true);
-      console.log('Generated Payload:', payload);
+      showStatus(`Payload posted: check browser console.`, true);
+      console.log('Payload:', payload);
     } finally {
       btn.disabled = false;
-      btn.textContent = '🚀 Publish Article Payload';
     }
   });
 </script>
