@@ -140,6 +140,11 @@ app.get('/', (req, res) => {
     res.redirect(302, 'https://uhsocial.in/frontend/v2');
 });
 
+app.get('/publish', (req, res) => {
+    res.sendFile(path.join(__dirname, "public", "publisher.html"));
+    //res.redirect(302, 'https://uhsocial.in/frontend/v2');
+});
+
 app.get('/.well-known/assetlinks.json', (req, res) => {
   res.status(200).json(assetLinks);
 });
