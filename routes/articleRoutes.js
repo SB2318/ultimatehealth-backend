@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const articleController = require('../controllers/articleController');
 const authenticateToken = require('../middleware/authentcatetoken');
+const publisherMiddleware = require('../middleware/publisherMiddleware');
 const adminAuthenticateToken = require('../middleware/adminAuthenticateToken');
 
 /**** For Article Tags */
@@ -71,7 +72,7 @@ const adminAuthenticateToken = require('../middleware/adminAuthenticateToken');
  *                   example: "Internal server error"
  */
 
-router.post('/articles/tags', authenticateToken, articleController.addNewTag);
+router.post('/articles/tags', publisherMiddleware, articleController.addNewTag);
 
 /**
  * @openapi
@@ -438,7 +439,7 @@ router.delete('/articles/tags/:id', adminAuthenticateToken, articleController.de
  *                   type: string
  *                   example: "Error creating article"
  */
-router.post('/articles',authenticateToken, articleController.createArticle); 
+router.post('/articles', publisherMiddleware, articleController.createArticle); 
 
 /**
  * @openapi
