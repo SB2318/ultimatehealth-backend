@@ -524,10 +524,22 @@
     try {
       const res = await fetch('/api/articles/tags');
       const data = await res.json();
-      availableCategories = Array.isArray(data) ? data : (data.tags || []);
+
+      // Handle both response shapes:
+      //   v1: plain array  [ { _id, id, name }, ... ]
+      //   v2: { success: true, data: [ ... ] }
+      if (Array.isArray(data)) {
+        availableCategories = data;
+      } else if (data.data && Array.isArray(data.data)) {
+        availableCategories = data.data;
+      } else {
+        availableCategories = [];
+      }
+
       renderCategories();
     } catch (err) {
       console.error('Failed to fetch categories:', err);
+      document.getElementById('tagsContainer').innerHTML = '<em style="color:#f88">Failed to load categories. Check your connection.</em>';
     }
   }
 
@@ -568,7 +580,10 @@
   async function createNewCategory() {
     const input = document.getElementById('newCategoryInput');
     const name = input.value.trim();
-    if (!name) return;
+    if (!name) {
+      showStatus('Please enter a category name before clicking Create.', false);
+      return;
+    }
 
     const token = document.getElementById('refreshToken').value;
 
@@ -579,18 +594,28 @@
           'Content-Type': 'application/json',
           'Authorization': token ? `Bearer ${token}` : ''
         },
-        body: JSON.stringify({ name: name })
+        body: JSON.stringify({ name })
       });
+
       const data = await res.json();
-      const newCat = data.category || data;
-      
+
+      if (!res.ok) {
+        const errMsg = data.error || data.message || `Server error ${res.status}`;
+        showStatus(`Failed to create category: ${errMsg}`, false);
+        return;
+      }
+
+      // Handle both v1 (tag object directly) and v2 ({ success, data: tag }) shapes
+      const newCat = (data.data && data.data.name) ? data.data : data;
+
       availableCategories.push(newCat);
       selectedTags.push(newCat);
       renderCategories();
       input.value = '';
-      showStatus(`Category "${name}" created and selected!`, true);
+      showStatus(`Category "${newCat.name}" created and selected!`, true);
     } catch (err) {
       console.error('Create category error:', err);
+      showStatus('Network error while creating category. Please try again.', false);
     }
   }
 

@@ -1167,8 +1167,8 @@ module.exports.getContributors = expressAsyncHandler(async (req, res) => {
         isContributor: true
       };
 
-      // Generate refresh token with 2 hour minimum validity
-      const refreshToken = jwt.sign(tokenPayload, secret, { expiresIn: '2h' });
+      // Generate refresh token with 20 minutes validity
+      const refreshToken = jwt.sign(tokenPayload, secret, { expiresIn: '20m' });
 
       return {
         _id: user._id,

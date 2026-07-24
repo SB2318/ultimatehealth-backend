@@ -817,8 +817,24 @@ module.exports.addNewTag = expressAsyncHandler(
   async (req, res) => {
     try {
       const { name } = req.body;
+
+      // Validate that name is present and non-empty
+      if (!name || typeof name !== 'string' || !name.trim()) {
+        return res.status(400).json({ error: 'Tag name is required and cannot be empty.' });
+      }
+
+      const trimmedName = name.trim();
+
+      // Prevent duplicate tag names (case-insensitive)
+      const existing = await ArticleTag.findOne({
+        name: { $regex: new RegExp(`^${trimmedName}$`, 'i') }
+      });
+      if (existing) {
+        return res.status(409).json({ error: `A tag named "${existing.name}" already exists.` });
+      }
+
       const id = await getNextId();
-      const newTag = new ArticleTag({ id, name });
+      const newTag = new ArticleTag({ id, name: trimmedName });
       await newTag.save();
       res.status(201).json(newTag);
     } catch (err) {

@@ -685,10 +685,34 @@ const getNextId = async () => {
 // Create a new tag
 module.exports.addNewTag = expressAsyncHandler(async (req, res) => {
   const { name } = req.body;
+
+  // Validate that name is present and non-empty
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    throwError(
+      HTTP_STATUS.BAD_REQUEST,
+      ERROR_CODES.VALIDATION_ERROR,
+      'Tag name is required and cannot be empty.'
+    );
+  }
+
+  const trimmedName = name.trim();
+
+  // Prevent duplicate tag names (case-insensitive)
+  const existing = await ArticleTag.findOne({
+    name: { $regex: new RegExp(`^${trimmedName}$`, 'i') }
+  });
+  if (existing) {
+    throwError(
+      HTTP_STATUS.CONFLICT,
+      ERROR_CODES.RESOURCE_ALREADY_EXISTS,
+      `A tag named "${existing.name}" already exists.`
+    );
+  }
+
   const id = await getNextId();
-  const newTag = new ArticleTag({ id, name });
+  const newTag = new ArticleTag({ id, name: trimmedName });
   await newTag.save();
-  sendSuccess(res, HTTP_STATUS.OK, "Tag created successfully", newTag);
+  sendSuccess(res, HTTP_STATUS.CREATED, 'Tag created successfully', newTag);
 });
 
 // Get all tags

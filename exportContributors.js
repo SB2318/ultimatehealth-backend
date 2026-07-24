@@ -39,7 +39,7 @@ async function exportContributors() {
       user_handle: user.user_handle,
       isContributor: true
     };
-    const refreshToken = jwt.sign(tokenPayload, secret, { expiresIn: '2h' });
+    const refreshToken = jwt.sign(tokenPayload, secret, { expiresIn: '20m' });
 
     return {
       userId: user._id.toString(),
@@ -48,7 +48,7 @@ async function exportContributors() {
       email: user.email,
       defaultPassword: 'ContributorPass123!',
       refreshToken: refreshToken,
-      refreshTokenExpiresIn: '2h',
+      refreshTokenExpiresIn: '20m',
       isVerified: user.isVerified,
       isContributor: user.isContributor,
       profileImage: user.Profile_image,
