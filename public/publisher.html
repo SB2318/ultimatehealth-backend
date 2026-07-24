@@ -342,6 +342,20 @@
   </div>
 
   <form id="publisherForm">
+    <!-- Instructions Section -->
+    <div style="background: #1A365D; border: 1px solid #2B6CB0; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+      <h3 style="margin-top: 0; color: #63B3ED; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+        <span>📝</span> Publisher Instructions
+      </h3>
+      <ol style="margin: 0; padding-left: 20px; color: #E2E8F0; font-size: 14px; line-height: 1.6;">
+        <li><strong>Mandatory Authentication:</strong> You MUST select a Contributor from the dropdown first. This provides the necessary access token to create categories and publish articles.</li>
+        <li><strong>Title & Summary:</strong> Provide a concise title and a short summary (for preview cards).</li>
+        <li><strong>Categories:</strong> Select up to 5 relevant tags. If a tag is missing, you can create a new one (requires Contributor selection).</li>
+        <li><strong>Content:</strong> Paste your HTML content or upload an HTML file.</li>
+        <li><strong>Publishing:</strong> Click Publish to automatically upload the file and save the record to MongoDB.</li>
+      </ol>
+    </div>
+
     <!-- Contributor Selection Dropdown -->
     <div class="form-group">
       <label for="contributorSelect">Select Author / Contributor *</label>
@@ -597,6 +611,11 @@
 
     const token = document.getElementById('refreshToken').value;
 
+    if (!token) {
+      alert('Authentication required: Please select an Author / Contributor from the dropdown to authorize category creation.');
+      return;
+    }
+
     try {
       const res = await fetch('/api/articles/tags', {
         method: 'POST',
@@ -674,8 +693,8 @@
     const title = document.getElementById('title').value;
     const htmlContent = document.getElementById('htmlInput').value;
 
-    if (!authorId || !authorName) {
-      alert("Please select a contributor from the dropdown.");
+    if (!authorId || !authorName || !token) {
+      alert("Authentication required: Please select an Author / Contributor from the dropdown to publish the article.");
       return;
     }
 
