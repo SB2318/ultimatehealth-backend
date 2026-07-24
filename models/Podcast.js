@@ -95,6 +95,17 @@ const podcastSchema = new Schema({
         type: Schema.Types.ObjectId,
         ref: 'admin',
         default: null
+    },
+
+    episode_id: {
+        type: Schema.Types.ObjectId,
+        ref: 'PodcastEpisode',
+        default: null
+    },
+
+    episode_number: {
+        type: Number,
+        default: 0
     }
 
 })
