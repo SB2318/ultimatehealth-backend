@@ -1,6 +1,12 @@
 const express = require('express');
 const router = express.Router();
 
+const signPodcastUrlsMiddleware = require('../middleware/podcastSignMiddleware');
+const { streamPodcast } = require('../controllers/podcastStreamController');
+
+router.use(signPodcastUrlsMiddleware);
+router.get('/podcast/stream/:key', streamPodcast);
+
 const authenticateToken = require('../middleware/authentcatetoken');
 const {
     getFollowingsPodcasts,
