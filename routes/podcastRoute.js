@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { getPodcastsByEpisode } = require('../controllers/podcastController');
 
 const authenticateToken = require('../middleware/authentcatetoken');
 const {
@@ -10,6 +11,7 @@ const {
     getPodcastProfile,
     getAllPublishedPodcasts,
     searchPodcast,
+    getPodcastsByEpisode,
 
     createPodcast,
     savePodcast,
@@ -1603,6 +1605,6 @@ router.get('/podcast/user-pending', authenticateToken, getUserPendingPodcasts);
  *                   example: "Something went wrong while retrieving published podcasts"
  */
 router.get('/podcast/user-published', authenticateToken, getUserPublishedPodcasts);
-
+router.get('/episodes/:episodeId/podcasts', getPodcastsByEpisode);
 
 module.exports = router;

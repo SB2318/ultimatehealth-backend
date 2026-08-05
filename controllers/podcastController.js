@@ -8,6 +8,8 @@ const Comment = require("../models/commentSchema");
 const PlayList = require("../models/playlistSchema");
 const AudioLikeAggregate = require('../models/events/audioLikeEventSchema');
 const AudioViewAggregate = require('../models/events/audioViewEventSchema');
+const Podcast = require("../models/Podcast");
+const PodcastEpisode = require("../models/PodcastEpisode");
 const { deleteFileFn } = require('./uploadController');
 const { sendPodcastForReviewEmail } = require("./emailservice");
 
@@ -339,41 +341,66 @@ const filterPodcast = expressAsyncHandler(
     }
 )
 
-/** To create podcast */
-const createPodcast = expressAsyncHandler(
+// Update podcast
+const updatePodcast = expressAsyncHandler(
     async (req, res) => {
-        const { title, description, tags, article_id, audio_url, cover_image, duration } = req.body;
+        // Added episode_id
+        const { podcastId, name, cover_image, episode_id } = req.body;
 
-        if (!title || !description || !tags || !audio_url || !duration || !cover_image) {
-            return res.status(400).json({ message: 'All fields are required: title, description, tags, audio_url, duration, cover_image' });
+        if (!podcastId || !name) {
+            return res.status(400).json({ error: 'Invalid request: podcastId and name are required' });
         }
 
         try {
-
-            const user = await User.findById(req.userId);
-
-            if (user.isBlockUser || user.isBannedUser) {
-                return res.status(403).json({ error: "User is blocked or banned." });
+            // Change to findById so we can check the OLD episode_id
+            const podcast = await Podcast.findById(podcastId);
+            if (!podcast) {
+                return res.status(404).json({ error: 'Podcast not found' });
             }
-            const podcast = new Podcast({
-                title,
-                description,
-                tags,
-                article_id,
-                audio_url,
-                duration,
-                user_id: user._id,
-                cover_image,
-            });
 
-            podcast.mentionedUsers.push(user._id);
+            // 1. Handle Episode changes (moving podcast to a new episode)
+            if (episode_id !== undefined && String(podcast.episode_id) !== String(episode_id)) {
+                
+                // Decrement old episode count
+                if (podcast.episode_id) {
+                    await PodcastEpisode.findByIdAndUpdate(podcast.episode_id, {
+                        $inc: { podcasts_count: -1 }
+                    });
+                }
+
+                // Increment new episode count and calculate number
+                if (episode_id) {
+                    await PodcastEpisode.findByIdAndUpdate(episode_id, {
+                        $inc: { podcasts_count: 1 }
+                    });
+                    const count = await Podcast.countDocuments({ episode_id: episode_id });
+                    podcast.episode_number = count + 1;
+                    podcast.episode_id = episode_id;
+                } else {
+                    // User removed it from the episode completely
+                    podcast.episode_id = null;
+                    podcast.episode_number = null;
+                }
+            }
+
+            // 2. Apply standard updates
+            podcast.title = name;
+            podcast.updated_at = new Date();
+
+            // 3. Handle cover image update (preserving your original logic)
+            if (cover_image) {
+                const coverParts = podcast.cover_image.split('/api/getFile/');
+                if (coverParts.length >= 2) {
+                    await deleteFileFn(coverParts[1]);
+                }
+                podcast.cover_image = cover_image;
+            }
 
             await podcast.save();
-            sendPodcastForReviewEmail(user.email, title);
-            res.status(201).json({ message: 'Podcast created successfully.', podcast: podcast });
+            res.status(200).json({ message: 'Podcast updated successfully' });
         } catch (err) {
             console.log(err);
-            res.status(500).json({ message: err.message });
+            res.status(500).json({ error: 'An error occurred while updating podcast' });
         }
     }
 )
@@ -903,6 +930,7 @@ const updatePlaylist = expressAsyncHandler(
 
 )
 // Delete Podcast
+// Delete Podcast
 const deletePodcast = expressAsyncHandler(
     async (req, res) => {
         const { podcastId } = req.body;
@@ -910,10 +938,19 @@ const deletePodcast = expressAsyncHandler(
             return res.status(400).json({ error: 'Invalid request: podcastId is required' });
         }
         try {
+            // This correctly returns the deleted podcast document so we can read its data!
             const podcast = await Podcast.findByIdAndDelete(podcastId);
             if (!podcast) {
                 return res.status(404).json({ error: 'Podcast not found' });
             }
+
+            // ADDED: Decrement count on parent episode
+            if (podcast.episode_id) {
+                await PodcastEpisode.findByIdAndUpdate(podcast.episode_id, {
+                    $inc: { podcasts_count: -1 }
+                });
+            }
+
             // Delete audio url
             const parts = podcast.audio_url.split('/api/getFile/');
             const coverParts = podcast.cover_image.split('/api/getFile/');
@@ -924,7 +961,6 @@ const deletePodcast = expressAsyncHandler(
             if (parts.length >= 2) {
                 await deleteFileFn(parts[1]);
             }
-
 
             res.status(200).json({ message: 'Podcast deleted successfully' });
         } catch (err) {
@@ -1058,6 +1094,26 @@ const getDiscardedPodcasts = expressAsyncHandler(
     }
 )
 
+// Get Podcasts by Episode ID
+const getPodcastsByEpisode = expressAsyncHandler(
+    async (req, res) => {
+        try {
+            const { episodeId } = req.params;
+            
+            const podcasts = await Podcast.find({ episode_id: episodeId })
+                .populate('tags')
+                .populate('user_id', 'user_name user_handle Profile_image')
+                .sort({ episode_number: 1 }) // 1 = Ascending order
+                .exec();
+
+            res.status(200).json(podcasts);
+        } catch (err) {
+            console.log(err);
+            res.status(500).json({ error: 'An error occurred while fetching episode podcasts' });
+        }
+    }
+)
+
 module.exports = {
     getPodcastProfile,
     getFollowingsPodcasts,
@@ -1067,7 +1123,7 @@ module.exports = {
     getPodcastById,
     searchPodcast,
     filterPodcast,
-
+    getPodcastsByEpisode,
     // post
     createPodcast,
     savePodcast,
