@@ -359,8 +359,10 @@ const updatePodcast = expressAsyncHandler(
             }
 
             // 1. Handle Episode changes (moving podcast to a new episode)
-            if (episode_id !== undefined && String(podcast.episode_id) !== String(episode_id)) {
-                
+            if (episode_id !== undefined ){
+                if (String(podcast.episode_id) === String(episode_id)) {
+                    // No need to update, the episode hasn't changed
+                } else {
                 // Decrement old episode count
                 if (podcast.episode_id) {
                     await PodcastEpisode.findByIdAndUpdate(podcast.episode_id, {
@@ -382,6 +384,7 @@ const updatePodcast = expressAsyncHandler(
                     podcast.episode_number = null;
                 }
             }
+        }
 
             // 2. Apply standard updates
             podcast.title = name;
