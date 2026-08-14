@@ -202,6 +202,4 @@ We welcome contributions! This backend is open for **students, developers, and o
 
 If you're new to open source, feel free to ask questions by opening a Discussion or commenting on an issue.
 
-  
-
-
+<!-- PR #2224 reference -->
