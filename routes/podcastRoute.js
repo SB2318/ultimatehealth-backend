@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getPodcastsByEpisode } = require('../controllers/podcastController');
+//const { getPodcastsByEpisode } = require('../controllers/podcastController');
 
 const authenticateToken = require('../middleware/authentcatetoken');
 const {

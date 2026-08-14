@@ -3,6 +3,7 @@ const express = require('express');
 const compression = require('compression');
 const cors = require('cors');
 const path = require("path");
+const {connectProducer} = require('./services/mqueue/kafkaProducer');
 
 const cookieParser = require('cookie-parser');
 const { articleReviewNotificationsToUser } = require('./controllers/notifications/notificationHelper');
@@ -61,6 +62,7 @@ const { globalLimiter } = require('./middleware/ratelimit');
 const app = express();
 dotenv.config();
 db.dbConnect();
+connectProducer(); // Connect the Kafka producer to the Kafka cluster
 
 // Prevent process crash on unhandled errors
 process.on('uncaughtException', (err) => {
