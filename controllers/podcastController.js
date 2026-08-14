@@ -12,7 +12,7 @@ const AudioViewAggregate = require('../models/events/audioViewEventSchema');
 const PodcastEpisode = require("../models/PodcastEpisode");
 const { deleteFileFn } = require('./uploadController');
 //const { sendPodcastForReviewEmail } = require("./emailservice");
-const { publishContentEmailEvent, EMAIL_EVENT_TYPES } = require("../services/mqueue/kafkaProducer");
+const { publishContentEmailEvent, publishPodcastAnalyticsEvent, EMAIL_EVENT_TYPES, ANALYTICS_EVENT_TYPES } = require("../services/mqueue/kafkaProducer");
 const mongoose = require('mongoose');
 
 /** Podcast profile */
@@ -720,71 +720,75 @@ const removePodcastFromPlaylist = expressAsyncHandler(
 
 
 async function updatePodcastLikeContribution(userId) {
-
-    const now = new Date();
-    const today = new Date(now.setHours(0, 0, 0, 0));
-
     try {
 
-        const event = await AudioLikeAggregate.findOne({ userId: userId, date: today });
+        // const event = await AudioLikeAggregate.findOne({ userId: userId, date: today });
 
-        if (!event) {
-            const newEvent = new AudioLikeAggregate({
-                userId: userId,
-                date: today,
-                dailyLikes: 1,
-                monthlyLikes: 1,
-                yearlyLikes: 1
-            });
+        // if (!event) {
+        //     const newEvent = new AudioLikeAggregate({
+        //         userId: userId,
+        //         date: today,
+        //         dailyLikes: 1,
+        //         monthlyLikes: 1,
+        //         yearlyLikes: 1
+        //     });
 
-            await newEvent.save();
-        } else {
+        //     await newEvent.save();
+        // } else {
 
-            event.dailyLikes += 1;
-            event.monthlyLikes += 1;
-            event.yearlyLikes += 1;
-            await event.save();
-        }
+        //     event.dailyLikes += 1;
+        //     event.monthlyLikes += 1;
+        //     event.yearlyLikes += 1;
+        //     await event.save();
+        // }
+        await publishPodcastAnalyticsEvent({
+            type: ANALYTICS_EVENT_TYPES.PODCAST.LIKE,
+            userId: userId,
+            timestamp: new Date()
+        });
     } catch (err) {
         console.log(err);
     }
-
 }
 
 async function updatePodcastViewContribution(userId) {
-
-    const now = new Date();
-    const today = new Date(now.setHours(0, 0, 0, 0));
-
     try {
+       
+        // const now = new Date();
+        // const today = new Date(now.setHours(0, 0, 0, 0));
+        // const user = await User.findById(userId);
+        // if (!user) {
+        //     return;
+        // }
+        // const event = await AudioViewAggregate.findOne({ userId: user._id, date: today });
 
-        const user = await User.findById(userId);
-        if (!user) {
-            return;
-        }
-        const event = await AudioViewAggregate.findOne({ userId: user._id, date: today });
+        // if (!event) {
+        //     const newEvent = new AudioViewAggregate({
+        //         userId: userId,
+        //         date: today,
+        //         dailyViews: 1,
+        //         monthlyViews: 1,
+        //         yearlyViews: 1
+        //     });
 
-        if (!event) {
-            const newEvent = new AudioViewAggregate({
-                userId: userId,
-                date: today,
-                dailyViews: 1,
-                monthlyViews: 1,
-                yearlyViews: 1
-            });
-
-            await newEvent.save();
-        } else {
-            event.dailyViews += 1;
-            event.monthlyViews += 1;
-            event.yearlyViews += 1;
-            await event.save();
-        }
+        //     await newEvent.save();
+        // } else {
+        //     event.dailyViews += 1;
+        //     event.monthlyViews += 1;
+        //     event.yearlyViews += 1;
+        //     await event.save();
+        // }
+        await publishPodcastAnalyticsEvent({
+            type: ANALYTICS_EVENT_TYPES.PODCAST.VIEW,
+            userId: userId,
+            timestamp: new Date()
+        });
     } catch (err) {
         console.log(err);
     }
-
 }
+
+
 
 // Get analytics
 

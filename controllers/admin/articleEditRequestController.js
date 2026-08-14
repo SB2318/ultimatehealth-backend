@@ -6,7 +6,7 @@ const User = require('../../models/UserModel');
 const { articleReviewNotificationsToUser, articleSubmitNotificationsToAdmin } = require('../notifications/notificationHelper');
 const Comment = require('../../models/commentSchema');
 const WriteAggregate = require("../../models/events/writeEventSchema");
-const { publishContentEmailEvent, EMAIL_EVENT_TYPES } = require('../../services/mqueue/kafkaProducer');
+const { publishContentEmailEvent, publishArticleAnalyticsEvent, publishAdminAnalyticsEvent, EMAIL_EVENT_TYPES, ANALYTICS_EVENT_TYPES } = require('../../services/mqueue/kafkaProducer');
 const cron = require('node-cron');
 const statusEnum = require('../../utils/StatusEnum');
 const AdminAggregate = require('../../models/events/adminContributionEvent');
@@ -601,12 +601,12 @@ module.exports.publishImprovement = expressAsyncHandler(
             await updateWriteEvents(article._id, contributor._id);
 
             // Update admin contribution for publish new article
-            const aggregate = new AdminAggregate({
+            await publishAdminAnalyticsEvent({
+                type: ANALYTICS_EVENT_TYPES.ADMIN.CONTRIBUTION,
                 userId: editRequest.reviewer_id,
                 contributionType: 2,
+                timestamp: new Date()
             });
-
-            await aggregate.save();
 
             // send mail to user
             // sendArticlePublishedEmail(contributor.email, "", article.title);
@@ -673,31 +673,34 @@ module.exports.unassignModerator = expressAsyncHandler(
 )
 
 async function updateWriteEvents(articleId, userId) {
-
-    const now = new Date();
-    const today = new Date(now.setHours(0, 0, 0, 0));
-
     try {
 
+        //  const now = new Date();
+        //  const today = new Date(now.setHours(0, 0, 0, 0));
         // Check for existing event entry
-        const writeEvent = await WriteAggregate.findOne({ userId: userId, date: today });
+        // const writeEvent = await WriteAggregate.findOne({ userId: userId, date: today });
 
-        if (!writeEvent) {
-            // New Write Event Entry
-            const newWriteEvent = new WriteAggregate({ userId: userId, date: today });
-            newWriteEvent.dailyWrites = 1;
-            newWriteEvent.monthlyWrites = 1;
-            newWriteEvent.yearlyWrites = 1;
+        // if (!writeEvent) {
+        //     // New Write Event Entry
+        //     const newWriteEvent = new WriteAggregate({ userId: userId, date: today });
+        //     newWriteEvent.dailyWrites = 1;
+        //     newWriteEvent.monthlyWrites = 1;
+        //     newWriteEvent.yearlyWrites = 1;
 
-            await newWriteEvent.save();
-        } else {
+        //     await newWriteEvent.save();
+        // } else {
 
-            writeEvent.dailyWrites += 1;
-            writeEvent.monthlyWrites += 1;
-            writeEvent.yearlyWrites += 1;
+        //     writeEvent.dailyWrites += 1;
+        //     writeEvent.monthlyWrites += 1;
+        //     writeEvent.yearlyWrites += 1;
 
-            await writeEvent.save();
-        }
+        //     await writeEvent.save();
+        // }
+        await publishArticleAnalyticsEvent({
+            type: ANALYTICS_EVENT_TYPES.ARTICLE.WRITE,
+            userId: userId,
+            timestamp: new Date()
+        });
     } catch (err) {
         console.log('Article Write Event Update Error', err);
     }

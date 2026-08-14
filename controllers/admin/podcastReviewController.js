@@ -6,7 +6,7 @@ const cron = require('node-cron');
 const statusEnum = require('../../utils/StatusEnum');
 const AdminAggregate = require('../../models/events/adminContributionEvent');
 
-const { publishContentEmailEvent, EMAIL_EVENT_TYPES } = require('../../services/mqueue/kafkaProducer');
+const { publishContentEmailEvent, publishPodcastAnalyticsEvent, publishAdminAnalyticsEvent, EMAIL_EVENT_TYPES, ANALYTICS_EVENT_TYPES } = require('../../services/mqueue/kafkaProducer');
 const { sendPostNotification, podcastReviewNotificationsToUser } = require('../notifications/notificationHelper');
 const { deleteFileFn } = require('../uploadController');
 
@@ -177,11 +177,12 @@ const approvePodcast = expressAsyncHandler(
             await podcast.save();
 
             // Increase admin contribution
-            const adminAggregate = new AdminAggregate({
+            await publishAdminAnalyticsEvent({
+                type: ANALYTICS_EVENT_TYPES.ADMIN.CONTRIBUTION,
                 userId: adminUser._id,
-                contributionType: 4
+                contributionType: 4,
+                timestamp: new Date()
             });
-            await adminAggregate.save();
 
             if (!podcast.user_id) {
                 return res.status(404).json({ message: "Podcast author not found" });
@@ -263,11 +264,12 @@ const discardPodcast = expressAsyncHandler(
             await podcast.save();
 
             // Increase admin contribution
-            const adminAggregate = new AdminAggregate({
+            await publishAdminAnalyticsEvent({
+                type: ANALYTICS_EVENT_TYPES.ADMIN.CONTRIBUTION,
                 userId: adminUser._id,
-                contributionType: 4
+                contributionType: 4,
+                timestamp: new Date()
             });
-            await adminAggregate.save();
 
             // send mail
 
@@ -299,33 +301,33 @@ const discardPodcast = expressAsyncHandler(
 )
 
 async function updateUserContribution(userId) {
-
-    const now = new Date();
-    const today = new Date(now.setHours(0, 0, 0, 0));
-
     try {
 
-        const event = await AudioWAggregate.findOne({ userId: userId, date: today });
+        // const event = await AudioWAggregate.findOne({ userId: userId, date: today });
 
-        if (!event) {
-            const newEvent = new AudioWAggregate({
-                userId: userId,
-                date: today,
-                monthlyUploads: 1,
-                yearlyUploads: 1
-            });
+        // if (!event) {
+        //     const newEvent = new AudioWAggregate({
+        //         userId: userId,
+        //         date: today,
+        //         monthlyUploads: 1,
+        //         yearlyUploads: 1
+        //     });
 
-            await newEvent.save();
-        } else {
+        //     await newEvent.save();
+        // } else {
 
-            event.monthlyUploads += 1;
-            event.yearlyUploads += 1;
-            await event.save();
-        }
+        //     event.monthlyUploads += 1;
+        //     event.yearlyUploads += 1;
+        //     await event.save();
+        // }
+        await publishPodcastAnalyticsEvent({
+            type: ANALYTICS_EVENT_TYPES.PODCAST.WRITE,
+            userId: userId,
+            timestamp: new Date()
+        });
     } catch (err) {
         console.log(err);
     }
-
 }
 
 // cron job for podcast  unassigned

@@ -7,7 +7,7 @@ const ReadAggregate = require("../models/events/readEventSchema");
 const WriteAggregate = require("../models/events/writeEventSchema");
 const statusEnum = require("../utils/StatusEnum");
 // const { sendArticleForReviewEmail } = require("./emailservice");
-const { publishContentEmailEvent, EMAIL_EVENT_TYPES } = require("../services/mqueue/kafkaProducer");
+const { publishContentEmailEvent, publishArticleAnalyticsEvent, EMAIL_EVENT_TYPES, ANALYTICS_EVENT_TYPES } = require("../services/mqueue/kafkaProducer");
 
 const mongoose = require('mongoose');
 
@@ -981,31 +981,37 @@ module.exports.updateReadEvents = expressAsyncHandler(
     const today = new Date(now.setHours(0, 0, 0, 0));
 
     try {
-      // New Read Event Entry
-      // console.log("Today", today);
-      // console.log("Read event post", req.userId);
-      const readEvent = await ReadAggregate.findOne({ userId: req.userId, date: today });
 
-      if (!readEvent) {
-        // Create New
+           
+      // // console.log("Read event post", req.userId);
+      // const readEvent = await ReadAggregate.findOne({ userId: req.userId, date: today });
 
-        const newReadEvent = new ReadAggregate({ userId: req.userId, date: today });
-        newReadEvent.dailyReads = 1;
-        newReadEvent.monthlyReads = 1;
-        newReadEvent.yearlyReads = 1;
-        newReadEvent.date = today;
-        await newReadEvent.save();
+      // if (!readEvent) {
+      //   // Create New
 
-        res.status(201).json({ message: 'Read Event Saved', event: newReadEvent });
-      } else {
-        readEvent.dailyReads += 1;
-        readEvent.monthlyReads += 1;
-        readEvent.yearlyReads += 1;
+      //   const newReadEvent = new ReadAggregate({ userId: req.userId, date: today });
+      //   newReadEvent.dailyReads = 1;
+      //   newReadEvent.monthlyReads = 1;
+      //   newReadEvent.yearlyReads = 1;
+      //   newReadEvent.date = today;
+      //   await newReadEvent.save();
 
-        await readEvent.save();
+      //   res.status(201).json({ message: 'Read Event Saved', event: newReadEvent });
+      // } else {
+      //   readEvent.dailyReads += 1;
+      //   readEvent.monthlyReads += 1;
+      //   readEvent.yearlyReads += 1;
 
-        res.status(201).json({ message: 'Read Event Saved', event: readEvent });
-      }
+      //   await readEvent.save();
+
+      //   res.status(201).json({ message: 'Read Event Saved', event: readEvent });
+      // }
+      await publishArticleAnalyticsEvent({
+        type: ANALYTICS_EVENT_TYPES.ARTICLE.READ,
+        userId: req.userId,
+        timestamp: new Date()
+      });
+      res.status(201).json({ message: 'Read Event Published to Kafka Queue' });
     } catch (err) {
       console.log('Article Read Event Update Error', err);
       res.status(500).json({ error: err.message });

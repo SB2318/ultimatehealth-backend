@@ -6,7 +6,7 @@ const Comment = require("../../models/commentSchema");
 const Admin = require("../../models/admin/adminModel");
 const AdminAggregate = require("../../models/events/adminContributionEvent");
 const emailService = require("../../controllers/emailservice");
-const { publishModerationEmailEvent, publishAccountModerationEmailEvent, EMAIL_EVENT_TYPES } = require("../mqueue/kafkaProducer");
+const { publishModerationEmailEvent, publishAccountModerationEmailEvent, publishAdminAnalyticsEvent, EMAIL_EVENT_TYPES, ANALYTICS_EVENT_TYPES } = require("../mqueue/kafkaProducer");
 
 /**
  * Picks a report for investigation by a moderator.
@@ -277,7 +277,12 @@ const adminTakeAction = async ({ reportId, action, adminId, dismissReason }) => 
 
     // Record contribution
     if (action !== reportActionEnum.IGNORE) {
-        await new AdminAggregate({ userId: adminId, contributionType: 3 }).save();
+        await publishAdminAnalyticsEvent({
+            type: ANALYTICS_EVENT_TYPES.ADMIN.CONTRIBUTION,
+            userId: adminId,
+            contributionType: 3,
+            timestamp: new Date()
+        });
     }
 
     // Auto unblock if count drops
