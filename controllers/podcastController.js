@@ -8,7 +8,7 @@ const Comment = require("../models/commentSchema");
 const PlayList = require("../models/playlistSchema");
 const AudioLikeAggregate = require('../models/events/audioLikeEventSchema');
 const AudioViewAggregate = require('../models/events/audioViewEventSchema');
-const Podcast = require("../models/Podcast");
+
 const PodcastEpisode = require("../models/PodcastEpisode");
 const { deleteFileFn } = require('./uploadController');
 const { sendPodcastForReviewEmail } = require("./emailservice");
@@ -341,69 +341,54 @@ const filterPodcast = expressAsyncHandler(
     }
 )
 
-// Update podcast
-const updatePodcast = expressAsyncHandler(
+// Create podcast
+const createPodcast = expressAsyncHandler(
     async (req, res) => {
-        // Added episode_id
-        const { podcastId, name, cover_image, episode_id } = req.body;
+        let { title, description, tags, article_id, audio_url, duration, cover_image, episode_id = -1 } = req.body;
 
-        if (!podcastId || !name) {
-            return res.status(400).json({ error: 'Invalid request: podcastId and name are required' });
+        if (!title || !description || !tags || !audio_url || !duration || !cover_image) {
+            return res.status(400).json({ message: 'All fields are required: title, description, tags, audio_url, duration, cover_image' });
+        }
+
+        if (episode_id === -1) {
+            episode_id = null;
         }
 
         try {
-            // Change to findById so we can check the OLD episode_id
-            const podcast = await Podcast.findById(podcastId);
-            if (!podcast) {
-                return res.status(404).json({ error: 'Podcast not found' });
+            const user = await User.findById(req.userId);
+
+            if (user.isBlockUser || user.isBannedUser) {
+                return res.status(403).json({ error: "User is blocked or banned." });
             }
+            const podcast = new Podcast({
+                title,
+                description,
+                tags,
+                article_id,
+                audio_url,
+                duration,
+                user_id: user._id,
+                cover_image,
+                episode_id
+            });
 
-            // 1. Handle Episode changes (moving podcast to a new episode)
-            if (episode_id !== undefined ){
-                if (String(podcast.episode_id) === String(episode_id)) {
-                    // No need to update, the episode hasn't changed
-                } else {
-                // Decrement old episode count
-                if (podcast.episode_id) {
-                    await PodcastEpisode.findByIdAndUpdate(podcast.episode_id, {
-                        $inc: { podcasts_count: -1 }
-                    });
-                }
+            podcast.mentionedUsers.push(user._id);
 
-                // Increment new episode count and calculate number
-                if (episode_id) {
-                    await PodcastEpisode.findByIdAndUpdate(episode_id, {
-                        $inc: { podcasts_count: 1 }
-                    });
-                    const count = await Podcast.countDocuments({ episode_id: episode_id });
-                    podcast.episode_number = count + 1;
-                    podcast.episode_id = episode_id;
-                } else {
-                    // User removed it from the episode completely
-                    podcast.episode_id = null;
-                    podcast.episode_number = null;
-                }
-            }
-        }
-
-            // 2. Apply standard updates
-            podcast.title = name;
-            podcast.updated_at = new Date();
-
-            // 3. Handle cover image update (preserving your original logic)
-            if (cover_image) {
-                const coverParts = podcast.cover_image.split('/api/getFile/');
-                if (coverParts.length >= 2) {
-                    await deleteFileFn(coverParts[1]);
-                }
-                podcast.cover_image = cover_image;
+            // Handle Episode integration
+            if (episode_id) {
+                await PodcastEpisode.findByIdAndUpdate(episode_id, {
+                    $inc: { podcasts_count: 1 }
+                });
+                const count = await Podcast.countDocuments({ episode_id: episode_id });
+                podcast.episode_number = count + 1;
             }
 
             await podcast.save();
-            res.status(200).json({ message: 'Podcast updated successfully' });
+            sendPodcastForReviewEmail(user.email, title);
+            res.status(201).json({ message: 'Podcast created successfully.', podcast: podcast });
         } catch (err) {
             console.log(err);
-            res.status(500).json({ error: 'An error occurred while updating podcast' });
+            res.status(500).json({ message: err.message });
         }
     }
 )
@@ -874,40 +859,70 @@ const getPodcastViewDataForGraphs = expressAsyncHandler(
 // Update podcast
 const updatePodcast = expressAsyncHandler(
     async (req, res) => {
-        const { podcastId, name, cover_image } = req.body;
+        let { podcastId, name, cover_image, episode_id } = req.body;
+
+        if (episode_id === -1) {
+            episode_id = null;
+        }
 
         if (!podcastId || !name) {
             return res.status(400).json({ error: 'Invalid request: podcastId and name are required' });
         }
 
         try {
-
-            const podcast = await Podcast.findByIdAndUpdate(
-                podcastId,
-                { title: name, updated_at: new Date() },
-                { new: true }
-            );
-
+            const podcast = await Podcast.findById(podcastId);
             if (!podcast) {
                 return res.status(404).json({ error: 'Podcast not found' });
             }
+
+            // 1. Handle Episode changes (moving podcast to a new episode)
+            if (episode_id !== undefined ) {
+                if (String(podcast.episode_id) === String(episode_id)) {
+                    // No need to update, the episode hasn't changed
+                } else {
+                    // Decrement old episode count
+                    if (podcast.episode_id) {
+                        await PodcastEpisode.findByIdAndUpdate(podcast.episode_id, {
+                            $inc: { podcasts_count: -1 }
+                        });
+                    }
+
+                    // Increment new episode count and calculate number
+                    if (episode_id) {
+                        await PodcastEpisode.findByIdAndUpdate(episode_id, {
+                            $inc: { podcasts_count: 1 }
+                        });
+                        const count = await Podcast.countDocuments({ episode_id: episode_id });
+                        podcast.episode_number = count + 1;
+                        podcast.episode_id = episode_id;
+                    } else {
+                        // User removed it from the episode completely
+                        podcast.episode_id = null;
+                        podcast.episode_number = null;
+                    }
+                }
+            }
+
+            // 2. Apply standard updates
+            podcast.title = name;
+            podcast.updated_at = new Date();
+
+            // 3. Handle cover image update
             if (cover_image) {
-                // delete previous
                 const coverParts = podcast.cover_image.split('/api/getFile/');
                 if (coverParts.length >= 2) {
                     await deleteFileFn(coverParts[1]);
                 }
                 podcast.cover_image = cover_image;
-                await podcast.save();
             }
+
+            await podcast.save();
             res.status(200).json({ message: 'Podcast updated successfully' });
         } catch (err) {
             console.log(err);
             res.status(500).json({ error: 'An error occurred while updating podcast' });
         }
-
     }
-
 )
 
 const updatePlaylist = expressAsyncHandler(
