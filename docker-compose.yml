@@ -1,8 +1,8 @@
 version : '3.8'
 services:
-  kafka:
+  kafka1:
     image: apache/kafka:latest
-    container_name: kafka-ultimatehealth
+    container_name: kafka1-ultimatehealth
     ports:
       - "9092:9092"
     environment:
@@ -10,7 +10,7 @@ services:
       # KAFKA_ENABLED_KRAFT: 'true' 
       
       # The advertised host name is the host name that will be used by clients to connect to the Kafka broker. In this case, it is set to "kafka", which is the name of the Kafka service defined in this docker-compose file.
-      KAFKA_ADVERTISED_HOST_NAME: kafka
+      #KAFKA_ADVERTISED_HOST_NAME: kafka1-ultimatehealth
 
       # The KAFKA_CFG_BROKER_ID environment variable is used to specify the unique identifier for the Kafka broker. In this case, it is set to "1".
       #KAFKA_CFG_BROKER_ID: 1
@@ -22,27 +22,27 @@ services:
       # The KAFKA_CONTROLLER_LISTENER_NAMES environment variable is used to specify the listener names that will be used for the controller role. In this case, it is set to "CONTROLLER".
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
 
-      # The KAFKA_INNER_BROKER_LISTENER_NAME environment variable is used to specify the listener name that will be used for the inner broker role. In this case, it is set to "PLAINTEXT".
-      KAFKA_INNER_BROKER_LISTENER_NAME: PLAINTEXT
+      # The KAFKA_INTER_BROKER_LISTENER_NAME environment variable is used to specify the listener name that will be used for the internal broker role. In this case, it is set to "PLAINTEXT".
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
 
       # The KAFKA_LISTENERS environment variable is used to specify the listeners that the Kafka broker will use. In this case, it is set to "PLAINTEXT://:9092,CONTROLLER://:9093", which means that the broker will listen for plaintext connections on port 9092 and controller connections on port 9093.
       KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
       # The KAFKA_LISTENER_SECURITY_PROTOCOL_MAP environment variable is used to specify the security protocols that will be used for each listener. In this case, it is set to "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT", which means that both the plaintext and controller listeners will use the plaintext security protocol.
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
 
-      # The KAFKA_ADVERTISED_LISTENERS environment variable is used to specify the advertised listeners that will be used by clients to connect to the Kafka broker. In this case, it is set to "PLAINTEXT://kafka:9092,CONTROLLER://kafka:9093", which means that clients will connect to the broker using the hostname "kafka" and the appropriate port for each listener.
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,CONTROLLER://localhost:9093
-
+      # The KAFKA_ADVERTISED_LISTENERS environment variable is used to specify the advertised listeners that will be used by clients to connect to the Kafka broker.
+      # For this single-broker setup, advertise the service name so other containers can reach it at kafka:9092.
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka1:9092
 
       # The KAFKA_CONTROLLER_QUORUM_VOTERS environment variable is used to specify the voters for the controller quorum. In this case, it is set to "1@kafka:9093", which means that the broker with ID 1 will be a voter for the controller quorum and will listen on port 9093.
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-      
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka1:9093, 2@kafka2:9093, 3@kafka3:9093
+
       # The KAFKA_NUM_PARTITIONS environment variable is used to specify the default number of partitions for topics created on the Kafka broker. In this case, it is set to "3", which means that any new topic created on this broker will have 3 partitions by default.
       KAFKA_NUM_PARTITIONS: 3
 
       
-      # The KAFKA_OFFSET_TOPIC_REPLICATION_FACTOR environment variable is used to specify the replication factor for the internal __consumer_offsets topic. In this case, it is set to "3", which means that the __consumer_offsets topic will have 3 replicas.
-      KAFKA_OFFSET_TOPIC_REPLICATION_FACTOR: 3
+      # The KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR environment variable is used to specify the replication factor for the internal __consumer_offsets topic. In this case, it is set to "3", which means that the __consumer_offsets topic will have 3 replicas.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
 
       # The KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR environment variable is used to specify the replication factor for the internal __transaction_state topic. In this case, it is set to "3", which means that the __transaction_state topic will have 3 replicas.
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
@@ -51,7 +51,115 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
 
       # Allow unencrypted traffic to the Kafka broker. This is necessary for clients that do not support encryption, such as some older versions of Kafka clients.
-      ALLOW_PLAINTEXT_LISTENER: 'yes'
+      # ALLOW_PLAINTEXT_LISTENER: 'yes'
+
+  kafka2:
+    image: apache/kafka:latest
+    container_name: kafka2-ultimatehealth
+    ports:
+      - "9093:9092"
+    environment:
+      # Tells the Bitnami image to use the modern KRaft mode instead of looking for a ZooKeeper server.
+      # KAFKA_ENABLED_KRAFT: 'true' 
+      
+      # The advertised host name is the host name that will be used by clients to connect to the Kafka broker. In this case, it is set to "kafka", which is the name of the Kafka service defined in this docker-compose file.
+      # KAFKA_ADVERTISED_HOST_NAME: kafka2-ultimatehealth
+
+      # The KAFKA_CFG_BROKER_ID environment variable is used to specify the unique identifier for the Kafka broker. In this case, it is set to "1".
+      #KAFKA_CFG_BROKER_ID: 1
+      KAFKA_NODE_ID: 2
+
+      # In KRaft mode, the Kafka broker can take on multiple roles, including being a broker and a controller. The KAFKA_CFG_PROCESS_ROLES environment variable is used to specify the roles that the Kafka broker will take on. In this case, it is set to "broker,controller".
+      KAFKA_PROCESS_ROLES: broker,controller
+
+      # The KAFKA_CONTROLLER_LISTENER_NAMES environment variable is used to specify the listener names that will be used for the controller role. In this case, it is set to "CONTROLLER".
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+
+      # The KAFKA_INTER_BROKER_LISTENER_NAME environment variable is used to specify the listener name that will be used for the inner broker role. In this case, it is set to "PLAINTEXT".
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      # The KAFKA_LISTENERS environment variable is used to specify the listeners that the Kafka broker will use. In this case, it is set to "PLAINTEXT://:9092,CONTROLLER://:9093", which means that the broker will listen for plaintext connections on port 9092 and controller connections on port 9093.
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      # The KAFKA_LISTENER_SECURITY_PROTOCOL_MAP environment variable is used to specify the security protocols that will be used for each listener. In this case, it is set to "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT", which means that both the plaintext and controller listeners will use the plaintext security protocol.
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+
+      # The KAFKA_ADVERTISED_LISTENERS environment variable is used to specify the advertised listeners that will be used by clients to connect to the Kafka broker.
+      # For this single-broker setup, advertise the service name so other containers can reach it at kafka:9092.
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka2:9092
+
+      # The KAFKA_CONTROLLER_QUORUM_VOTERS environment variable is used to specify the voters for the controller quorum. In this case, it is set to "1@kafka:9093", which means that the broker with ID 1 will be a voter for the controller quorum and will listen on port 9093.
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka1:9093, 2@kafka2:9093, 3@kafka3:9093
+
+      # The KAFKA_NUM_PARTITIONS environment variable is used to specify the default number of partitions for topics created on the Kafka broker. In this case, it is set to "3", which means that any new topic created on this broker will have 3 partitions by default.
+      KAFKA_NUM_PARTITIONS: 3
+
+      
+      # The KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR environment variable is used to specify the replication factor for the internal __consumer_offsets topic. In this case, it is set to "3", which means that the __consumer_offsets topic will have 3 replicas.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+
+      # The KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR environment variable is used to specify the replication factor for the internal __transaction_state topic. In this case, it is set to "3", which means that the __transaction_state topic will have 3 replicas.
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+
+      # The KAFKA_TRANSACTION_STATE_LOG_MIN_ISR environment variable is used to specify the minimum number of in-sync replicas for the internal __transaction_state topic. In this case, it is set to "2", which means that at least 2 replicas must be in sync for the __transaction_state topic to be considered healthy.
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+
+      # Allow unencrypted traffic to the Kafka broker. This is necessary for clients that do not support encryption, such as some older versions of Kafka clients.
+      # ALLOW_PLAINTEXT_LISTENER: 'yes'
+
+  kafka3:
+    image: apache/kafka:latest
+    container_name: kafka3-ultimatehealth
+    ports:
+      - "9094:9092"
+    environment:
+      # Tells the Bitnami image to use the modern KRaft mode instead of looking for a ZooKeeper server.
+      # KAFKA_ENABLED_KRAFT: 'true' 
+      
+      # The advertised host name is the host name that will be used by clients to connect to the Kafka broker. In this case, it is set to "kafka", which is the name of the Kafka service defined in this docker-compose file.
+      # KAFKA_ADVERTISED_HOST_NAME: kafka3-ultimatehealth
+
+      # The KAFKA_CFG_BROKER_ID environment variable is used to specify the unique identifier for the Kafka broker. In this case, it is set to "1".
+      #KAFKA_CFG_BROKER_ID: 1
+      KAFKA_NODE_ID: 3
+
+      # In KRaft mode, the Kafka broker can take on multiple roles, including being a broker and a controller. The KAFKA_CFG_PROCESS_ROLES environment variable is used to specify the roles that the Kafka broker will take on. In this case, it is set to "broker,controller".
+      KAFKA_PROCESS_ROLES: broker,controller
+
+      # The KAFKA_CONTROLLER_LISTENER_NAMES environment variable is used to specify the listener names that will be used for the controller role. In this case, it is set to "CONTROLLER".
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+
+      # The KAFKA_INTER_BROKER_LISTENER_NAME environment variable is used to specify the listener name that will be used for the internal broker role. In this case, it is set to "PLAINTEXT".
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      # The KAFKA_LISTENERS environment variable is used to specify the listeners that the Kafka broker will use. In this case, it is set to "PLAINTEXT://:9092,CONTROLLER://:9093", which means that the broker will listen for plaintext connections on port 9092 and controller connections on port 9093.
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      # The KAFKA_LISTENER_SECURITY_PROTOCOL_MAP environment variable is used to specify the security protocols that will be used for each listener. In this case, it is set to "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT", which means that both the plaintext and controller listeners will use the plaintext security protocol.
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+
+      # The KAFKA_ADVERTISED_LISTENERS environment variable is used to specify the advertised listeners that will be used by clients to connect to the Kafka broker.
+      # For this single-broker setup, advertise the service name so other containers can reach it at kafka:9092.
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka3:9092
+
+      # The KAFKA_CONTROLLER_QUORUM_VOTERS environment variable is used to specify the voters for the controller quorum. In this case, it is set to "1@kafka:9093", which means that the broker with ID 1 will be a voter for the controller quorum and will listen on port 9093.
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka1:9093, 2@kafka2:9093, 3@kafka3:9093
+
+      # The KAFKA_NUM_PARTITIONS environment variable is used to specify the default number of partitions for topics created on the Kafka broker. In this case, it is set to "3", which means that any new topic created on this broker will have 3 partitions by default.
+      KAFKA_NUM_PARTITIONS: 3
+
+      
+      # The KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR environment variable is used to specify the replication factor for the internal __consumer_offsets topic. In this case, it is set to "3", which means that the __consumer_offsets topic will have 3 replicas.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+
+      # The KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR environment variable is used to specify the replication factor for the internal __transaction_state topic. In this case, it is set to "3", which means that the __transaction_state topic will have 3 replicas.
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+
+      # The KAFKA_TRANSACTION_STATE_LOG_MIN_ISR environment variable is used to specify the minimum number of in-sync replicas for the internal __transaction_state topic. In this case, it is set to "2", which means that at least 2 replicas must be in sync for the __transaction_state topic to be considered healthy.
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+
+      # Allow unencrypted traffic to the Kafka broker. This is necessary for clients that do not support encryption, such as some older versions of Kafka clients.
+      # ALLOW_PLAINTEXT_LISTENER: 'yes'
+
+
 
 
 # To Run : docker-compose up -d
