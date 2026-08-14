@@ -5,7 +5,7 @@ const User = require('../../models/UserModel');
 const { articleReviewNotificationsToUser, articleSubmitNotificationsToAdmin, broadcastNewArticlePublished } = require('../notifications/notificationHelper');
 const Comment = require('../../models/commentSchema');
 const WriteAggregate = require("../../models/events/writeEventSchema");
-const { sendArticleFeedbackEmail, sendArticlePublishedEmail, sendArticleDiscardEmail, sendMailArticleDiscardByAdmin, pickArticleMail } = require('../emailservice');
+const { publishContentEmailEvent, EMAIL_EVENT_TYPES } = require('../../services/mqueue/kafkaProducer');
 const cron = require('node-cron');
 const statusEnum = require('../../utils/StatusEnum');
 const { deleteFileFn } = require('../uploadController');
@@ -133,7 +133,7 @@ module.exports.getAllReviewCompletedArticles = expressAsyncHandler(
                 .exec();
 
             if (Number(page) === 1) {
-                
+
                 const totalArticles = await Article.countDocuments({
                     reviewer_id: reviewer_id,
                     is_removed: false,
@@ -146,7 +146,7 @@ module.exports.getAllReviewCompletedArticles = expressAsyncHandler(
                 return;
             }
 
-            res.status(200).json({articles});
+            res.status(200).json({ articles });
         } catch (err) {
             console.log(err);
             res.status(500).json({ message: err.message });
@@ -204,13 +204,19 @@ module.exports.assignModerator = expressAsyncHandler(
 
             await article.save();
 
-            pickArticleMail(article.authorId.email, article.title);
+            // pickArticleMail(article.authorId.email, article.title);
+
+            await publishContentEmailEvent({
+                email: article.authorId.email,
+                title: article.title,
+                groupIndex: EMAIL_EVENT_TYPES.CONTENT.PICK_ARTICLE
+            });
 
             articleReviewNotificationsToUser(article.authorId._id, article._id, article.pb_recordId, null,
                 `Congrats!Your Article : ${article.title} is Under Review`,
                 "Our team has started reviewing your article. Stay tuned!"
             );
-           
+
             res.status(200).json({ message: "Article status updated" });
 
         } catch (err) {
@@ -274,7 +280,14 @@ module.exports.submitReview = expressAsyncHandler(
             );
 
             // send mail
-            sendArticleFeedbackEmail(article.authorId.email, feedback, article.title);
+            // sendArticleFeedbackEmail(article.authorId.email, feedback, article.title);
+
+            await publishContentEmailEvent({
+                email: article.authorId.email,
+                title: article.title,
+                feedback: feedback,
+                groupIndex: EMAIL_EVENT_TYPES.CONTENT.ARTICLE_FEEDBACK
+            });
 
             res.status(200).json({ message: "Review submitted" });
 
@@ -416,12 +429,20 @@ module.exports.publishArticle = expressAsyncHandler(
             });
 
             await aggregate.save();
-            
+
             const dynamicLink = `https://uhsocial.in/api/share/article?articleId=${article._id}&recordId=${article.pb_recordId}&authorId=${article.authorId._id}`;
-             
+
             const blogLink = `https://uhsocial.in/api/share/blog/${article.pb_recordId}`;
             // send mail to user
-            sendArticlePublishedEmail(article.authorId.email, blogLink, article.title);
+            //sendArticlePublishedEmail(article.authorId.email, blogLink, article.title);
+
+            await publishContentEmailEvent({
+                email: contributor.email,
+                title: article.title,
+                articleLink: blogLink,
+                groupIndex: EMAIL_EVENT_TYPES.CONTENT.ARTICLE_PUBLISHED
+            });
+
 
             articleReviewNotificationsToUser(
                 article.authorId._id,
@@ -483,7 +504,14 @@ module.exports.discardChanges = expressAsyncHandler(
             await article.save();
             if (user) {
 
-                sendMailArticleDiscardByAdmin(user.email, article.title, discardReason);
+                // sendMailArticleDiscardByAdmin(user.email, article.title, discardReason);
+
+                await publishContentEmailEvent({
+                    email: user.email,
+                    title: article.title,
+                    reason: discardReason,
+                    groupIndex: EMAIL_EVENT_TYPES.CONTENT.ARTICLE_DISCARD_BY_ADMIN
+                });
             }
 
             return res.status(200).json({ message: "Article Discarded" });
@@ -652,7 +680,15 @@ async function discardArticle() {
                     "Your article with title " + article.title + " has been discarded by system"
                 );
 
-                sendArticleDiscardEmail(article.authorId.email, article.status, article.title, "");
+                // sendArticleDiscardEmail(article.authorId.email, article.status, article.title, "");
+
+                await publishContentEmailEvent({
+                    email: article.authorId.email,
+                    status: article.status,
+                    title: article.title,
+                    reason: "Your article with title " + article.title + " has been discarded by system",
+                    groupIndex: EMAIL_EVENT_TYPES.CONTENT.ARTICLE_DISCARD
+                });
             }
 
 

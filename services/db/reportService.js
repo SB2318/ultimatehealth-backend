@@ -6,6 +6,7 @@ const Comment = require("../../models/commentSchema");
 const Admin = require("../../models/admin/adminModel");
 const AdminAggregate = require("../../models/events/adminContributionEvent");
 const emailService = require("../../controllers/emailservice");
+const { publishModerationEmailEvent, publishAccountModerationEmailEvent, EMAIL_EVENT_TYPES } = require("../mqueue/kafkaProducer");
 
 /**
  * Picks a report for investigation by a moderator.
@@ -30,7 +31,15 @@ const adminAction = async (reportId, adminId) => {
     await report.save();
 
     /** Send Mail to user */
-    emailService.sendReportUndertakenEmail(report.reportedBy.email, report._id);
+    //emailService.sendReportUndertakenEmail(report.reportedBy.email, report._id);
+
+    await publishModerationEmailEvent(
+        {
+            email: report.reportedBy.email,
+            issueNumber: report._id,
+            groupIndex: EMAIL_EVENT_TYPES.MODERATION.REPORT_UNDERTAKEN
+        }
+    );
     return report;
 };
 
@@ -86,8 +95,21 @@ const adminTakeAction = async ({ reportId, action, adminId, dismissReason }) => 
         case reportActionEnum.RESOLVED:
             report.action_taken = reportActionEnum.RESOLVED;
             convict.activeReportCount = Math.max(0, convict.activeReportCount - 1);
-            await emailService.sendResolvedMailToConvict(convict.email, details, reportType);
-            await emailService.sendResolvedMailToVictim(victim.email, details, reportType, action);
+            // await emailService.sendResolvedMailToConvict(convict.email, details, reportType);
+            await publishModerationEmailEvent({
+                email: convict.email,
+                details: details,
+                reportType: reportType,
+                groupIndex: EMAIL_EVENT_TYPES.MODERATION.RESOLVED_CONVICT
+            });
+            await publishModerationEmailEvent({
+                email: victim.email,
+                details: details,
+                reportType: reportType,
+                resolution: action,
+                groupIndex: EMAIL_EVENT_TYPES.MODERATION.RESOLVED_VICTIM
+            });
+            // await emailService.sendResolvedMailToVictim(victim.email, details, reportType, action);
             break;
 
         case reportActionEnum.DISMISSED:
@@ -99,8 +121,25 @@ const adminTakeAction = async ({ reportId, action, adminId, dismissReason }) => 
                 victim.isBlockUser = true;
                 victim.blockedAt = new Date();
             }
-            await emailService.sendWarningMailToVictimOnReportDismissOrIgnore(victim.email, details, reportType, dismissReason, Math.max(victim.reportFeatureMisuse - 1, 0));
-            await emailService.sendDismissedOrIgnoreMailToConvict(convict.email, details, reportType);
+            //   await emailService.sendWarningMailToVictimOnReportDismissOrIgnore(victim.email, details, reportType, dismissReason, Math.max(victim.reportFeatureMisuse - 1, 0));
+
+            await publishModerationEmailEvent({
+                email: victim.email,
+                details: details,
+                reportType: reportType,
+                dismissReason: dismissReason,
+                misuseCount: Math.max(victim.reportFeatureMisuse - 1, 0),
+                groupIndex: EMAIL_EVENT_TYPES.MODERATION.WARNING_VICTIM_DISMISS
+            });
+
+            //await emailService.sendDismissedOrIgnoreMailToConvict(convict.email, details, reportType);
+            await publishModerationEmailEvent({
+                email: convict.email,
+                details: details,
+                reportType: reportType,
+                groupIndex: EMAIL_EVENT_TYPES.MODERATION.DISMISSED_CONVICT
+            });
+
             break;
 
         case reportActionEnum.IGNORE:
@@ -114,16 +153,49 @@ const adminTakeAction = async ({ reportId, action, adminId, dismissReason }) => 
             convict.strikeCount += 1;
             if (convict.strikeCount >= 3) convict.isBannedUser = true;
             await removeContent(report);
-            await emailService.sendWarningMailToConvict(convict.email, details, reportType, report.reasonId.reason, Math.max(0, convict.strikeCount));
-            await emailService.sendResolvedMailToVictim(victim.email, details, reportType, action);
+
+            await publishModerationEmailEvent({
+                email: convict.email,
+                details: details,
+                reportType: reportType,
+                reason: report.reasonId.reason,
+                strikeCount: Math.max(0, convict.strikeCount),
+                groupIndex: EMAIL_EVENT_TYPES.MODERATION.WARNING_CONVICT
+            });
+            //await emailService.sendWarningMailToConvict(convict.email, details, reportType, report.reasonId.reason, Math.max(0, convict.strikeCount));
+
+            // await emailService.sendResolvedMailToVictim(victim.email, details, reportType, action);
+            await publishModerationEmailEvent({
+                email: victim.email,
+                details: details,
+                reportType: reportType,
+                resolution: action,
+                groupIndex: EMAIL_EVENT_TYPES.MODERATION.RESOLVED_VICTIM
+            });
             break;
 
         case reportActionEnum.REMOVE_CONTENT:
             report.action_taken = reportActionEnum.REMOVE_CONTENT;
             convict.activeReportCount = Math.max(0, convict.activeReportCount - 1);
             await removeContent(report);
-            await emailService.sendRemoveContentMailToConvict(convict.email, details, reportType, report.reasonId.reason);
-            await emailService.sendResolvedMailToVictim(victim.email, details, reportType, action);
+            // await emailService.sendRemoveContentMailToConvict(convict.email, details, reportType, report.reasonId.reason);
+
+            await publishModerationEmailEvent({
+                email: convict.email,
+                details: details,
+                reportType: reportType,
+                reason: report.reasonId.reason,
+                groupIndex: EMAIL_EVENT_TYPES.MODERATION.REMOVE_CONTENT_CONVICT
+            });
+
+            // await emailService.sendResolvedMailToVictim(victim.email, details, reportType, action);
+            await publishModerationEmailEvent({
+                email: victim.email,
+                details: details,
+                reportType: reportType,
+                resolution: action,
+                groupIndex: EMAIL_EVENT_TYPES.MODERATION.RESOLVED_VICTIM
+            });
             break;
 
         case reportActionEnum.BLOCK_CONVICT:
@@ -131,26 +203,69 @@ const adminTakeAction = async ({ reportId, action, adminId, dismissReason }) => 
             convict.activeReportCount = Math.max(0, convict.activeReportCount - 1); // Fixed from + 1 in original code
             convict.isBlockUser = true;
             convict.blockedAt = new Date();
-            await emailService.sendBlockConvictMail(convict.email, details, reportType, report.reasonId.reason);
-            await emailService.sendResolvedMailToVictim(victim.email, details, reportType, action);
+            // await emailService.sendBlockConvictMail(convict.email, details, reportType, report.reasonId.reason);
+
+            await publishModerationEmailEvent({
+                email: convict.email,
+                details: details,
+                reportType: reportType,
+                reason: report.reasonId.reason,
+                groupIndex: EMAIL_EVENT_TYPES.MODERATION.BLOCK_CONVICT
+            });
+            // await emailService.sendResolvedMailToVictim(victim.email, details, reportType, action);
+            await publishModerationEmailEvent({
+                email: victim.email,
+                details: details,
+                reportType: reportType,
+                resolution: action,
+                groupIndex: EMAIL_EVENT_TYPES.MODERATION.RESOLVED_VICTIM
+            });
             break;
 
         case reportActionEnum.BAN_CONVICT:
             report.action_taken = reportActionEnum.BAN_CONVICT;
             convict.activeReportCount = Math.max(0, convict.activeReportCount - 1);
             convict.isBannedUser = true;
-            await emailService.sendBannedUserMail(convict.email, details, reportType, report.reasonId.reason);
-            await emailService.sendResolvedMailToVictim(victim.email, details, reportType, action);
+            // await emailService.sendBannedUserMail(convict.email, details, reportType, report.reasonId.reason);
+
+            await publishModerationEmailEvent({
+                email: convict.email,
+                details: details,
+                reportType: reportType,
+                reason: report.reasonId.reason,
+                groupIndex: EMAIL_EVENT_TYPES.MODERATION.BANNED_USER
+            });
+
+            //   await emailService.sendResolvedMailToVictim(victim.email, details, reportType, action);
+            await publishModerationEmailEvent({
+                email: victim.email,
+                details: details,
+                reportType: reportType,
+                resolution: action,
+                groupIndex: EMAIL_EVENT_TYPES.MODERATION.RESOLVED_VICTIM
+            });
             break;
 
         case reportActionEnum.RESTORE_CONTENT:
             report.action_taken = reportActionEnum.RESTORE_CONTENT;
             await restoreContent(report);
-            await emailService.sendRestoreContentMailToUser(convict.email, report.articleId?.title || report.podcastId?.title);
+            //await emailService.sendRestoreContentMailToUser(convict.email, report.articleId?.title || report.podcastId?.title);
+
+            await publishAccountModerationEmailEvent({
+                email: convict.email,
+                details: { contentTitle: report.articleId?.title || report.podcastId?.title },
+                groupIndex: EMAIL_EVENT_TYPES.ACCOUNT.RESTORE_CONTENT
+            });
+
             break;
 
         case reportActionEnum.CONVICT_REQUEST_DISAPPROVED:
-            await emailService.sendRestoreRequestDisapprovedMail(convict.email, report.articleId?.title || report.podcastId?.title);
+            //  await emailService.sendRestoreRequestDisapprovedMail(convict.email, report.articleId?.title || report.podcastId?.title);
+            await publishAccountModerationEmailEvent({
+                email: convict.email,
+                details: { contentTitle: report.articleId?.title || report.podcastId?.title },
+                groupIndex: EMAIL_EVENT_TYPES.ACCOUNT.RESTORE_REQUEST_DISAPPROVED
+            });
             break;
 
         default:
@@ -170,7 +285,12 @@ const adminTakeAction = async ({ reportId, action, adminId, dismissReason }) => 
         convict.isBlockUser = false;
         convict.blockedAt = null;
         await convict.save();
-        await emailService.sendUnblockUserMail(convict.email, convict.user_name);
+        // await emailService.sendUnblockUserMail(convict.email, convict.user_name);
+        await publishAccountModerationEmailEvent({
+            email: convict.email,
+            details: { user_name: convict.user_name },
+            groupIndex: EMAIL_EVENT_TYPES.ACCOUNT.UNBLOCK_USER
+        });
     }
 
     return report;

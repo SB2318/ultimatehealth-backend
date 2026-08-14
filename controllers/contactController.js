@@ -1,6 +1,7 @@
 const expressAsyncHandler = require('express-async-handler');
 const ContactUs = require('../models/ContactUs');
-const { sendContactUsMail } = require('./emailservice');
+//const { sendContactUsMail } = require('./emailservice');
+const { publishSupportEmailEvent, EMAIL_EVENT_TYPES } = require('../services/mqueue/kafkaProducer');
 const validator = require('validator');
 
 const submitContactForm = expressAsyncHandler(async (req, res) => {
@@ -18,7 +19,14 @@ const submitContactForm = expressAsyncHandler(async (req, res) => {
         const newContact = new ContactUs({ name, email, subject, message });
         await newContact.save();
 
-        await sendContactUsMail({ name, email, subject, message });
+        //await sendContactUsMail({ name, email, subject, message });
+
+        // Publish support email event to Kafka
+        await publishSupportEmailEvent({
+            email: email,
+            details: { name, subject, message },
+            groupIndex: EMAIL_EVENT_TYPES.SUPPORT.CONTACT_US
+        });
 
         res.status(200).json({ message: 'Your message has been received. We will contact you shortly.' });
     } catch (err) {

@@ -4,7 +4,9 @@ const User = require('../../models/UserModel');
 const Notification = require('../../models/notificationSchema');
 const Admin = require('../../models/admin/adminModel');
 const Article = require('../../models/Articles');
-const { sendNewArticleEmail } = require('../emailservice');
+//const { sendNewArticleEmail } = require('../emailservice');
+
+const { publishContentEmailEvent, EMAIL_EVENT_TYPES } = require('../../services/mqueue/kafkaProducer');
 
 
 /**
@@ -543,7 +545,15 @@ module.exports.broadcastNewArticlePublished = async (articleId) => {
             try {
                 // Send email
                 if (user.email) {
-                    sendNewArticleEmail(user.email, article.title, article.authorId.user_name, articleLink);
+                  //  sendNewArticleEmail(user.email, article.title, article.authorId.user_name, articleLink);
+
+                    await publishContentEmailEvent({
+                        email: user.email,
+                        title: article.title,
+                        articleLink: articleLink,
+                        authorName: article.authorId.user_name,
+                        groupIndex: EMAIL_EVENT_TYPES.CONTENT.NEW_ARTICLE_PUBLISHED
+                    });
                 }
 
                 // Send push notification

@@ -6,7 +6,8 @@ const EditRequest = require('../models/admin/articleEditRequestModel');
 const ReadAggregate = require("../models/events/readEventSchema");
 const WriteAggregate = require("../models/events/writeEventSchema");
 const statusEnum = require("../utils/StatusEnum");
-const { sendArticleForReviewEmail } = require("./emailservice");
+// const { sendArticleForReviewEmail } = require("./emailservice");
+const { publishContentEmailEvent, EMAIL_EVENT_TYPES } = require("../services/mqueue/kafkaProducer");
 
 const mongoose = require('mongoose');
 
@@ -145,7 +146,12 @@ module.exports.createArticle = expressAsyncHandler(
 
       await user.save();
 
-      sendArticleForReviewEmail(user.email, title);
+      // sendArticleForReviewEmail(user.email, title);
+      await publishContentEmailEvent({
+        email: user.email,
+        title: title,
+        groupIndex: EMAIL_EVENT_TYPES.CONTENT.ARTICLE_FOR_REVIEW
+      });
       // Respond with a success message and the new article
       res.status(201).json({
         message: requestedTranslation ? "Translation under reviewed" : "Article under reviewed",

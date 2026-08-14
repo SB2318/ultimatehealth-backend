@@ -11,6 +11,7 @@ const Admin = require('../models/admin/adminModel');
 const AdminAggregate = require('../models/events/adminContributionEvent');
 const reportService = require('../services/db/reportService');
 const cron = require('node-cron');
+const {publishModerationEmailEvent, publishAccountModerationEmailEvent, EMAIL_EVENT_TYPES} = require("../services/mqueue/kafkaProducer");
 
 
 
@@ -206,16 +207,36 @@ module.exports.submitReport = expressAsyncHandler(
       await report.save();
 
       // send mail to user
-      await sendInitialReportMailtoVictim(user.email);
+      //await sendInitialReportMailtoVictim(user.email);
+
+      await publishModerationEmailEvent({
+        email: user.email,
+        groupIndex: EMAIL_EVENT_TYPES.MODERATION.INITIAL_REPORT_VICTIM
+      });
 
       // send mail to censurable
       if (details) {
-        await sendInitialReportMailtoConvict(author.email, details, reportType);
+       // await sendInitialReportMailtoConvict(author.email, details, reportType);
+
+        await publishModerationEmailEvent({
+          email: author.email,
+          details: details,
+          reportType: reportType,
+          groupIndex: EMAIL_EVENT_TYPES.MODERATION.INITIAL_REPORT_CONVICT
+        });
 
         if (author.activeReportCount >= 3 && !author.isBlockUser) {
           author.isBlockUser = true;
           author.blockedAt = new Date();
-          await sendBlockConvictMail(author.email, details, reportType, "3 active reports have been filed against your account.")
+          // await sendBlockConvictMail(author.email, details, reportType, "3 active reports have been filed against your account.")
+
+          await publishModerationEmailEvent({
+            email: author.email,
+            details: details,
+            reportType: reportType,
+            reason: "3 active reports have been filed against your account.",
+            groupIndex: EMAIL_EVENT_TYPES.MODERATION.BLOCK_CONVICT
+          });
         }
       }
 
@@ -539,7 +560,13 @@ module.exports.convictRequestToRestoreContent = expressAsyncHandler(
       await report.save();
 
       // Send email to user to inform them of the request to restore content
-      await sendRestoreRequestReceivedMail(convict.email, article.title);
+      //await sendRestoreRequestReceivedMail(convict.email, article.title);
+
+      await publishAccountModerationEmailEvent({
+        email: convict.email,
+        details: { contentTitle: article.title },
+        groupIndex: EMAIL_EVENT_TYPES.ACCOUNT.RESTORE_REQUEST_RECEIVED
+      });
 
       return res.status(200).json({ message: "Request sent" });
 
@@ -611,7 +638,12 @@ async function unBlockUser() {
       if (user) {
         user.isBlockUser = false;
         user.blockedAt = null;
-        await sendUnblockUserMail(user.email, user.user_name);
+       // await sendUnblockUserMail(user.email, user.user_name);
+        await publishAccountModerationEmailEvent({
+          email: user.email,
+          details: { user_name: user.user_name },
+          groupIndex: EMAIL_EVENT_TYPES.ACCOUNT.UNBLOCK_USER
+        });
       }
     }
 

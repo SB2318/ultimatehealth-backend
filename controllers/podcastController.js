@@ -11,8 +11,8 @@ const AudioViewAggregate = require('../models/events/audioViewEventSchema');
 
 const PodcastEpisode = require("../models/PodcastEpisode");
 const { deleteFileFn } = require('./uploadController');
-const { sendPodcastForReviewEmail } = require("./emailservice");
-
+//const { sendPodcastForReviewEmail } = require("./emailservice");
+const { publishContentEmailEvent, EMAIL_EVENT_TYPES } = require("../services/mqueue/kafkaProducer");
 const mongoose = require('mongoose');
 
 /** Podcast profile */
@@ -384,7 +384,13 @@ const createPodcast = expressAsyncHandler(
             }
 
             await podcast.save();
-            sendPodcastForReviewEmail(user.email, title);
+            // sendPodcastForReviewEmail(user.email, title);
+            await publishContentEmailEvent({
+                email: user.email,
+                title: title,
+                groupIndex: EMAIL_EVENT_TYPES.CONTENT.PODCAST_FOR_REVIEW
+            });
+
             res.status(201).json({ message: 'Podcast created successfully.', podcast: podcast });
         } catch (err) {
             console.log(err);

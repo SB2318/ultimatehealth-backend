@@ -5,7 +5,8 @@ const AudioWAggregate = require("../../models/events/audioWriteEventSchema");
 const cron = require('node-cron');
 const statusEnum = require('../../utils/StatusEnum');
 const AdminAggregate = require('../../models/events/adminContributionEvent');
-const { sendPodcastPublishedEmail, sendPodcastDiscardEmail, pickPodcastMail } = require('../emailservice');
+
+const { publishContentEmailEvent, EMAIL_EVENT_TYPES } = require('../../services/mqueue/kafkaProducer');
 const { sendPostNotification, podcastReviewNotificationsToUser } = require('../notifications/notificationHelper');
 const { deleteFileFn } = require('../uploadController');
 
@@ -25,14 +26,14 @@ const availablePodcastsForReview = expressAsyncHandler(
                 .exec();
 
             if (Number(page) === 1) {
-              const totalPodcasts = await Podcast.countDocuments({
-                status: statusEnum.statusEnum.REVIEW_PENDING
-              });
-              const totalPages = Math.ceil(totalPodcasts / Number(limit));
-              res.status(200).json({ podcasts, totalPages });
-              return;
+                const totalPodcasts = await Podcast.countDocuments({
+                    status: statusEnum.statusEnum.REVIEW_PENDING
+                });
+                const totalPages = Math.ceil(totalPodcasts / Number(limit));
+                res.status(200).json({ podcasts, totalPages });
+                return;
             }
-            res.status(200).json({podcasts});
+            res.status(200).json({ podcasts });
         } catch (err) {
             console.log(err);
             res.status(500).json({ message: "Internal server error" });
@@ -43,7 +44,7 @@ const availablePodcastsForReview = expressAsyncHandler(
 const getAllPodcastsOfModerator = expressAsyncHandler(
     async (req, res) => {
 
-        const {page = 1, limit = 10} = req.query;
+        const { page = 1, limit = 10 } = req.query;
         const skip = (Number(page) - 1) * parseInt(limit);
 
         try {
@@ -58,13 +59,13 @@ const getAllPodcastsOfModerator = expressAsyncHandler(
                 .exec();
 
             if (Number(page) === 1) {
-              const totalPodcasts = await Podcast.countDocuments({
-                status: statusEnum.statusEnum.IN_PROGRESS,
-                admin_id: req.userId
-              });
-              const totalPages = Math.ceil(totalPodcasts / Number(limit));
-              res.status(200).json({ podcasts, totalPages });
-              return;
+                const totalPodcasts = await Podcast.countDocuments({
+                    status: statusEnum.statusEnum.IN_PROGRESS,
+                    admin_id: req.userId
+                });
+                const totalPages = Math.ceil(totalPodcasts / Number(limit));
+                res.status(200).json({ podcasts, totalPages });
+                return;
             }
 
             res.status(200).json({ podcasts });
@@ -78,7 +79,7 @@ const getAllPodcastsOfModerator = expressAsyncHandler(
 const getAllCompletedPodcastsOfModerator = expressAsyncHandler(
 
     async (req, res) => {
-        const {page = 1, limit = 10} = req.query;
+        const { page = 1, limit = 10 } = req.query;
         const skip = (Number(page) - 1) * parseInt(limit);
 
         try {
@@ -91,15 +92,15 @@ const getAllCompletedPodcastsOfModerator = expressAsyncHandler(
                 .limit(Number(limit))
                 .sort({ updated_at: -1 })
                 .exec();
-            
+
             if (Number(page) === 1) {
-              const totalPodcasts = await Podcast.countDocuments({
-                status: statusEnum.statusEnum.PUBLISHED,
-                admin_id: req.userId
-              });
-              const totalPages = Math.ceil(totalPodcasts / Number(limit));
-              res.status(200).json({ podcasts, totalPages });
-              return;
+                const totalPodcasts = await Podcast.countDocuments({
+                    status: statusEnum.statusEnum.PUBLISHED,
+                    admin_id: req.userId
+                });
+                const totalPages = Math.ceil(totalPodcasts / Number(limit));
+                res.status(200).json({ podcasts, totalPages });
+                return;
             }
 
             res.status(200).json({ podcasts });
@@ -133,7 +134,14 @@ const pickPodcast = expressAsyncHandler(
             podcast.updated_at = new Date();
 
             await podcast.save();
-            pickPodcastMail(podcast.user_id.email, podcast.title);
+           // pickPodcastMail(podcast.user_id.email, podcast.title);
+
+            await publishContentEmailEvent({
+                email: podcast.user_id.email,
+                title: podcast.title,
+                groupIndex: EMAIL_EVENT_TYPES.CONTENT.PICK_PODCAST
+            });
+
             return res.status(200).json({ message: "Podcast picked successfully" });
 
         } catch (err) {
@@ -196,7 +204,14 @@ const approvePodcast = expressAsyncHandler(
 
             const dynamicLink = `https://uhsocial.in/api/share/podcast?trackId=${podcast._id}&audioUrl=${podcast.audio_url}`;
             // send mail
-            sendPodcastPublishedEmail(podcast.user_id.email, dynamicLink, podcast.title);
+            //sendPodcastPublishedEmail(podcast.user_id.email, dynamicLink, podcast.title);
+            await publishContentEmailEvent({
+                email: podcast.user_id.email,
+                title: podcast.title,
+                podcastLink: dynamicLink,
+                groupIndex: EMAIL_EVENT_TYPES.CONTENT.PODCAST_PUBLISHED
+            });
+
             return res.status(200).json({ message: "Podcast published successfully" });
 
         } catch (err) {
@@ -263,8 +278,16 @@ const discardPodcast = expressAsyncHandler(
                     "Podcast discarded",
                     "Your podcast with title " + podcast.title + " has been discarded by admin"
                 );
+               
+               // sendPodcastDiscardEmail(podcast.user_id.email, podcast.status, podcast.title, discardReason);
 
-                sendPodcastDiscardEmail(podcast.user_id.email, podcast.status, podcast.title, discardReason);
+                await publishContentEmailEvent({
+                    email: podcast.user_id.email,
+                    status: podcast.status,
+                    title: podcast.title,
+                    reason: discardReason,
+                    groupIndex: EMAIL_EVENT_TYPES.CONTENT.PODCAST_DISCARD
+                });
             }
             return res.status(200).json({ message: "Podcast discarded successfully" });
 
@@ -330,7 +353,7 @@ async function unassignPodcast() {
 
             await podcast.save();
 
-             await podcastReviewNotificationsToUser(
+            await podcastReviewNotificationsToUser(
                 podcast.user_id._id,
                 podcast._id,
                 "Moderator Unassigned",
@@ -387,7 +410,7 @@ async function discardPodcastFn() {
 
             if (podcast.user_id?.email && podcast.title) {
 
-               await podcastReviewNotificationsToUser(
+                await podcastReviewNotificationsToUser(
                     podcast.user_id._id,
                     podcast._id,
                     "Podcast discarded",

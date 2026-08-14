@@ -6,13 +6,13 @@ const User = require('../../models/UserModel');
 const { articleReviewNotificationsToUser, articleSubmitNotificationsToAdmin } = require('../notifications/notificationHelper');
 const Comment = require('../../models/commentSchema');
 const WriteAggregate = require("../../models/events/writeEventSchema");
-const { sendMailOnEditRequestApproval, sendMailArticleDiscardByAdmin, sendArticleFeedbackEmail, sendArticlePublishedEmail } = require('../emailservice');
+const { publishContentEmailEvent, EMAIL_EVENT_TYPES } = require('../../services/mqueue/kafkaProducer');
 const cron = require('node-cron');
 const statusEnum = require('../../utils/StatusEnum');
 const AdminAggregate = require('../../models/events/adminContributionEvent');
 const diff = require('diff');
 
-const {getHTMLFileContent} = require('../../utils/pocketbaseUtil');
+const { getHTMLFileContent } = require('../../utils/pocketbaseUtil');
 const { deleteFileFn } = require('../uploadController');
 // Flow
 
@@ -216,7 +216,7 @@ module.exports.getAllCompletedImprovementsForAdmin = expressAsyncHandler(
                 return;
             }
 
-            res.status(200).json({articles});
+            res.status(200).json({ articles });
         } catch (err) {
             console.log(err);
             res.status(500).json({ message: err.message });
@@ -281,7 +281,12 @@ module.exports.pickImprovementRequest = expressAsyncHandler(
 
 
                 // Send email
-                sendMailOnEditRequestApproval(user.email, editRequest.article.title);
+                // sendMailOnEditRequestApproval(user.email, editRequest.article.title);
+                await publishContentEmailEvent({
+                    email: user.email,
+                    title: editRequest.article.title,
+                    groupIndex: EMAIL_EVENT_TYPES.CONTENT.EDIT_REQUEST_APPROVAL
+                });
             }
 
             res.status(200).json({ message: "Article status updated" });
@@ -349,7 +354,14 @@ module.exports.submitReviewOnImprovement = expressAsyncHandler(
                 );
 
                 // send mail
-                sendArticleFeedbackEmail(editRequest.user_id.email, feedback, editRequest.article.title);
+               // sendArticleFeedbackEmail(editRequest.user_id.email, feedback, editRequest.article.title);
+
+                await publishContentEmailEvent({
+                    email: editRequest.user_id.email,
+                    title: editRequest.article.title,
+                    feedback: feedback,
+                    groupIndex: EMAIL_EVENT_TYPES.CONTENT.ARTICLE_FEEDBACK
+                });
 
                 res.status(200).json({ message: "Review submitted" });
 
@@ -517,7 +529,14 @@ module.exports.discardImprovement = expressAsyncHandler(
 
 
             if (editRequest.user_id.email && editRequest.article.title) {
-                sendMailArticleDiscardByAdmin(editRequest.user_id.email, editRequest.article.title, discardReason);
+                //  sendMailArticleDiscardByAdmin(editRequest.user_id.email, editRequest.article.title, discardReason);
+
+                await publishContentEmailEvent({
+                    email: editRequest.user_id.email,
+                    title: editRequest.article.title,
+                    reason: discardReason,
+                    groupIndex: EMAIL_EVENT_TYPES.CONTENT.ARTICLE_DISCARD_BY_ADMIN
+                });
             }
 
             return res.status(200).json({ message: "Improvement Discarded" });
@@ -590,7 +609,13 @@ module.exports.publishImprovement = expressAsyncHandler(
             await aggregate.save();
 
             // send mail to user
-            sendArticlePublishedEmail(contributor.email, "", article.title);
+            // sendArticlePublishedEmail(contributor.email, "", article.title);
+            await publishContentEmailEvent({
+                email: contributor.email,
+                title: article.title,
+                articleLink: `https://uhsocial.in/api/share/blog/${article.pb_recordId}`,
+                groupIndex: EMAIL_EVENT_TYPES.CONTENT.ARTICLE_PUBLISHED
+            })
 
             articleReviewNotificationsToUser(editRequest.user_id._id, editRequest.article._id,
                 editRequest.pb_recordId,
@@ -713,7 +738,14 @@ async function discardImprovements() {
             }
 
             if (editRequest.user_id.email && editRequest.article.title) {
-                sendMailArticleDiscardByAdmin(editRequest.user_id.email, editRequest.article.title, "Discarded by system");
+                // sendMailArticleDiscardByAdmin(editRequest.user_id.email, editRequest.article.title, "Discarded by system");
+
+                await publishContentEmailEvent({
+                    email: editRequest.user_id.email,
+                    title: editRequest.article.title,
+                    reason: "Discarded by system",
+                    groupIndex: EMAIL_EVENT_TYPES.CONTENT.ARTICLE_DISCARD_BY_ADMIN
+                });
             }
 
         }

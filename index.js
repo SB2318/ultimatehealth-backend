@@ -7,7 +7,8 @@ const {connectProducer} = require('./services/mqueue/kafkaProducer');
 
 const cookieParser = require('cookie-parser');
 const { articleReviewNotificationsToUser } = require('./controllers/notifications/notificationHelper');
-const {sendArticleFeedbackEmail}= require('./controllers/emailservice');
+//const {sendArticleFeedbackEmail}= require('./controllers/emailservice');
+const { publishContentEmailEvent, EMAIL_EVENT_TYPES } = require('./services/mqueue/kafkaProducer');
 const EditRequest = require('./models/admin/articleEditRequestModel');
 const Podcast = require('./models/Podcast');
 const statusEnum = require("./utils/StatusEnum");
@@ -1113,8 +1114,14 @@ io.on('connection', (socket) => {
                             article.title,
                         );
                         // send mail
-                        sendArticleFeedbackEmail(article.authorId.email, feedback, article.title);
+                       // sendArticleFeedbackEmail(article.authorId.email, feedback, article.title);
 
+                        await publishContentEmailEvent({
+                            email: article.authorId.email,
+                            title: article.title,
+                            feedback: feedback,
+                            groupIndex: EMAIL_EVENT_TYPES.CONTENT.ARTICLE_FEEDBACK
+                        });
                     } else if (isNote) {
 
                         const comment = new Comment({
@@ -1231,7 +1238,14 @@ io.on('connection', (socket) => {
                         );
 
                         // send mail
-                        sendArticleFeedbackEmail(editRequest.user_id.email, feedback, editRequest.article.title);
+                       // sendArticleFeedbackEmail(editRequest.user_id.email, feedback, editRequest.article.title);
+
+                        await publishContentEmailEvent({
+                            email: editRequest.user_id.email,
+                            title: editRequest.article.title,
+                            feedback: feedback,
+                            groupIndex: EMAIL_EVENT_TYPES.CONTENT.ARTICLE_FEEDBACK
+                        });
 
                     } else if (isNote) {
 
