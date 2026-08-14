@@ -6,7 +6,13 @@ const Admin = require('../../models/admin/adminModel');
 const Article = require('../../models/Articles');
 //const { sendNewArticleEmail } = require('../emailservice');
 
-const { publishContentEmailEvent, EMAIL_EVENT_TYPES } = require('../../services/mqueue/kafkaProducer');
+const { publishContentEmailEvent, EMAIL_EVENT_TYPES } = require('../../services/mqueue/emailProducer');
+const { 
+    publishSocialNotificationEvent,
+    publishReviewNotificationEvent,
+    publishBroadcastNotificationEvent,
+    NOTIFICATION_EVENT_TYPES 
+} = require('../../services/mqueue/notificationProducer');
 
 
 /**
@@ -52,13 +58,25 @@ module.exports.sendPostNotification =
     async (userId, articleId, articleRecordId, podcastId, requestId, title, message, authorTitle, authorMessage) => {
 
         try {
-            const user = await User.findById(userId).populate('followers').exec();
-            // (userId, articleId, articleRecordId, type, title, message, read, timestamp)
+            await publishBroadcastNotificationEvent({
+                type: NOTIFICATION_EVENT_TYPES.BROADCAST.POST_PUBLISHED_BROADCAST,
+                userId,
+                articleId,
+                articleRecordId,
+                podcastId,
+                requestId,
+                title,
+                message,
+                authorTitle,
+                authorMessage,
+                timestamp: Date.now()
+            });
 
+            /*
+            const user = await User.findById(userId).populate('followers').exec();
             if (user) {
                 user.followers.forEach(async u => {
                     if (u.fcmToken) {
-
                         const notification = new Notification({
                             userId: u._id,
                             adminId: null,
@@ -105,7 +123,7 @@ module.exports.sendPostNotification =
                     });
                 }
             }
-
+            */
 
         } catch (err) {
             console.log(err);
@@ -125,13 +143,20 @@ module.exports.sendPostNotification =
 module.exports.sendPostLikeNotification =
     async (userId, articleId, podcastId, articleRecordId, title, message) => {
         try {
+            await publishSocialNotificationEvent({
+                type: NOTIFICATION_EVENT_TYPES.SOCIAL.POST_LIKE,
+                userId,
+                articleId,
+                podcastId,
+                articleRecordId,
+                title,
+                message,
+                timestamp: Date.now()
+            });
+
+            /*
             const user = await User.findById(userId);
-            // (userId, articleId, articleRecordId, type, title, message, read, timestamp)
-
-            // console.log(user);
             if (user && user.fcmToken) {
-
-                //console.log("Push Notification sending");
                 const notification = new Notification({
                     userId: user._id,
                     adminId: null,
@@ -152,11 +177,11 @@ module.exports.sendPostLikeNotification =
                     title: title,
                     body: message
                 });
-               
             }
             else {
                 console.log("No FCM token found");
             }
+            */
         } catch (err) {
             console.log(err);
         }
@@ -174,11 +199,24 @@ module.exports.sendCommentNotification =
     async (articleId, podcastId, commentId, requestId, articleRecordId, userId, adminId, title, message) => {
 
         try {
-
             if (!userId && !adminId) return;
 
-            let user;
+            await publishSocialNotificationEvent({
+                type: NOTIFICATION_EVENT_TYPES.SOCIAL.POST_COMMENT,
+                articleId,
+                podcastId,
+                commentId,
+                requestId,
+                articleRecordId,
+                userId,
+                adminId,
+                title,
+                message,
+                timestamp: Date.now()
+            });
 
+            /*
+            let user;
             if (adminId) {
                 user = await Admin.findById(adminId);
             } else {
@@ -186,7 +224,6 @@ module.exports.sendCommentNotification =
             }
 
             if (user && user.fcmToken) {
-
                 const notification = new Notification({
                     userId: userId ? user._id : null,
                     adminId: adminId ? user._id : null,
@@ -208,6 +245,7 @@ module.exports.sendCommentNotification =
                     body: message
                 });
             }
+            */
         } catch (err) {
             console.error(err);
         }
@@ -228,10 +266,21 @@ module.exports.sendCommentLikeNotification =
     async (userId, articleId, podcastId, articleRecordId, commentId, title, message) => {
 
         try {
+            await publishSocialNotificationEvent({
+                type: NOTIFICATION_EVENT_TYPES.SOCIAL.COMMENT_LIKE,
+                userId,
+                articleId,
+                podcastId,
+                articleRecordId,
+                commentId,
+                title,
+                message,
+                timestamp: Date.now()
+            });
+
+            /*
             const user = await User.findById(userId);
-
             if (user && user.fcmToken) {
-
                 const notification = new Notification({
                     userId: user._id,
                     articleId: articleId,
@@ -252,9 +301,9 @@ module.exports.sendCommentLikeNotification =
                     body: message
                 });
             }
+            */
         } catch (err) {
             console.error(err);
-            //sendPushNotification()
         }
     }
 
@@ -266,10 +315,16 @@ module.exports.sendCommentLikeNotification =
 module.exports.userFollowNotification = async (userId, message) => {
 
     try {
-        const user = await User.findById(userId);
-        // (userId, type, title, message, read, timestamp)
-        if (user && user.fcmToken) {
+        await publishSocialNotificationEvent({
+            type: NOTIFICATION_EVENT_TYPES.SOCIAL.USER_FOLLOW,
+            userId,
+            message,
+            timestamp: Date.now()
+        });
 
+        /*
+        const user = await User.findById(userId);
+        if (user && user.fcmToken) {
             const notification = new Notification({
                 userId: user._id,
                 articleId: null,
@@ -286,6 +341,7 @@ module.exports.userFollowNotification = async (userId, message) => {
             await notification.save();
             sendPushNotification(user.fcmToken, message);
         }
+        */
     } catch (err) {
         console.error(err);
     }
@@ -300,14 +356,25 @@ module.exports.repostNotification =
     async (userId, authorId, articleId, articleRecordId, title, message, authorTitle, authorMessage) => {
 
         try {
+            await publishSocialNotificationEvent({
+                type: NOTIFICATION_EVENT_TYPES.SOCIAL.REPOST,
+                userId,
+                authorId,
+                articleId,
+                articleRecordId,
+                title,
+                message,
+                authorTitle,
+                authorMessage,
+                timestamp: Date.now()
+            });
 
+            /*
             // Notify to all followers
             const user = await User.findById(userId).populate('followers').exec();
-
             if (user) {
                 user.followers.forEach(async u => {
                     if (u.fcmToken) {
-
                         const notification = new Notification({
                             userId: u._id,
                             articleId: articleId,
@@ -331,9 +398,7 @@ module.exports.repostNotification =
             }
             // Notify to author
             const author = await User.findById(authorId);
-
             if (author && author.fcmToken) {
-
                 const notification = new Notification({
                     userId: author._id,
                     articleId: articleId,
@@ -353,9 +418,9 @@ module.exports.repostNotification =
                     body: authorMessage
                 });
             }
+            */
 
         } catch (err) {
-
             console.error(err);
         }
     }
@@ -369,10 +434,23 @@ module.exports.mentionNotification =
     async (mentionedUsers, articleId, podcastId, requestId, articleRecordId, commentId, title, message) => {
 
         try {
+            await publishSocialNotificationEvent({
+                type: NOTIFICATION_EVENT_TYPES.SOCIAL.MENTION,
+                mentionedUsers,
+                articleId,
+                podcastId,
+                requestId,
+                articleRecordId,
+                commentId,
+                title,
+                message,
+                timestamp: Date.now()
+            });
+
+            /*
             mentionedUsers.forEach(async userId => {
                 const user = await User.findById(userId);
                 if (user && user.fcmToken) {
-
                     const notification = new Notification({
                         userId: user._id,
                         articleId: articleId,
@@ -393,11 +471,10 @@ module.exports.mentionNotification =
                         body: message
                     });
                 }
-
             });
+            */
         } catch (err) {
             console.error(err);
-
         }
     }
 
@@ -407,13 +484,20 @@ module.exports.mentionNotification =
 module.exports.articleReviewNotificationsToUser = async (userId, articleId, articleRecordId, requestId, title, message) => {
 
     try {
+        await publishReviewNotificationEvent({
+            type: NOTIFICATION_EVENT_TYPES.REVIEW.ARTICLE_REVIEW_USER,
+            userId,
+            articleId,
+            articleRecordId,
+            requestId,
+            title,
+            message,
+            timestamp: Date.now()
+        });
+
+        /*
         const user = await User.findById(userId);
-        // Create notification object
-        // (userId, articleId, articleRecordId, type, title, message, read, timestamp)
-
-
         if (user && user.fcmToken) {
-
             const notification = new Notification({
                 userId: user._id,
                 articleId: articleId,
@@ -432,9 +516,9 @@ module.exports.articleReviewNotificationsToUser = async (userId, articleId, arti
                 body: message
             });
         }
+        */
     } catch (err) {
         console.error(err);
-        //sendPushNotification()
     }
 }
 
@@ -444,12 +528,18 @@ module.exports.articleReviewNotificationsToUser = async (userId, articleId, arti
 module.exports.podcastReviewNotificationsToUser = async (userId, podcastId, title, message) => {
 
     try {
+        await publishReviewNotificationEvent({
+            type: NOTIFICATION_EVENT_TYPES.REVIEW.PODCAST_REVIEW_USER,
+            userId,
+            podcastId,
+            title,
+            message,
+            timestamp: Date.now()
+        });
+
+        /*
         const user = await User.findById(userId);
-        // Create notification object
-        // (userId, articleId, articleRecordId, type, title, message, read, timestamp)
-
         if (user && user.fcmToken) {
-
             const notification = new Notification({
                 userId: user._id,
                 articleId: null,
@@ -469,9 +559,9 @@ module.exports.podcastReviewNotificationsToUser = async (userId, podcastId, titl
                 body: message
             });
         }
+        */
     } catch (err) {
         console.error(err);
-        //sendPushNotification()
     }
 }
 
@@ -482,11 +572,20 @@ module.exports.articleSubmitNotificationsToAdmin =
     async (adminId, articleId, articleRecordId, requestId, title, message) => {
 
         try {
-            const admin = await Admin.findById(adminId);
-            // Create notification object
-            // (userId, articleId, articleRecordId, type, title, message, read, timestamp)
-            if (admin && admin.fcmToken) {
+            await publishReviewNotificationEvent({
+                type: NOTIFICATION_EVENT_TYPES.REVIEW.ARTICLE_SUBMIT_ADMIN,
+                adminId,
+                articleId,
+                articleRecordId,
+                requestId,
+                title,
+                message,
+                timestamp: Date.now()
+            });
 
+            /*
+            const admin = await Admin.findById(adminId);
+            if (admin && admin.fcmToken) {
                 const notification = new Notification({
                     adminId: admin._id,
                     articleId: articleId,
@@ -505,9 +604,9 @@ module.exports.articleSubmitNotificationsToAdmin =
                     body: message
                 });
             }
+            */
         } catch (err) {
             console.error(err);
-            //sendPushNotification()
         }
     }
 
@@ -557,6 +656,17 @@ module.exports.broadcastNewArticlePublished = async (articleId) => {
                 }
 
                 // Send push notification
+                await publishBroadcastNotificationEvent({
+                    type: NOTIFICATION_EVENT_TYPES.BROADCAST.NEW_ARTICLE_BROADCAST,
+                    articleId: article._id,
+                    userId: user._id,
+                    authorName: article.authorId.user_name,
+                    articleTitle: article.title,
+                    articleRecordId: article.pb_recordId,
+                    timestamp: Date.now()
+                });
+
+                /*
                 if (user.fcmToken) {
                     const notification = new Notification({
                         userId: user._id,
@@ -579,6 +689,7 @@ module.exports.broadcastNewArticlePublished = async (articleId) => {
                         body: article.title
                     });
                 }
+                */
             } catch (err) {
                 console.error(`Error notifying user ${user._id} for article ${article._id}:`, err);
             }

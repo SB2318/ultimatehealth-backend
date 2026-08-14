@@ -6,7 +6,8 @@ const cron = require('node-cron');
 const statusEnum = require('../../utils/StatusEnum');
 const AdminAggregate = require('../../models/events/adminContributionEvent');
 
-const { publishContentEmailEvent, publishPodcastAnalyticsEvent, publishAdminAnalyticsEvent, EMAIL_EVENT_TYPES, ANALYTICS_EVENT_TYPES } = require('../../services/mqueue/kafkaProducer');
+const { publishContentEmailEvent, EMAIL_EVENT_TYPES } = require('../../services/mqueue/emailProducer');
+const { publishPodcastAnalyticsEvent, publishAdminAnalyticsEvent, ANALYTICS_EVENT_TYPES } = require('../../services/mqueue/analyticsProducer');
 const { sendPostNotification, podcastReviewNotificationsToUser } = require('../notifications/notificationHelper');
 const { deleteFileFn } = require('../uploadController');
 

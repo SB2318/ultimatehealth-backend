@@ -7,7 +7,8 @@ const ReadAggregate = require("../models/events/readEventSchema");
 const WriteAggregate = require("../models/events/writeEventSchema");
 const statusEnum = require("../utils/StatusEnum");
 // const { sendArticleForReviewEmail } = require("./emailservice");
-const { publishContentEmailEvent, publishArticleAnalyticsEvent, EMAIL_EVENT_TYPES, ANALYTICS_EVENT_TYPES } = require("../services/mqueue/kafkaProducer");
+const { publishContentEmailEvent, EMAIL_EVENT_TYPES } = require("../services/mqueue/emailProducer");
+const { publishArticleAnalyticsEvent, ANALYTICS_EVENT_TYPES } = require("../services/mqueue/analyticsProducer");
 
 const mongoose = require('mongoose');
 

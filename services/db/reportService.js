@@ -6,7 +6,8 @@ const Comment = require("../../models/commentSchema");
 const Admin = require("../../models/admin/adminModel");
 const AdminAggregate = require("../../models/events/adminContributionEvent");
 const emailService = require("../../controllers/emailservice");
-const { publishModerationEmailEvent, publishAccountModerationEmailEvent, publishAdminAnalyticsEvent, EMAIL_EVENT_TYPES, ANALYTICS_EVENT_TYPES } = require("../mqueue/kafkaProducer");
+const { publishModerationEmailEvent, publishAccountModerationEmailEvent, EMAIL_EVENT_TYPES } = require("../mqueue/emailProducer");
+const { publishAdminAnalyticsEvent, ANALYTICS_EVENT_TYPES } = require("../mqueue/analyticsProducer");
 
 /**
  * Picks a report for investigation by a moderator.

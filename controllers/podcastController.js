@@ -12,7 +12,8 @@ const AudioViewAggregate = require('../models/events/audioViewEventSchema');
 const PodcastEpisode = require("../models/PodcastEpisode");
 const { deleteFileFn } = require('./uploadController');
 //const { sendPodcastForReviewEmail } = require("./emailservice");
-const { publishContentEmailEvent, publishPodcastAnalyticsEvent, EMAIL_EVENT_TYPES, ANALYTICS_EVENT_TYPES } = require("../services/mqueue/kafkaProducer");
+const { publishContentEmailEvent, EMAIL_EVENT_TYPES } = require("../services/mqueue/emailProducer");
+const { publishPodcastAnalyticsEvent, ANALYTICS_EVENT_TYPES } = require("../services/mqueue/analyticsProducer");
 const mongoose = require('mongoose');
 
 /** Podcast profile */
