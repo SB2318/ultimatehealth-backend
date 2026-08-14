@@ -581,19 +581,32 @@ module.exports.getArticleTranslations = expressAsyncHandler(
 module.exports.updateArticle = expressAsyncHandler(
   async (req, res) => {
     try {
-      const article = await Article.findByIdAndUpdate(req.params.id, req.body, {
-        new: true,
-      }).populate('tags') // This populates the tag data
-        .exec();
-      if (!article) {
-        return res.status(404).json({ message: "Article not found" });
+      const existingArticle = await Article.findById(req.params.id);
+
+      if (!existingArticle) {
+        return res.status(404).json({message: "Article not found"});
       }
-      // await article.save();
-      res.status(200).json({ message: "Article updated successfully", article });
+
+      if (existingArticle.authorId.toString() !== req.userId.toString()) {
+        return res.status(403).json({message: "Forbidden"});
+      }
+
+      const article = await Article.findByIdAndUpdate(
+        req.params.id,
+        req.body,
+        {new: true}
+      )
+        .populate('tags')
+        .exec();
+
+      res.status(200).json({
+        message: "Article updated successfully",
+        article
+      });
     } catch (error) {
       res
         .status(500)
-        .json({ error: "Error updating article", details: error.message });
+        .json({error: "Error updating article", details: error.message});
     }
   }
 )
@@ -602,17 +615,23 @@ module.exports.updateArticle = expressAsyncHandler(
 module.exports.deleteArticle = expressAsyncHandler(
   async (req, res) => {
     try {
-      const article = await Article.findByIdAndDelete(req.params.id)
-        .populate('tags') // This populates the tag data
-        .exec();
-      if (!article) {
-        return res.status(404).json({ message: "Article not found" });
+      const existingArticle = await Article.findById(req.params.id);
+
+      if (!existingArticle) {
+        return res.status(404).json({message: "Article not found"});
       }
-      res.status(200).json({ message: "Article deleted successfully" });
+
+      if (existingArticle.authorId.toString() !== req.userId.toString()) {
+        return res.status(403).json({message: "Forbidden"});
+      }
+
+      await Article.findByIdAndDelete(req.params.id);
+
+      res.status(200).json({message: "Article deleted successfully"});
     } catch (error) {
       res
         .status(500)
-        .json({ error: "Error deleting article", details: error.message });
+        .json({error: "Error deleting article", details: error.message});
     }
   }
 )
