@@ -8,7 +8,7 @@ const AdminAggregate = require('../../models/events/adminContributionEvent');
 
 const { publishContentEmailEvent, EMAIL_EVENT_TYPES } = require('../../services/mqueue/producers/emailProducer');
 const { publishPodcastAnalyticsEvent, publishAdminAnalyticsEvent, ANALYTICS_EVENT_TYPES } = require('../../services/mqueue/producers/analyticsProducer');
-const { sendPostNotification, podcastReviewNotificationsToUser } = require('../notifications/notificationHelper');
+const { publishBroadcastNotificationEvent, publishReviewNotificationEvent, NOTIFICATION_EVENT_TYPES } = require('../../services/mqueue/producers/notificationProducer');
 const { deleteFileFn } = require('../uploadController');
 
 // Available podcast review
@@ -192,17 +192,19 @@ const approvePodcast = expressAsyncHandler(
             // Increase user contribution
             await updateUserContribution(podcast.user_id._id);
 
-            await sendPostNotification(
-                podcast.user_id._id,
-                null,
-                null,
-                podcast._id,
-                null,
-                `${podcast.user_id.user_name} shared a new update`,
-                `A fresh podcast just went live, don't miss it: ${podcast.title}`,
-                "Congratulations🎉! Your podcast has been published",
-                podcast.title
-            );
+            await publishBroadcastNotificationEvent({
+                type: NOTIFICATION_EVENT_TYPES.BROADCAST.POST_PUBLISHED_BROADCAST,
+                userId: podcast.user_id._id,
+                articleId: null,
+                articleRecordId: null,
+                podcastId: podcast._id,
+                requestId: null,
+                title: `${podcast.user_id.user_name} shared a new update`,
+                message: `A fresh podcast just went live, don't miss it: ${podcast.title}`,
+                authorTitle: "Congratulations🎉! Your podcast has been published",
+                authorMessage: podcast.title,
+                timestamp: Date.now()
+            });
 
             const dynamicLink = `https://uhsocial.in/api/share/podcast?trackId=${podcast._id}&audioUrl=${podcast.audio_url}`;
             // send mail
@@ -275,12 +277,14 @@ const discardPodcast = expressAsyncHandler(
             // send mail
 
             if (podcast.user_id) {
-                await podcastReviewNotificationsToUser(
-                    podcast.user_id._id,
-                    podcast._id,
-                    "Podcast discarded",
-                    "Your podcast with title " + podcast.title + " has been discarded by admin"
-                );
+                await publishReviewNotificationEvent({
+                    type: NOTIFICATION_EVENT_TYPES.REVIEW.PODCAST_REVIEW_USER,
+                    userId: podcast.user_id._id,
+                    podcastId: podcast._id,
+                    title: "Podcast discarded",
+                    message: "Your podcast with title " + podcast.title + " has been discarded by admin",
+                    timestamp: Date.now()
+                });
                
                // sendPodcastDiscardEmail(podcast.user_id.email, podcast.status, podcast.title, discardReason);
 
@@ -356,12 +360,14 @@ async function unassignPodcast() {
 
             await podcast.save();
 
-            await podcastReviewNotificationsToUser(
-                podcast.user_id._id,
-                podcast._id,
-                "Moderator Unassigned",
-                "Your podcast with title " + podcast.title + " has been unassigned by system"
-            );
+            await publishReviewNotificationEvent({
+                type: NOTIFICATION_EVENT_TYPES.REVIEW.PODCAST_REVIEW_USER,
+                userId: podcast.user_id._id,
+                podcastId: podcast._id,
+                title: "Moderator Unassigned",
+                message: "Your podcast with title " + podcast.title + " has been unassigned by system",
+                timestamp: Date.now()
+            });
 
 
         });
@@ -413,12 +419,14 @@ async function discardPodcastFn() {
 
             if (podcast.user_id?.email && podcast.title) {
 
-                await podcastReviewNotificationsToUser(
-                    podcast.user_id._id,
-                    podcast._id,
-                    "Podcast discarded",
-                    "Your podcast with title " + podcast.title + " has been discarded by system"
-                );
+                await publishReviewNotificationEvent({
+                    type: NOTIFICATION_EVENT_TYPES.REVIEW.PODCAST_REVIEW_USER,
+                    userId: podcast.user_id._id,
+                    podcastId: podcast._id,
+                    title: "Podcast discarded",
+                    message: "Your podcast with title " + podcast.title + " has been discarded by system",
+                    timestamp: Date.now()
+                });
 
             }
 

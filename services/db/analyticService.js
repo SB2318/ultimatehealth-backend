@@ -10,7 +10,7 @@ const getMidNight = () => {
     return new Date(date.setHours(0, 0, 0, 0));
 }
 
-const recordArticleRead = ({ userId }) => {
+const recordArticleRead = async ({ userId }) => {
 
     const today = getMidNight();
 
@@ -23,7 +23,7 @@ const recordArticleRead = ({ userId }) => {
     );
 }
 
-const recordArticleWrite = ({ userId }) => {
+const recordArticleWrite = async ({ userId }) => {
 
     const today = getMidNight();
     await WriteAggregate.updateOne(
@@ -35,7 +35,7 @@ const recordArticleWrite = ({ userId }) => {
     );
 }
 
-const recordPodcastView = ({ userId }) => {
+const recordPodcastView = async ({ userId }) => {
     const today = getMidNight();
 
     await AudioViewAggregate.updateOne(
@@ -48,7 +48,7 @@ const recordPodcastView = ({ userId }) => {
 
 }
 
-const recordPodcastLike = ({ userId }) => {
+const recordPodcastLike = async ({ userId }) => {
     const today = getMidNight();
 
     await AudioLikeAggregate.updateOne(
@@ -60,7 +60,7 @@ const recordPodcastLike = ({ userId }) => {
     );
 }
 
-const recordPodcastCreation = ({ userId }) => {
+const recordPodcastCreation = async ({ userId }) => {
     const today = getMidNight();
 
     await AudioWriteAggregate.updateOne(

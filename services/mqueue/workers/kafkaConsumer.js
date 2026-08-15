@@ -1,6 +1,7 @@
-const { globalEmailConsumer, globalAnalyticsConsumer } = require("../../../config/kafka");
+const { globalEmailConsumer, globalAnalyticsConsumer, globalNotificationConsumer } = require("../../../config/kafka");
 const { handleEmailEvent } = require("./emailConsumer");
 const { handleAnalyticsEvent } = require("./analyticsConsumer");
+const {handleNotificationEvent} = require("./notificationConsumer");
 
 const connectEmailConsumer = async () => {
     try {
@@ -9,16 +10,10 @@ const connectEmailConsumer = async () => {
         // subscribe to the topic
         await globalEmailConsumer.subscribe({
             topics: [
-                // 'article-analytics-events',
-                //'podcast-analytics-events',
-                //'admin-analytics-events',
                 'content-notification-events',
                 'content-moderation-events',
                 'account-moderation-events',
                 'support-email-events',
-                //'social-notification-events',
-                //'content-review-notifications',
-                //'broadcast-notifications'
             ],
             fromBeginning: false
         });
@@ -33,10 +28,7 @@ const connectEmailConsumer = async () => {
             eachMessage: async ({ topic, message }) => {
 
                 try {
-
-
                     await handleEmailEvent(topic, message);
-
 
                 } catch (err) {
                     console.error(`[Consumer] Failed to process message from ${topic}:`, err);
@@ -79,9 +71,11 @@ const connectAnalyticsConsumer = async () => {
                 for (const message of batch.messages) {
                     // Process batch analytics event
                     try {
-                        const event = JSON.parse(message.toString());
-                        const topic = message.topic;
+                        const event = JSON.parse(message.value.toString());
+                        const topic = batch.topic;
                         await handleAnalyticsEvent(topic, event);
+                        resolveOffset(message.offset);
+                        await heartbeat();
 
                     } catch (err) {
                         console.log("analytics consumer error", err, message);
@@ -91,6 +85,54 @@ const connectAnalyticsConsumer = async () => {
         });
     } catch (err) {
         console.log("Analytics Consumer Error", err);
+    }
+}
+
+const connectNotificationConsumer = async () =>{
+
+    try{
+       
+        await globalNotificationConsumer.connect();
+
+        await globalNotificationConsumer.subscribe({
+            topics: [
+             'social-notification-events',
+             'content-review-notifications',
+             'broadcast-notifications'
+            ],
+            fromBeginning: false
+        });
+
+        await globalNotificationConsumer.run({
+            partitionsConsumedConcurrently: 3,
+            eachBatchAutoResolve: false,
+            eachBatch: async({
+                batch,
+                resolveOffset,
+                heartbeat,
+                commitOffsetsIfNecessary
+            })=>{
+
+                console.log(`Processing ${batch.messages.length} notification events`);
+
+                for (const message of batch.messages) {
+                    // Process batch analytics event
+                    try {
+                        const event = JSON.parse(message.value.toString());
+                        const topic = batch.topic;
+                        await handleNotificationEvent(topic, event);
+                        resolveOffset(message.offset);
+                        await heartbeat();
+
+                    } catch (err) {
+                        console.log("Notification consumer error", err, message);
+                    }
+                }
+            }
+        })
+
+    }catch(err){
+        console.log("Connect Notification Consumer Error", err);
     }
 }
 
@@ -110,5 +152,6 @@ const SUBSCRIBED_EVENT_TYPES = {
 module.exports = {
     connectEmailConsumer,
     connectAnalyticsConsumer,
+    connectNotificationConsumer,
     SUBSCRIBED_EVENT_TYPES
 }

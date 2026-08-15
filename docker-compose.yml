@@ -42,10 +42,10 @@ services:
 
       
       # The KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR environment variable is used to specify the replication factor for the internal __consumer_offsets topic. In this case, it is set to "3", which means that the __consumer_offsets topic will have 3 replicas.
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
 
       # The KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR environment variable is used to specify the replication factor for the internal __transaction_state topic. In this case, it is set to "3", which means that the __transaction_state topic will have 3 replicas.
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 2
 
       # The KAFKA_TRANSACTION_STATE_LOG_MIN_ISR environment variable is used to specify the minimum number of in-sync replicas for the internal __transaction_state topic. In this case, it is set to "2", which means that at least 2 replicas must be in sync for the __transaction_state topic to be considered healthy.
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
@@ -95,10 +95,10 @@ services:
 
       
       # The KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR environment variable is used to specify the replication factor for the internal __consumer_offsets topic. In this case, it is set to "3", which means that the __consumer_offsets topic will have 3 replicas.
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
 
       # The KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR environment variable is used to specify the replication factor for the internal __transaction_state topic. In this case, it is set to "3", which means that the __transaction_state topic will have 3 replicas.
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 2
 
       # The KAFKA_TRANSACTION_STATE_LOG_MIN_ISR environment variable is used to specify the minimum number of in-sync replicas for the internal __transaction_state topic. In this case, it is set to "2", which means that at least 2 replicas must be in sync for the __transaction_state topic to be considered healthy.
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2

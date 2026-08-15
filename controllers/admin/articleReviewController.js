@@ -2,7 +2,7 @@ const expressAsyncHandler = require('express-async-handler');
 const Article = require('../../models/Articles');
 const admin = require('../../models/admin/adminModel');
 const User = require('../../models/UserModel');
-const { articleReviewNotificationsToUser, articleSubmitNotificationsToAdmin, broadcastNewArticlePublished } = require('../notifications/notificationHelper');
+const { publishReviewNotificationEvent, publishBroadcastNotificationEvent, NOTIFICATION_EVENT_TYPES } = require('../../services/mqueue/producers/notificationProducer');
 const Comment = require('../../models/commentSchema');
 const WriteAggregate = require("../../models/events/writeEventSchema");
 const { publishContentEmailEvent, EMAIL_EVENT_TYPES } = require('../../services/mqueue/producers/emailProducer');
@@ -275,10 +275,16 @@ module.exports.submitReview = expressAsyncHandler(
 
             await article.save();
 
-            articleReviewNotificationsToUser(article.authorId._id, article._id, article.pb_recordId, null,
-                "New feedback received on your Article : ",
-                feedback
-            );
+            await publishReviewNotificationEvent({
+                type: NOTIFICATION_EVENT_TYPES.REVIEW.ARTICLE_REVIEW_USER,
+                userId: article.authorId._id,
+                articleId: article._id,
+                articleRecordId: article.pb_recordId,
+                requestId: null,
+                title: "New feedback received on your Article : ",
+                message: feedback,
+                timestamp: Date.now()
+            });
 
             // send mail
             // sendArticleFeedbackEmail(article.authorId.email, feedback, article.title);
@@ -355,11 +361,16 @@ module.exports.submitSuggestedChanges = expressAsyncHandler(
             // notify reviewer
             if (article.reviewer_id) {
 
-                articleSubmitNotificationsToAdmin(
-                    article.reviewer_id, article._id, article.pb_recordId, null,
-                    `New changes from author on : ${article.title}`,
-                    "Please review the changes made by the author."
-                );
+                await publishReviewNotificationEvent({
+                    type: NOTIFICATION_EVENT_TYPES.REVIEW.ARTICLE_SUBMIT_ADMIN,
+                    adminId: article.reviewer_id,
+                    articleId: article._id,
+                    articleRecordId: article.pb_recordId,
+                    requestId: null,
+                    title: `New changes from author on : ${article.title}`,
+                    message: "Please review the changes made by the author.",
+                    timestamp: Date.now()
+                });
 
             }
 
@@ -438,23 +449,29 @@ module.exports.publishArticle = expressAsyncHandler(
             //sendArticlePublishedEmail(article.authorId.email, blogLink, article.title);
 
             await publishContentEmailEvent({
-                email: contributor.email,
+                email: article.authorId.email,
                 title: article.title,
                 articleLink: blogLink,
                 groupIndex: EMAIL_EVENT_TYPES.CONTENT.ARTICLE_PUBLISHED
             });
 
 
-            articleReviewNotificationsToUser(
-                article.authorId._id,
-                article._id,
-                article.pb_recordId,
-                null,
-                `Congrats! Your Article : ${article.title} is Live now!`,
-                "Keep contributing! We encourage you to keep sharing valuable content with us."
-            );
+            await publishReviewNotificationEvent({
+                type: NOTIFICATION_EVENT_TYPES.REVIEW.ARTICLE_REVIEW_USER,
+                userId: article.authorId._id,
+                articleId: article._id,
+                articleRecordId: article.pb_recordId,
+                requestId: null,
+                title: `Congrats! Your Article : ${article.title} is Live now!`,
+                message: "Keep contributing! We encourage you to keep sharing valuable content with us.",
+                timestamp: Date.now()
+            });
             // send notification
-            broadcastNewArticlePublished(article._id);
+            await publishBroadcastNotificationEvent({
+                type: NOTIFICATION_EVENT_TYPES.BROADCAST.NEW_ARTICLE_BROADCAST,
+                articleId: article._id,
+                timestamp: Date.now()
+            });
 
             res.status(200).json({ message: "Article Published" });
 
@@ -552,10 +569,16 @@ module.exports.unassignModerator = expressAsyncHandler(
 
             await article.save();
 
-            await articleReviewNotificationsToUser(
-                article.authorId, article._id, article.pb_recordId, null,
-                article.title, "Your article has been unassigned from moderation."
-            );
+            await publishReviewNotificationEvent({
+                type: NOTIFICATION_EVENT_TYPES.REVIEW.ARTICLE_REVIEW_USER,
+                userId: article.authorId,
+                articleId: article._id,
+                articleRecordId: article.pb_recordId,
+                requestId: null,
+                title: article.title,
+                message: "Your article has been unassigned from moderation.",
+                timestamp: Date.now()
+            });
 
             res.status(200).json({ message: "Article unassigned" });
 
@@ -603,10 +626,16 @@ async function unassignArticle() {
 
             await article.save();
 
-            await articleReviewNotificationsToUser(
-                article.authorId, article._id, article.pb_recordId, null,
-                article.title, "Your article has been unassigned from moderation."
-            );
+            await publishReviewNotificationEvent({
+                type: NOTIFICATION_EVENT_TYPES.REVIEW.ARTICLE_REVIEW_USER,
+                userId: article.authorId,
+                articleId: article._id,
+                articleRecordId: article.pb_recordId,
+                requestId: null,
+                title: article.title,
+                message: "Your article has been unassigned from moderation.",
+                timestamp: Date.now()
+            });
 
 
         });
@@ -656,11 +685,16 @@ async function discardArticle() {
 
             if (article.authorId?.email && article.title) {
 
-                await articleReviewNotificationsToUser(
-                    article.authorId._id, article._id, article.pb_recordId, null,
-                    "Article discarded",
-                    "Your article with title " + article.title + " has been discarded by system"
-                );
+                await publishReviewNotificationEvent({
+                    type: NOTIFICATION_EVENT_TYPES.REVIEW.ARTICLE_REVIEW_USER,
+                    userId: article.authorId._id,
+                    articleId: article._id,
+                    articleRecordId: article.pb_recordId,
+                    requestId: null,
+                    title: "Article discarded",
+                    message: "Your article with title " + article.title + " has been discarded by system",
+                    timestamp: Date.now()
+                });
 
                 // sendArticleDiscardEmail(article.authorId.email, article.status, article.title, "");
 

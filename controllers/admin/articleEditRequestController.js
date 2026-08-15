@@ -3,7 +3,7 @@ const Article = require('../../models/Articles');
 const EditRequest = require('../../models/admin/articleEditRequestModel');
 const admin = require('../../models/admin/adminModel');
 const User = require('../../models/UserModel');
-const { articleReviewNotificationsToUser, articleSubmitNotificationsToAdmin } = require('../notifications/notificationHelper');
+const { publishReviewNotificationEvent, NOTIFICATION_EVENT_TYPES } = require('../../services/mqueue/producers/notificationProducer');
 const Comment = require('../../models/commentSchema');
 const WriteAggregate = require("../../models/events/writeEventSchema");
 const { publishContentEmailEvent, EMAIL_EVENT_TYPES } = require('../../services/mqueue/producers/emailProducer');
@@ -273,12 +273,16 @@ module.exports.pickImprovementRequest = expressAsyncHandler(
             // send Notification
             if (editRequest.article._id && editRequest.article.title) {
 
-                articleReviewNotificationsToUser(editRequest.user_id._id, editRequest.article._id,
-                    editRequest.pb_recordId,
-                    editRequest._id,
-                    'New feedback on your improvement: ',
-                    `Congrats! Your Improvement Request has been accepted`,
-                );
+                await publishReviewNotificationEvent({
+                    type: NOTIFICATION_EVENT_TYPES.REVIEW.ARTICLE_REVIEW_USER,
+                    userId: editRequest.user_id._id,
+                    articleId: editRequest.article._id,
+                    articleRecordId: editRequest.pb_recordId,
+                    requestId: editRequest._id,
+                    title: 'New feedback on your improvement: ',
+                    message: `Congrats! Your Improvement Request has been accepted`,
+                    timestamp: Date.now()
+                });
 
 
                 // Send email
@@ -347,12 +351,16 @@ module.exports.submitReviewOnImprovement = expressAsyncHandler(
                 await editRequest.save();
 
 
-                articleReviewNotificationsToUser(editRequest.user_id._id, editRequest.article._id,
-                    editRequest.pb_recordId,
-                    editRequest._id,
-                    "New feedback on your improvement: ",
-                    feedback,
-                );
+                await publishReviewNotificationEvent({
+                    type: NOTIFICATION_EVENT_TYPES.REVIEW.ARTICLE_REVIEW_USER,
+                    userId: editRequest.user_id._id,
+                    articleId: editRequest.article._id,
+                    articleRecordId: editRequest.pb_recordId,
+                    requestId: editRequest._id,
+                    title: "New feedback on your improvement: ",
+                    message: feedback,
+                    timestamp: Date.now()
+                });
 
                 // send mail
                // sendArticleFeedbackEmail(editRequest.user_id.email, feedback, editRequest.article.title);
@@ -415,12 +423,16 @@ module.exports.submitImprovement = expressAsyncHandler(
             if (editRequest.reviewer_id && editRequest.article._id && editRequest.article.title) {
 
 
-                articleSubmitNotificationsToAdmin(editRequest.reviewer_id, editRequest.article._id,
-                    editRequest.pb_recordId,
-                    editRequest._id,
-                    ` New changes from author on : ${editRequest.article.title} `,
-                    "Please reach out"
-                );
+                await publishReviewNotificationEvent({
+                    type: NOTIFICATION_EVENT_TYPES.REVIEW.ARTICLE_SUBMIT_ADMIN,
+                    adminId: editRequest.reviewer_id,
+                    articleId: editRequest.article._id,
+                    articleRecordId: editRequest.pb_recordId,
+                    requestId: editRequest._id,
+                    title: ` New changes from author on : ${editRequest.article.title} `,
+                    message: "Please reach out",
+                    timestamp: Date.now()
+                });
 
 
             }
@@ -618,12 +630,16 @@ module.exports.publishImprovement = expressAsyncHandler(
                 groupIndex: EMAIL_EVENT_TYPES.CONTENT.ARTICLE_PUBLISHED
             })
 
-            articleReviewNotificationsToUser(editRequest.user_id._id, editRequest.article._id,
-                editRequest.pb_recordId,
-                editRequest._id,
-                ` Your Improvements on article : ${article.title} is Live now!`,
-                "We encourage you to keep sharing valuable content with us.",
-            );
+            await publishReviewNotificationEvent({
+                type: NOTIFICATION_EVENT_TYPES.REVIEW.ARTICLE_REVIEW_USER,
+                userId: editRequest.user_id._id,
+                articleId: editRequest.article._id,
+                articleRecordId: editRequest.pb_recordId,
+                requestId: editRequest._id,
+                title: ` Your Improvements on article : ${article.title} is Live now!`,
+                message: "We encourage you to keep sharing valuable content with us.",
+                timestamp: Date.now()
+            });
 
 
             res.status(200).json({ message: "Article Published" });

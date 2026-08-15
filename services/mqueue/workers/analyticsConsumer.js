@@ -44,7 +44,7 @@ const handleAnalyticsEvent = async (topic, event)=>{
      }
 }
 
-const handleArticleContribution = (event)=>{
+const handleArticleContribution = async (event)=>{
 
     switch(event.type){
 
@@ -66,7 +66,7 @@ const handleArticleContribution = (event)=>{
     }
 }
 
-const handlePodcastContribution = (event)=>{
+const handlePodcastContribution = async (event)=>{
 
     switch(event.type){
 
@@ -89,4 +89,8 @@ const handlePodcastContribution = (event)=>{
         default:
             console.log("Analytics Podcast Topic Not Found");
     }
+}
+
+module.exports = {
+    handleAnalyticsEvent
 }

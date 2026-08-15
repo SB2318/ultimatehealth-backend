@@ -4,9 +4,13 @@ const compression = require('compression');
 const cors = require('cors');
 const path = require("path");
 const {connectProducer} = require('./services/mqueue/kafkaProducer');
+const {
+connectEmailConsumer,
+connectAnalyticsConsumer,
+connectNotificationConsumer
+} = require("./services/mqueue/workers/kafkaConsumer");
 
 const cookieParser = require('cookie-parser');
-const { articleReviewNotificationsToUser } = require('./controllers/notifications/notificationHelper');
 //const {sendArticleFeedbackEmail}= require('./controllers/emailservice');
 const { publishContentEmailEvent, EMAIL_EVENT_TYPES } = require('./services/mqueue/producers/emailProducer');
 const EditRequest = require('./models/admin/articleEditRequestModel');
@@ -44,16 +48,7 @@ const shareRoute = require('./routes/shareRoute');
 const contactRoutes = require('./routes/contactRoutes');
 const newsletterRoutes = require('./routes/newsletterRoutes');
 const wellnessRoutes = require('./routes/wellnessRoute');
-const {
-    sendPostNotification,
-    sendPostLikeNotification,
-    sendCommentNotification,
-    sendCommentLikeNotification,
-    repostNotification,
-    mentionNotification,
-    userFollowNotification,
-    articleSubmitNotificationsToAdmin
-} = require('./controllers/notifications/notificationHelper');
+const { publishSocialNotificationEvent, publishBroadcastNotificationEvent, NOTIFICATION_EVENT_TYPES } = require('./services/mqueue/producers/notificationProducer');
 const {verifyRefreshToken } = require("./services/security/tokenService");
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
@@ -64,6 +59,9 @@ const app = express();
 dotenv.config();
 db.dbConnect();
 connectProducer(); // Connect the Kafka producer to the Kafka cluster
+connectEmailConsumer();
+connectAnalyticsConsumer();
+connectNotificationConsumer();
 
 // Prevent process crash on unhandled errors
 process.on('uncaughtException', (err) => {
@@ -248,14 +246,25 @@ io.on('connection', (socket) => {
     })
        */
 
-    socket.on("notification", (data) => {
+    socket.on("notification", async (data) => {
         // Save notification to database AND broadcast to user's notification room
+
 
         if (data.type === 'openPost') {
             console.log('open post notification');
-            sendPostNotification(data.userId, data.articleId,
-                data.articleRecordId, data.podcastId,
-                data.requestId, data.title, data.message, data.authorTitle, data.authorMessage);
+            await publishBroadcastNotificationEvent({
+                type: NOTIFICATION_EVENT_TYPES.BROADCAST.POST_PUBLISHED_BROADCAST,
+                userId: data.userId,
+                articleId: data.articleId,
+                articleRecordId: data.articleRecordId,
+                podcastId: data.podcastId,
+                requestId: data.requestId,
+                title: data.title,
+                message: data.message,
+                authorTitle: data.authorTitle,
+                authorMessage: data.authorMessage,
+                timestamp: Date.now()
+            });
 
             // Real-time broadcast to target user
             if (data.targetUserId) {
@@ -270,7 +279,16 @@ io.on('connection', (socket) => {
         }
         else if (data.type === 'likePost') {
             console.log('like post notification');
-            sendPostLikeNotification(data.userId, data.articleId, data.podcastId, data.articleRecordId, data.title, data.message);
+            await publishSocialNotificationEvent({
+                type: NOTIFICATION_EVENT_TYPES.SOCIAL.POST_LIKE,
+                userId: data.userId,
+                articleId: data.articleId,
+                podcastId: data.podcastId,
+                articleRecordId: data.articleRecordId,
+                title: data.title,
+                message: data.message,
+                timestamp: Date.now()
+            });
 
             // Real-time broadcast to target user
             if (data.targetUserId) {
@@ -285,17 +303,19 @@ io.on('connection', (socket) => {
         }
         else if (data.type === 'commentPost') {
             console.log('comment post notification');
-            sendCommentNotification(
-                data.articleId,
-                data.podcastId,
-                data.commentId,
-                null,
-                data.articleRecordId,
-                data.userId,
-                data.adminId,
-                data.title,
-                data.message
-            );
+            await publishSocialNotificationEvent({
+                type: NOTIFICATION_EVENT_TYPES.SOCIAL.POST_COMMENT,
+                articleId: data.articleId,
+                podcastId: data.podcastId,
+                commentId: data.commentId,
+                requestId: null,
+                articleRecordId: data.articleRecordId,
+                userId: data.userId,
+                adminId: data.adminId,
+                title: data.title,
+                message: data.message,
+                timestamp: Date.now()
+            });
 
             // Real-time broadcast to target user
             if (data.targetUserId) {
@@ -311,8 +331,17 @@ io.on('connection', (socket) => {
         }
         else if (data.type === 'commentLikePost') {
             console.log('comment like post notification');
-            sendCommentLikeNotification(data.userId, data.articleId,
-                data.podcastId, data.articleRecordId, data.commentId, data.title, data.message);
+            await publishSocialNotificationEvent({
+                type: NOTIFICATION_EVENT_TYPES.SOCIAL.COMMENT_LIKE,
+                userId: data.userId,
+                articleId: data.articleId,
+                podcastId: data.podcastId,
+                articleRecordId: data.articleRecordId,
+                commentId: data.commentId,
+                title: data.title,
+                message: data.message,
+                timestamp: Date.now()
+            });
 
             // Real-time broadcast to target user
             if (data.targetUserId) {
@@ -327,7 +356,12 @@ io.on('connection', (socket) => {
         }
         else if (data.type === 'userFollow') {
             console.log('user follow notification');
-            userFollowNotification(data.userId, data.message);
+            await publishSocialNotificationEvent({
+                type: NOTIFICATION_EVENT_TYPES.SOCIAL.USER_FOLLOW,
+                userId: data.userId,
+                message: data.message,
+                timestamp: Date.now()
+            });
 
             // Real-time broadcast to target user
             if (data.targetUserId) {
@@ -341,16 +375,18 @@ io.on('connection', (socket) => {
         else if (data.type === "repost") {
             console.log("repost notification");
 
-            repostNotification(
-                data.userId,
-                data.authorId,
-                data.postId,
-                data.articleRecordId,
-                data.message.title,
-                data.message.message,
-                data.authorMessage.title,
-                data.authorMessage.message
-            );
+            await publishSocialNotificationEvent({
+                type: NOTIFICATION_EVENT_TYPES.SOCIAL.REPOST,
+                userId: data.userId,
+                authorId: data.authorId,
+                articleId: data.postId,
+                articleRecordId: data.articleRecordId,
+                title: data.message.title,
+                message: data.message.message,
+                authorTitle: data.authorMessage.title,
+                authorMessage: data.authorMessage.message,
+                timestamp: Date.now()
+            });
 
             // Real-time broadcast to author and original poster
             if (data.authorId) {
@@ -488,17 +524,19 @@ io.on('connection', (socket) => {
 
                     if (article && articleId) {
 
-                        sendCommentNotification(
-                            null,
-                            podcastId,
-                            parentComment._id,
-                            null,
-                            article.pb_recordId,
-                            parentComment.userId,
-                            null,
-                            `${user.user_handle} replied to your comment`,
-                            content
-                        );
+                        await publishSocialNotificationEvent({
+                            type: NOTIFICATION_EVENT_TYPES.SOCIAL.POST_COMMENT,
+                            articleId: null,
+                            podcastId: podcastId,
+                            commentId: parentComment._id,
+                            requestId: null,
+                            articleRecordId: article.pb_recordId,
+                            userId: parentComment.userId,
+                            adminId: null,
+                            title: `${user.user_handle} replied to your comment`,
+                            message: content,
+                            timestamp: Date.now()
+                        });
 
                         // Real-time notification to parent comment owner
                         io.to(`user:${parentComment.userId}`).emit('notification', {
@@ -511,17 +549,19 @@ io.on('connection', (socket) => {
                         });
                     }
                     else if (podcastId) {
-                        sendCommentNotification(
-                            null,
-                            podcastId,
-                            parentComment._id,
-                            null,
-                            null,
-                            parentComment.userId,
-                            null,
-                            `${user.user_handle} replied to your comment`,
-                            content
-                        );
+                        await publishSocialNotificationEvent({
+                            type: NOTIFICATION_EVENT_TYPES.SOCIAL.POST_COMMENT,
+                            articleId: null,
+                            podcastId: podcastId,
+                            commentId: parentComment._id,
+                            requestId: null,
+                            articleRecordId: null,
+                            userId: parentComment.userId,
+                            adminId: null,
+                            title: `${user.user_handle} replied to your comment`,
+                            message: content,
+                            timestamp: Date.now()
+                        });
 
                         // Real-time notification to parent comment owner
                         io.to(`user:${parentComment.userId}`).emit('notification', {
@@ -558,32 +598,36 @@ io.on('connection', (socket) => {
                     if (mentionedUsers && Array.isArray(mentionedUsers) && mentionedUsers.length > 0) {
 
 
-                        mentionNotification(
-                            mentionedUsers,
-                            articleId,
-                            podcastId,
-                            null,
-                            null,
-                            populatedComment._id,
-                            `${user.user_handle} mentioned you in a comment`,
-                            content
-                        );
+                        await publishSocialNotificationEvent({
+                            type: NOTIFICATION_EVENT_TYPES.SOCIAL.MENTION,
+                            mentionedUsers: mentionedUsers,
+                            articleId: articleId,
+                            podcastId: podcastId,
+                            requestId: null,
+                            articleRecordId: null,
+                            commentId: populatedComment._id,
+                            title: `${user.user_handle} mentioned you in a comment`,
+                            message: content,
+                            timestamp: Date.now()
+                        });
                     }
                     //  console.log("Mentioned Users", mentionedUsers);
 
                     if (article && articleId) {
 
-                        sendCommentNotification(
-                            article._id,
-                            null,
-                            populatedComment._id,
-                            null,
-                            article.pb_recordId,
-                            article.authorId,
-                            null,
-                            `${user.user_handle} commented on your post`,
-                            content
-                        );
+                        await publishSocialNotificationEvent({
+                            type: NOTIFICATION_EVENT_TYPES.SOCIAL.POST_COMMENT,
+                            articleId: article._id,
+                            podcastId: null,
+                            commentId: populatedComment._id,
+                            requestId: null,
+                            articleRecordId: article.pb_recordId,
+                            userId: article.authorId,
+                            adminId: null,
+                            title: `${user.user_handle} commented on your post`,
+                            message: content,
+                            timestamp: Date.now()
+                        });
 
                         // Real-time notification to article author
                         io.to(`user:${article.authorId}`).emit('notification', {
@@ -595,17 +639,19 @@ io.on('connection', (socket) => {
                         });
 
                     } else if (podcast && podcastId) {
-                        sendCommentNotification(
-                            null,
-                            podcastId,
-                            populatedComment._id,
-                            null,
-                            null,
-                            podcast.user_id,
-                            null,
-                            `${user.user_handle} commented on your podcast`,
-                            content
-                        );
+                        await publishSocialNotificationEvent({
+                            type: NOTIFICATION_EVENT_TYPES.SOCIAL.POST_COMMENT,
+                            articleId: null,
+                            podcastId: podcastId,
+                            commentId: populatedComment._id,
+                            requestId: null,
+                            articleRecordId: null,
+                            userId: podcast.user_id,
+                            adminId: null,
+                            title: `${user.user_handle} commented on your podcast`,
+                            message: content,
+                            timestamp: Date.now()
+                        });
 
                         // Real-time notification to podcast author
                         io.to(`user:${podcast.user_id}`).emit('notification', {
