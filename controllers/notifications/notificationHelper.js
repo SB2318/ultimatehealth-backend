@@ -645,14 +645,16 @@ module.exports.broadcastNewArticlePublished = async (articleId) => {
                 // Send email
                 if (user.email) {
                   //  sendNewArticleEmail(user.email, article.title, article.authorId.user_name, articleLink);
-
-                    await publishContentEmailEvent({
-                        email: user.email,
-                        title: article.title,
-                        articleLink: articleLink,
-                        authorName: article.authorId.user_name,
-                        groupIndex: EMAIL_EVENT_TYPES.CONTENT.NEW_ARTICLE_PUBLISHED
-                    });
+                    
+                  // This will be resolved under notification consumer
+                    // await publishContentEmailEvent({
+                    //     email: user.email,
+                    //     title: article.title,
+                    //     articleLink: articleLink,
+                    //     authorName: article.authorId.user_name,
+                    //     groupIndex: EMAIL_EVENT_TYPES.CONTENT.NEW_ARTICLE_PUBLISHED
+                    // });
+                    
                 }
 
                 // Send push notification

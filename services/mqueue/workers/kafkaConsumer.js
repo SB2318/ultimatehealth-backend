@@ -29,6 +29,7 @@ const connectEmailConsumer = async () => {
         // Here, I have once case for email also, where I have to do batch processing
         
         await globalEmailConsumer.run({
+            partitionsConsumedConcurrently: 3,
             eachMessage: async ({ topic, message }) => {
 
                 try {

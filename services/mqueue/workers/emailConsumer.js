@@ -170,23 +170,24 @@ const handleContentNotificationEmailEvent = async (emailEvent) => {
                 await pickPodcastMail(emailEvent.email, emailEvent.title);
             }
             break;
+       
+        // Batch Processing
+        // case EMAIL_EVENT_TYPES.CONTENT.NEW_ARTICLE_PUBLISHED:
+        //     // New Article Published, mail to every follower and subscribers
+        //     if (
+        //         emailEvent.email && emailEvent.title
+        //         && emailEvent.authorName && emailEvent.articleLink
+        //     ) {
 
-        case EMAIL_EVENT_TYPES.CONTENT.NEW_ARTICLE_PUBLISHED:
-            // New Article Published, mail to every follower and subscribers
-            if (
-                emailEvent.email && emailEvent.title
-                && emailEvent.authorName && emailEvent.articleLink
-            ) {
-
-                await
-                    sendNewArticleEmail(
-                        emailEvent.email,
-                        emailEvent.title,
-                        emailEvent.authorName,
-                        emailEvent.articleLink
-                    );
-            }
-            break;
+        //         await
+        //             sendNewArticleEmail(
+        //                 emailEvent.email,
+        //                 emailEvent.title,
+        //                 emailEvent.authorName,
+        //                 emailEvent.articleLink
+        //             );
+        //     }
+        //     break;
 
         case EMAIL_EVENT_TYPES.CONTENT.ARTICLE_FEEDBACK:
 
