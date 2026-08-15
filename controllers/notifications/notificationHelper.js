@@ -6,13 +6,13 @@ const Admin = require('../../models/admin/adminModel');
 const Article = require('../../models/Articles');
 //const { sendNewArticleEmail } = require('../emailservice');
 
-const { publishContentEmailEvent, EMAIL_EVENT_TYPES } = require('../../services/mqueue/emailProducer');
+const { publishContentEmailEvent, EMAIL_EVENT_TYPES } = require('../../services/mqueue/producers/emailProducer');
 const { 
     publishSocialNotificationEvent,
     publishReviewNotificationEvent,
     publishBroadcastNotificationEvent,
     NOTIFICATION_EVENT_TYPES 
-} = require('../../services/mqueue/notificationProducer');
+} = require('../../services/mqueue/producers/notificationProducer');
 
 
 /**

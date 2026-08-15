@@ -1,4 +1,4 @@
-const { globalProducer } = require('../../config/kafka');
+const { globalProducer } = require('../../../config/kafka');
 
 const EMAIL_EVENT_TYPES = {
     CONTENT: {

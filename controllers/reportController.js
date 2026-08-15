@@ -11,7 +11,7 @@ const Admin = require('../models/admin/adminModel');
 const AdminAggregate = require('../models/events/adminContributionEvent');
 const reportService = require('../services/db/reportService');
 const cron = require('node-cron');
-const {publishModerationEmailEvent, publishAccountModerationEmailEvent, EMAIL_EVENT_TYPES} = require("../services/mqueue/emailProducer");
+const {publishModerationEmailEvent, publishAccountModerationEmailEvent, EMAIL_EVENT_TYPES} = require("../services/mqueue/producers/emailProducer");
 
 
 

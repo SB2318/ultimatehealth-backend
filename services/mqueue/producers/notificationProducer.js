@@ -1,4 +1,4 @@
-const { globalProducer } = require('../../config/kafka');
+const { globalProducer } = require('../../../config/kafka');
 
 const NOTIFICATION_EVENT_TYPES = {
     SOCIAL: {

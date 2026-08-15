@@ -1,7 +1,7 @@
 const expressAsyncHandler = require('express-async-handler');
 const ContactUs = require('../models/ContactUs');
 //const { sendContactUsMail } = require('./emailservice');
-const { publishSupportEmailEvent, EMAIL_EVENT_TYPES } = require('../services/mqueue/emailProducer');
+const { publishSupportEmailEvent, EMAIL_EVENT_TYPES } = require('../services/mqueue/producers/emailProducer');
 const validator = require('validator');
 
 const submitContactForm = expressAsyncHandler(async (req, res) => {

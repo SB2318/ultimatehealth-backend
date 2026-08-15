@@ -7,8 +7,8 @@ const ReadAggregate = require("../models/events/readEventSchema");
 const WriteAggregate = require("../models/events/writeEventSchema");
 const statusEnum = require("../utils/StatusEnum");
 // const { sendArticleForReviewEmail } = require("./emailservice");
-const { publishContentEmailEvent, EMAIL_EVENT_TYPES } = require("../services/mqueue/emailProducer");
-const { publishArticleAnalyticsEvent, ANALYTICS_EVENT_TYPES } = require("../services/mqueue/analyticsProducer");
+const { publishContentEmailEvent, EMAIL_EVENT_TYPES } = require("../services/mqueue/producers/emailProducer");
+const { publishArticleAnalyticsEvent, ANALYTICS_EVENT_TYPES } = require("../services/mqueue/producers/analyticsProducer");
 
 const mongoose = require('mongoose');
 
