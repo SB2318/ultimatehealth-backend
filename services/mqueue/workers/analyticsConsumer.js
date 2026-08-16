@@ -41,6 +41,7 @@ const handleAnalyticsEvent = async (topic, event)=>{
          
      }catch(err){
         console.log("Analytics event error", err);
+        throw err; // kafka will retry
      }
 }
 

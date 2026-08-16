@@ -45,30 +45,35 @@ const {
 
 const handleEmailEvent = async (topic, message) => {
 
-    const emailEvent = JSON.parse(message.value.toString());
+    try {
 
-    switch (topic) {
+        const emailEvent = JSON.parse(message.value.toString());
 
-        case SUBSCRIBED_EVENT_TYPES.CONTENT_NOTIFICATION:
-            console.log('Received Content Notification Email event:', emailEvent);
-            await handleContentNotificationEmailEvent(emailEvent);
-            break;
+        switch (topic) {
 
-        case SUBSCRIBED_EVENT_TYPES.CONTENT_MODERATION:
-            console.log('Received Content Moderation Email event:', emailEvent);
-            await handleContentModerationEmailEvent(emailEvent);
-            break;
+            case SUBSCRIBED_EVENT_TYPES.CONTENT_NOTIFICATION:
+                console.log('Received Content Notification Email event:', emailEvent);
+                await handleContentNotificationEmailEvent(emailEvent);
+                break;
 
-        case SUBSCRIBED_EVENT_TYPES.ACCOUNT_MODERATION:
-            console.log('Received Account Moderation Email event:', emailEvent);
-            await handleAccountModerationEmailEvent(emailEvent);
-            break;
-        case SUBSCRIBED_EVENT_TYPES.SUPPORT_EMAIL:
-            console.log('Received Support Email event:', emailEvent);
-            await handleSupportEmailEvent(emailEvent);
-            break;
-        default:
-            console.log('Received unknown email event type:', topic);
+            case SUBSCRIBED_EVENT_TYPES.CONTENT_MODERATION:
+                console.log('Received Content Moderation Email event:', emailEvent);
+                await handleContentModerationEmailEvent(emailEvent);
+                break;
+
+            case SUBSCRIBED_EVENT_TYPES.ACCOUNT_MODERATION:
+                console.log('Received Account Moderation Email event:', emailEvent);
+                await handleAccountModerationEmailEvent(emailEvent);
+                break;
+            case SUBSCRIBED_EVENT_TYPES.SUPPORT_EMAIL:
+                console.log('Received Support Email event:', emailEvent);
+                await handleSupportEmailEvent(emailEvent);
+                break;
+            default:
+                console.log('Received unknown email event type:', topic);
+        }
+    } catch (err) {
+         throw err;
     }
 }
 
@@ -170,7 +175,7 @@ const handleContentNotificationEmailEvent = async (emailEvent) => {
                 await pickPodcastMail(emailEvent.email, emailEvent.title);
             }
             break;
-       
+
         // Batch Processing
         // case EMAIL_EVENT_TYPES.CONTENT.NEW_ARTICLE_PUBLISHED:
         //     // New Article Published, mail to every follower and subscribers

@@ -1,7 +1,8 @@
 const { globalEmailConsumer, globalAnalyticsConsumer, globalNotificationConsumer } = require("../../../config/kafka");
 const { handleEmailEvent } = require("./emailConsumer");
 const { handleAnalyticsEvent } = require("./analyticsConsumer");
-const {handleNotificationEvent} = require("./notificationConsumer");
+const { handleNotificationEvent } = require("./notificationConsumer");
+const { publishDLQEvent } = require("./dlqConsumer");
 
 const connectEmailConsumer = async () => {
     try {
@@ -70,15 +71,18 @@ const connectAnalyticsConsumer = async () => {
 
                 for (const message of batch.messages) {
                     // Process batch analytics event
+                    const event = JSON.parse(message.value.toString());
                     try {
-                        const event = JSON.parse(message.value.toString());
                         const topic = batch.topic;
                         await handleAnalyticsEvent(topic, event);
                         resolveOffset(message.offset);
                         await heartbeat();
 
                     } catch (err) {
-                        console.log("analytics consumer error", err, message);
+                        console.log("analytics consumer error, sending to DLQ...", err, message);
+                        await publishDLQEvent(batch.topic, event, err);
+                        resolveOffset(message.offset);
+                        await heartbeat();
                     }
                 }
             }
@@ -88,17 +92,17 @@ const connectAnalyticsConsumer = async () => {
     }
 }
 
-const connectNotificationConsumer = async () =>{
+const connectNotificationConsumer = async () => {
 
-    try{
-       
+    try {
+
         await globalNotificationConsumer.connect();
 
         await globalNotificationConsumer.subscribe({
             topics: [
-             'social-notification-events',
-             'content-review-notifications',
-             'broadcast-notifications'
+                'social-notification-events',
+                'content-review-notifications',
+                'broadcast-notifications'
             ],
             fromBeginning: false
         });
@@ -106,33 +110,46 @@ const connectNotificationConsumer = async () =>{
         await globalNotificationConsumer.run({
             partitionsConsumedConcurrently: 3,
             eachBatchAutoResolve: false,
-            eachBatch: async({
+            eachBatch: async ({
                 batch,
                 resolveOffset,
                 heartbeat,
                 commitOffsetsIfNecessary
-            })=>{
+            }) => {
 
                 console.log(`Processing ${batch.messages.length} notification events`);
 
                 for (const message of batch.messages) {
                     // Process batch analytics event
+                    const event = JSON.parse(message.value.toString());
                     try {
-                        const event = JSON.parse(message.value.toString());
+
                         const topic = batch.topic;
                         await handleNotificationEvent(topic, event);
                         resolveOffset(message.offset);
                         await heartbeat();
 
                     } catch (err) {
-                        console.log("Notification consumer error", err, message);
+                        console.log("Notification consumer error, send to DLQ", err, message);
+                        await publishDLQEvent(batch.topic, event, err);
+                        resolveOffset(message.offset);
+                        await heartBeat();
                     }
                 }
             }
         })
 
-    }catch(err){
+    } catch (err) {
         console.log("Connect Notification Consumer Error", err);
+    }
+}
+
+const connectDLQConsumer = async () => {
+
+    try {
+
+    } catch (err) {
+
     }
 }
 
