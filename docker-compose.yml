@@ -6,8 +6,8 @@ services:
     ports:
       - "9092:9092"
 
-    # VOLUMES: By default, Docker containers are ephemeral (stateless). If a container stops or restarts, 
-    # all Kafka topics and messages are lost. Volumes map a directory inside the container (/var/lib/kafka/data) 
+    # VOLUMES: By default, Docker containers are ephemeral (stateless). If a container stops or restarts,
+    # all Kafka topics and messages are lost. Volumes map a directory inside the container (/var/lib/kafka/data)
     # to persistent storage on your host machine, ensuring your data survives restarts.
     volumes:
       - kafka1-data:/var/lib/kafka/data
@@ -24,6 +24,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+    # Scaling Strategy 3: Increase open descriptor file size limit
+    # Kafka opens a lot of files (one for every log segment of every partition) and network sockets.
+    # Docker defaults to a low limit
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
 
     environment:
       # Tells the Bitnami image to use the modern KRaft mode instead of looking for a ZooKeeper server.
@@ -60,7 +68,8 @@ services:
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka1:9093, 2@kafka2:9093, 3@kafka3:9093
 
       # The KAFKA_NUM_PARTITIONS environment variable is used to specify the default number of partitions for topics created on the Kafka broker. In this case, it is set to "3", which means that any new topic created on this broker will have 3 partitions by default.
-      KAFKA_NUM_PARTITIONS: 3
+      # Scale Strategy 1: Increase number of partitions to more parallel read
+      KAFKA_NUM_PARTITIONS: 12
 
       # The KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR environment variable is used to specify the replication factor for the internal __consumer_offsets topic. In this case, it is set to "3", which means that the __consumer_offsets topic will have 3 replicas.
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
@@ -73,6 +82,9 @@ services:
 
       # Allow unencrypted traffic to the Kafka broker. This is necessary for clients that do not support encryption, such as some older versions of Kafka clients.
       # ALLOW_PLAINTEXT_LISTENER: 'yes'
+
+      # Scaling  Strategy 2: Protect broker memory with max concurrent connection limit
+      KAFKA_MAX_CONNECTIONS: 5000
 
   kafka2:
     image: apache/kafka:latest
@@ -95,6 +107,11 @@ services:
       timeout: 5s
       retries: 5
 
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+
     environment:
       KAFKA_CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
       KAFKA_NODE_ID: 2
@@ -105,10 +122,11 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka2:9092
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka1:9093, 2@kafka2:9093, 3@kafka3:9093
-      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_NUM_PARTITIONS: 12
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_MAX_CONNECTIONS: 5000
 
   kafka3:
     image: apache/kafka:latest
@@ -131,6 +149,11 @@ services:
       timeout: 5s
       retries: 5
 
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+
     environment:
       KAFKA_CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
       KAFKA_NODE_ID: 3
@@ -141,10 +164,11 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka3:9092
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka1:9093, 2@kafka2:9093, 3@kafka3:9093
-      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_NUM_PARTITIONS: 12
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_MAX_CONNECTIONS: 5000
 
   kafdrop:
     image: obsidiandynamics/kafdrop:latest
@@ -167,4 +191,6 @@ volumes:
   kafka2-data:
   kafka3-data:
 
-# To Run : docker-compose up -d
+# To Run :
+# docker-compose down
+# docker-compose up -d
