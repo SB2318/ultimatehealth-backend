@@ -7,7 +7,7 @@ During sudden traffic surges—such as millions of users logging in simultaneous
 
 We have to think in a way, how can we solve with minimal changes. So, My prefer strategies always will be with some configuration setup.
 
-Here we are going to manage the **docker-compose** file with some minimal changes, so that we can fix everything.
+Here we are going to manage the **docker-compose** file with some minimal changes, so that we can fix at max.
 
 #### 1. First of all, try to estimate your traffic.
 #### 2. Increase partitionCount and brokerCount based on your estimation.
