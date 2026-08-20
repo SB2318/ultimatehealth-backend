@@ -1247,17 +1247,6 @@ module.exports.trustArticle = expressAsyncHandler(
 );
 
 // Get all tags
-module.exports.getAllTags = expressAsyncHandler(
-  async (req, res) => {
-    try {
-      const allTags = await ArticleTag.find().sort({ id: -1 }).lean();
-      res.status(200).json(allTags);
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  }
-)
-
 // Get trusted users for an article
 module.exports.getTrustedUsers = expressAsyncHandler(
   async (req, res) => {
