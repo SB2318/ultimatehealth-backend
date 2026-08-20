@@ -665,7 +665,10 @@ module.exports.saveArticle = expressAsyncHandler(
       // Check if the article is already saved
       //const isArticleSaved = user.savedArticles.includes(id => id === article_id);
       const savedArticlesSet = new Set(user.savedArticles);
-      const isArticleSaved = savedArticlesSet.has(article_id);
+      // savedArticles is [Number], so coerce (article_id often arrives as a
+      // string) — without this the check is always false and unsave is
+      // unreachable. Matches likeArticle's Number(article_id) usage.
+      const isArticleSaved = savedArticlesSet.has(Number(article_id));
 
       if (isArticleSaved) {
 
