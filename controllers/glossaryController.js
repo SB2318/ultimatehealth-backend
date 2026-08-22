@@ -4,7 +4,10 @@ const { throwError } = require('../utils/throwError');
 
 module.exports.createTerm = expressAsyncHandler(async (req, res) => {
 
-  const authorId = req.user ? req.userId: req.body.authorId; 
+  // adminAuthenticateToken sets req.userId (never req.user), so the author must
+  // come from the authenticated admin — never from a client-supplied body field,
+  // which would let anyone spoof authorship.
+  const authorId = req.userId;
   const data = { ...req.validateBody, authorId };
   
   const term = await glossaryService.createTerm(data);
