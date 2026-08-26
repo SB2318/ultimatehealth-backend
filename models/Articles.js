@@ -9,7 +9,7 @@ const articleSchema = new Schema({
     type: Number,
     autoIncrement: true,
   },
-  pb_recordId :{
+  pb_recordId: {
     type: String,
     require: true,
     default: null
@@ -22,7 +22,7 @@ const articleSchema = new Schema({
   description: {
     type: String,
     required: true,
-    default:''
+    default: ''
   },
   authorName: {
     type: String,
@@ -37,9 +37,9 @@ const articleSchema = new Schema({
     [{
       type: Schema.Types.ObjectId, // Reference to User ho edited the article
       ref: 'User',
-      default:[]
+      default: []
     }],
-  
+
   content: {
     type: String,
     required: true,
@@ -63,7 +63,7 @@ const articleSchema = new Schema({
     ref: 'ArticleTag',
     default: []
   },
- 
+
   imageUtils: {
     type: [String],
     required: true,
@@ -78,30 +78,30 @@ const articleSchema = new Schema({
     required: true,
     default: 0,
   },
- 
+
   language: {
     type: String,
     required: true,
     default: 'English',
   },
-  isTranslation:{
+  isTranslation: {
     type: Boolean,
     default: false,
   },
-  sourceArticleId:{
+  sourceArticleId: {
     type: Number,
     ref: 'Article',
     default: null,
   },
-  sourceArticleRecordId:{
+  sourceArticleRecordId: {
     type: String,
     default: null,
   },
-  sourceLanguage:{
+  sourceLanguage: {
     type: String,
     default: null,
   },
-  translationOf:{
+  translationOf: {
     type: Number,
     ref: 'Article',
     default: null,
@@ -134,66 +134,91 @@ const articleSchema = new Schema({
   }],
   viewUsers: [{
     type: Schema.Types.ObjectId,
-    ref: 'User', 
+    ref: 'User',
     default: []
   }],
   mentionedUsers: [{
     type: Schema.Types.ObjectId,
-    ref: 'User', 
+    ref: 'User',
     default: []
   }],
 
   trustUsers: [{
     type: Schema.Types.ObjectId,
-    ref: 'User', 
+    ref: 'User',
     default: []
   }],
-  
-  status :{
+
+  status: {
     type: String,
-    enum: ['unassigned', 'in-progress', 'review-pending',  'published', 'discarded','awaiting-user'],
+    enum: ['unassigned', 'in-progress', 'review-pending', 'published', 'discarded', 'awaiting-user', 'deleted'],
     default: 'unassigned'
   },
 
-  assigned_date:{
-     type: Date,
-     default: null
-  },
-  reviewer_id:{
-    type: Schema.Types.ObjectId,
-    ref: 'admin', 
+  assigned_date: {
+    type: Date,
     default: null
- },
+  },
+  reviewer_id: {
+    type: Schema.Types.ObjectId,
+    ref: 'admin',
+    default: null
+  },
 
   review_comments:
-  [{
+    [{
       type: Schema.Types.ObjectId,
       ref: 'Comment',
       default: []
-  }],
-  
+    }],
 
-  discardReason:{
+
+  discardReason: {
     type: String,
     default: "Discarded by system"
   },
 
-  is_removed:{
+  is_removed: {
     type: Boolean,
     default: false
   },
-  reportId:{
+  reportId: {
     type: Schema.Types.ObjectId,
     default: null,
-    ref:"ReportAction"
+    ref: "ReportAction"
   },
 
 
-  allow_for_podcast:{
+  allow_for_podcast: {
     type: Boolean,
     default: false
   },
 
+});
+
+
+// Apply pre hook, to check whether status deleted or not
+articleSchema.pre(/^find/, function (next) {
+  // this refers to current query
+  this.find({
+    status: {
+      $ne: 'deleted'
+    }
+  });
+  next();
+});
+
+// Apply to aggregation pipelines so soft-deleted articles don't show up in charts
+articleSchema.pre('aggregate', function (next) {
+  // this -> current query
+  this.pipeline().unshift({
+    $match: {
+      status: {
+        $ne: 'deleted'
+      }
+    }
+  });
+  next();
 });
 
 // Apply the autoIncrement plugin to the schema

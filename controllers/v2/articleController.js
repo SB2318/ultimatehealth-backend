@@ -453,17 +453,51 @@ module.exports.updateArticle = expressAsyncHandler(async (req, res) => {
 
 // Delete an article by ID
 module.exports.deleteArticle = expressAsyncHandler(async (req, res) => {
-  const article = await Article.findByIdAndDelete(req.params.id)
-    .populate("tags") // This populates the tag data
-    .exec();
+  const { id } = req.params;
+  const { hardDelete } = req.query;
+
+  if (hardDelete === "true" || hardDelete === true) {
+    const article = await Article.findByIdAndDelete(id)
+      .populate("tags") // This populates the tag data
+      .exec();
+      
+    if (!article) {
+      throwError(
+        HTTP_STATUS.NOT_FOUND,
+        ERROR_CODES.RESOURCE_NOT_FOUND,
+        "Article not found",
+      );
+    }
+
+    // Cleanup related resources for hard delete
+    await User.updateMany(
+      { savedArticles: id },
+      { $pull: { savedArticles: id, likedArticles: id } }
+    );
+    await EditRequest.deleteMany({ articleId: id });
+
+    return sendSuccess(res, HTTP_STATUS.OK, "Article and related data hard-deleted successfully");
+  }
+
+  // Soft delete logic
+  const article = await Article.findOneAndUpdate(
+    { _id: id },
+    { 
+      status: statusEnum.statusEnum.DELETED,
+      is_removed: true 
+    },
+    { new: true }
+  ).exec();
+
   if (!article) {
     throwError(
       HTTP_STATUS.NOT_FOUND,
       ERROR_CODES.RESOURCE_NOT_FOUND,
-      "Article not found",
+      "Article not found or already deleted",
     );
   }
-  sendSuccess(res, HTTP_STATUS.OK, "Article deleted successfully");
+
+  sendSuccess(res, HTTP_STATUS.OK, "Article soft-deleted successfully");
 });
 
 // Save Article : (published article)

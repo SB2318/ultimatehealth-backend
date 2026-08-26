@@ -50,8 +50,8 @@ const handleArticleContribution = async (event)=>{
     switch(event.type){
 
         case ANALYTICS_EVENT_TYPES.ARTICLE.READ:
-         if(event.userId){
-            await recordArticleRead({userId: event.userId});
+         if(event.userId && event.articleId && event.timestamp){
+            await recordArticleRead({userId: event.userId, articleId: event.articleId, timestamp: event.timestamp});
          }
          break;
         

@@ -5,7 +5,8 @@ module.exports.statusEnum = {
     REVIEW_PENDING: 'review-pending',
     PUBLISHED: 'published',
     DISCARDED: 'discarded',
-    AWAITING_USER: 'awaiting-user'
+    AWAITING_USER: 'awaiting-user',
+    DELETED: 'deleted'
   };
 
   

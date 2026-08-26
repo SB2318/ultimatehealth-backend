@@ -438,7 +438,7 @@ io.on('connection', (socket) => {
                 if (podcastId) {
                     podcast = await Podcast.findById(podcastId);
                 }
-                if (!user || (articleId && (!article || article.is_removed)) || (podcastId && (!podcast || podcast.is_removed))) {
+                if (!user || (articleId && (!article || article.is_removed || article.status === statusEnum.statusEnum.DELETED)) || (podcastId && (!podcast || podcast.is_removed))) {
                     socket.emit('error', { message: "user or article or podcast not found" });
                     socket.emit("comment-processing", false);
                     return;

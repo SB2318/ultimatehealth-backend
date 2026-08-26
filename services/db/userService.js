@@ -102,6 +102,9 @@ const findUnverifiedUserById = async (_id) => {
     return user
 }
 
+
+
+
 const findUserByEmail = async (email) => {
     return User.findOne({ email }).lean()
 }

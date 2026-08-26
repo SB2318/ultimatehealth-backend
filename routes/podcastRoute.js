@@ -1054,7 +1054,7 @@ router.post('/podcast/create-playlist', authenticateToken, createPlaylist);
 
 /**
  * @swagger
- * /podcast/add-podcast-form-playlist:
+ * /podcast/add-podcast-to-playlist:
  *   post:
  *     summary: Add a podcast to an existing playlist
  *     description: Allows an authenticated user to add a podcast to one of their playlists.
@@ -1135,7 +1135,7 @@ router.post('/podcast/create-playlist', authenticateToken, createPlaylist);
  *                   type: string
  *                   example: "Detailed error message"
  */
-router.post('/podcast/add-podcast-form-playlist', authenticateToken, addPodcastToPlaylist);
+router.post('/podcast/add-podcast-to-playlist', authenticateToken, addPodcastToPlaylist);
 
 /**
  * @swagger

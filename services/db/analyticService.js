@@ -4,13 +4,14 @@ const AudioViewAggregate = require("../../models/events/audioViewEventSchema");
 const AudioLikeAggregate = require("../../models/events/audioLikeEventSchema");
 const AudioWriteAggregate = require("../../models/events/audioWriteEventSchema");
 const AdminAggregate = require("../../models/events/adminContributionEvent");
+const ReadingHistory = require("../../models/events/readHistorySchema");
 
 const getMidNight = () => {
     const date = new Date();
     return new Date(date.setHours(0, 0, 0, 0));
 }
 
-const recordArticleRead = async ({ userId }) => {
+const recordArticleRead = async ({ userId, articleId, timestamp }) => {
 
     const today = getMidNight();
 
@@ -21,6 +22,12 @@ const recordArticleRead = async ({ userId }) => {
         },
         { upsert: true } // If it doesn't exist, create it automatically
     );
+
+    await ReadingHistory.create({
+        userId: userId,
+        articleId: Number(articleId),
+        dateRead: timestamp
+    });
 }
 
 const recordArticleWrite = async ({ userId }) => {

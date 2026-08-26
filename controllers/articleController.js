@@ -9,7 +9,9 @@ const statusEnum = require("../utils/StatusEnum");
 // const { sendArticleForReviewEmail } = require("./emailservice");
 const { publishContentEmailEvent, EMAIL_EVENT_TYPES } = require("../services/mqueue/producers/emailProducer");
 const { publishArticleAnalyticsEvent, ANALYTICS_EVENT_TYPES } = require("../services/mqueue/producers/analyticsProducer");
-
+const { getReadingHistory } = require("../services/db/articleService");
+const { throwError } = require("../utils/throwError");
+const { HTTP_STATUS, ERROR_CODES } = require("../constants/errorConstants");
 const mongoose = require('mongoose');
 
 module.exports.createArticle = expressAsyncHandler(
@@ -585,17 +587,17 @@ module.exports.updateArticle = expressAsyncHandler(
       const existingArticle = await Article.findById(req.params.id);
 
       if (!existingArticle) {
-        return res.status(404).json({message: "Article not found"});
+        return res.status(404).json({ message: "Article not found" });
       }
 
       if (existingArticle.authorId.toString() !== req.userId.toString()) {
-        return res.status(403).json({message: "Forbidden"});
+        return res.status(403).json({ message: "Forbidden" });
       }
 
       const article = await Article.findByIdAndUpdate(
         req.params.id,
         req.body,
-        {new: true}
+        { new: true }
       )
         .populate('tags')
         .exec();
@@ -607,7 +609,7 @@ module.exports.updateArticle = expressAsyncHandler(
     } catch (error) {
       res
         .status(500)
-        .json({error: "Error updating article", details: error.message});
+        .json({ error: "Error updating article", details: error.message });
     }
   }
 )
@@ -616,23 +618,61 @@ module.exports.updateArticle = expressAsyncHandler(
 module.exports.deleteArticle = expressAsyncHandler(
   async (req, res) => {
     try {
-      const existingArticle = await Article.findById(req.params.id);
 
-      if (!existingArticle) {
-        return res.status(404).json({message: "Article not found"});
+      const { id } = req.params;
+      const { hardDelete } = req.query;
+
+      if (!id) {
+        throwError(
+          HTTP_STATUS.BAD_REQUEST,
+          ERROR_CODES.BAD_REQUEST,
+          "Article id not found"
+        );
       }
 
-      if (existingArticle.authorId.toString() !== req.userId.toString()) {
-        return res.status(403).json({message: "Forbidden"});
+
+      const article = await Article.findById(Number(id));
+
+      if (!article) {
+        throwError(
+          HTTP_STATUS.BAD_REQUEST,
+          ERROR_CODES.BAD_REQUEST,
+          "Article not found"
+        );
+        return;
       }
 
-      await Article.findByIdAndDelete(req.params.id);
+      if (article.authorId.toString() !== req.userId) {
+        throwError(
+          HTTP_STATUS.FORBIDDEN,
+          ERROR_CODES.ACCESS_DENIED,
+          "You are not the author of this article"
+        );
 
-      res.status(200).json({message: "Article deleted successfully"});
+        return;
+      }
+
+      if (hardDelete === 'true' || hardDelete === true) {
+        await Article.findByIdAndDelete(Number(id));
+        // Cleanup related resources for hard delete
+        await User.updateMany(
+          { savedArticles: id },
+          { $pull: { savedArticles: id, likedArticles: id } }
+        );
+        await EditRequest.deleteMany({ articleId: id });
+      } else {
+        article.status = statusEnum.statusEnum.DELETED;
+        article.is_removed = true;
+        await article.save();
+      }
+
+      res.status(204).json({ message: "Article deleted successfully" });
+
+
     } catch (error) {
       res
         .status(500)
-        .json({error: "Error deleting article", details: error.message});
+        .json({ error: "Error deleting article", details: error.message });
     }
   }
 )
@@ -983,7 +1023,7 @@ module.exports.updateReadEvents = expressAsyncHandler(
 
     try {
 
-           
+
       // // console.log("Read event post", req.userId);
       // const readEvent = await ReadAggregate.findOne({ userId: req.userId, date: today });
 
@@ -1010,6 +1050,7 @@ module.exports.updateReadEvents = expressAsyncHandler(
       await publishArticleAnalyticsEvent({
         type: ANALYTICS_EVENT_TYPES.ARTICLE.READ,
         userId: req.userId,
+        articleId: Number(article_id),
         timestamp: new Date()
       });
       res.status(201).json({ message: 'Read Event Published to Kafka Queue' });
@@ -1051,6 +1092,40 @@ module.exports.getReadDataForGraphs = expressAsyncHandler(
       });
     } catch (error) {
       res.status(500).json({ error: 'An error occurred while fetching read data' });
+    }
+  }
+)
+
+// GET READING HISTORIES
+module.exports.getReadingHistoriesOfUser = expressAsyncHandler(
+  async (req, res) => {
+
+    try {
+      const userId = req.userId;
+
+      if (!userId) {
+        throwError(
+          HTTP_STATUS.BAD_REQUEST,
+          ERROR_CODES.BAD_REQUEST,
+          "Userid not found"
+        );
+        return;
+      }
+
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 100;
+      const skip = (page - 1) * limit;
+
+      const records = await getReadingHistory(userId, limit, skip);
+
+      res.status(200).json(records);
+    } catch (err) {
+      res.status(500).json({ message: "Internal server error" });
+      throwError(
+        HTTP_STATUS.INTERNAL_SERVER_ERROR,
+        ERROR_CODES.SERVICE_UNAVAILABLE,
+        err.message || "Unknown error"
+      );
     }
   }
 )
@@ -1182,9 +1257,6 @@ module.exports.getImprovementById = expressAsyncHandler(
 
 
 
-
-
-
 // Trust or Untrust an Article
 module.exports.trustArticle = expressAsyncHandler(
   async (req, res) => {
@@ -1232,7 +1304,7 @@ module.exports.trustArticle = expressAsyncHandler(
 
       await Promise.all([user.save(), articleDb.save()]);
 
-      return res.status(200).json({ 
+      return res.status(200).json({
         message: isTrusted ? 'Article trusted successfully' : 'Article untrusted successfully',
         isTrusted
       });
@@ -1273,8 +1345,8 @@ module.exports.getTrustedUsers = expressAsyncHandler(
         return res.status(404).json({ error: 'Article not found' });
       }
 
-      return res.status(200).json({ 
-        trustUsers: articleDb.trustUsers 
+      return res.status(200).json({
+        trustUsers: articleDb.trustUsers
       });
     } catch (err) {
       console.error(err);

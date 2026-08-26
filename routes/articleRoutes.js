@@ -439,7 +439,7 @@ router.delete('/articles/tags/:id', adminAuthenticateToken, articleController.de
  *                   type: string
  *                   example: "Error creating article"
  */
-router.post('/articles', publisherMiddleware, articleController.createArticle); 
+router.post('/articles', publisherMiddleware, articleController.createArticle);
 
 /**
  * @openapi
@@ -629,12 +629,12 @@ router.get('/articles/:id', articleController.getArticleById); // auth removed f
 /**
  * @deprecated
  */
-router.put('/articles/:id',authenticateToken, articleController.updateArticle);
+router.put('/articles/:id', authenticateToken, articleController.updateArticle);
 
 /**
  * @deprecated
  */
-router.delete('/articles/:id',authenticateToken, articleController.deleteArticle);
+router.delete('/articles/:id', authenticateToken, articleController.deleteArticle);
 
 
 /**
@@ -725,7 +725,7 @@ router.delete('/articles/:id',authenticateToken, articleController.deleteArticle
  *                   example: "Error saving article"
  */
 
-router.post('/articles/saveArticle', authenticateToken, articleController.saveArticle); 
+router.post('/articles/saveArticle', authenticateToken, articleController.saveArticle);
 
 /**
  * @openapi
@@ -815,7 +815,7 @@ router.post('/articles/saveArticle', authenticateToken, articleController.saveAr
  *         description: Server error during like/unlike operation
  */
 
-router.post('/articles/likeArticle', authenticateToken, articleController.likeArticle ); 
+router.post('/articles/likeArticle', authenticateToken, articleController.likeArticle);
 
 /**
  * @openapi
@@ -909,7 +909,7 @@ router.post('/articles/likeArticle', authenticateToken, articleController.likeAr
  *                   type: string
  *                   example: Error updating view
  */
-router.post('/articles/updateViewCount', authenticateToken, articleController.updateViewCount );
+router.post('/articles/updateViewCount', authenticateToken, articleController.updateViewCount);
 
 
 /**
@@ -999,7 +999,7 @@ router.get('/article/read-status', authenticateToken, articleController.getReadD
 /**
  * @deprecated
  */
-router.get('/article/write-status', authenticateToken, articleController.getWriteDataForGraphs );
+router.get('/article/write-status', authenticateToken, articleController.getWriteDataForGraphs);
 
 /**
  * @openapi
@@ -1286,7 +1286,7 @@ router.get('/article/improvements', authenticateToken, articleController.getAllI
  *                   example: Unexpected database error
  */
 
-router.get('/user-articles',authenticateToken,articleController.getAllArticlesForUser);
+router.get('/user-articles', authenticateToken, articleController.getAllArticlesForUser);
 
 /**
  * @openapi
@@ -1420,6 +1420,7 @@ router.post('/articles/trust', authenticateToken, articleController.trustArticle
  *       '500':
  *         description: Internal server error
  */
-router.get('/articles/trusted-users', articleController.getTrustedUsers);
+router.get('/articles/trusted-users', articleController.getTrustedUsers); // need to protect the route
+router.get('/articles/read-history', authenticateToken, articleController.getReadingHistoriesOfUser); // need to be place in user route, later will replace
 
 module.exports = router;
