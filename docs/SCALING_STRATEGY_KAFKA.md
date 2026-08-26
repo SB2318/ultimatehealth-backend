@@ -1,3 +1,18 @@
+# Understanding Docker
+
+Docker solves the famous "it works on my machine" problem. It allows you to wrap an application's code, runtime, system tools, and libraries into a lightweight, isolated image.
+
+- **Dockerfile:** A text blueprint containing instructions on how to build your application environment.
+- **Docker Image:** The read-only, executable snapshot built from the Dockerfile.
+- **Docker Container:** The live, running instance of that image isolated from the host operating system. 
+
+## How They Work Together
+
+In a typical modern development pipeline, the two tools work hand-in-hand rather than competing against each other:
+
+- A developer writes code and uses **Docker** to build a container image.
+- The image is uploaded to a centralized storage bank like **Docker Hub**.
+- **Kubernetes** pulls that image from the registry and deploys it onto a production server cluster, handling all future traffic spikes and system crashes seamlessly.
 
 # Usecase
 
