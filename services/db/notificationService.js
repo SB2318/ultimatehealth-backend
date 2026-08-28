@@ -309,7 +309,7 @@ const broadcastNewArticleNotifications = async ({ articleId, timestamp }) => {
         });
     }
 
-    const articleLink = `https://uhsocial.in/api/share/blog/${article.pb_recordId}`;
+    const articleLink = `https://ultimatehealth.blog/api/share/blog/${article.pb_recordId}`;
     const notifTitle = `New Article by ${article.authorId.user_name}`;
     const notifMessage = article.title;
 

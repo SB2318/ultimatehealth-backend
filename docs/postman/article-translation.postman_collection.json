@@ -7,7 +7,7 @@
   "variable": [
     {
       "key": "baseUrl",
-      "value": "https://uhsocial.in/api"
+      "value": "https://ultimatehealth.blog/api"
     },
     {
       "key": "authToken",
@@ -68,7 +68,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"authorId\": \"{{authorId}}\",\n  \"title\": \"Understanding Hydration - Hindi Translation\",\n  \"authorName\": \"UltimateHealth Contributor\",\n  \"description\": \"Hindi translation of the hydration article.\",\n  \"content\": \"https://uhsocial.in/api/getfile/{{pbRecordId}}\",\n  \"tags\": [\n    {\n      \"_id\": \"{{tagId}}\"\n    }\n  ],\n  \"imageUtils\": [\n    \"https://uhsocial.in/api/getfile/sample-image\"\n  ],\n  \"pb_recordId\": \"{{pbRecordId}}\",\n  \"allow_podcast\": true,\n  \"language\": \"{{targetLanguage}}\",\n  \"isTranslation\": true,\n  \"sourceArticleId\": \"{{sourceArticleId}}\",\n  \"sourceArticleRecordId\": \"{{sourceArticleRecordId}}\",\n  \"sourceLanguage\": \"{{sourceLanguage}}\",\n  \"translationOf\": \"{{sourceArticleId}}\"\n}"
+          "raw": "{\n  \"authorId\": \"{{authorId}}\",\n  \"title\": \"Understanding Hydration - Hindi Translation\",\n  \"authorName\": \"UltimateHealth Contributor\",\n  \"description\": \"Hindi translation of the hydration article.\",\n  \"content\": \"https://ultimatehealth.blog/api/getfile/{{pbRecordId}}\",\n  \"tags\": [\n    {\n      \"_id\": \"{{tagId}}\"\n    }\n  ],\n  \"imageUtils\": [\n    \"https://ultimatehealth.blog/api/getfile/sample-image\"\n  ],\n  \"pb_recordId\": \"{{pbRecordId}}\",\n  \"allow_podcast\": true,\n  \"language\": \"{{targetLanguage}}\",\n  \"isTranslation\": true,\n  \"sourceArticleId\": \"{{sourceArticleId}}\",\n  \"sourceArticleRecordId\": \"{{sourceArticleRecordId}}\",\n  \"sourceLanguage\": \"{{sourceLanguage}}\",\n  \"translationOf\": \"{{sourceArticleId}}\"\n}"
         }
       },
       "response": [

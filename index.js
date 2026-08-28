@@ -92,7 +92,7 @@ app.use(helmet({
 app.set('trust proxy', 1);
 app.use(globalLimiter); // Apply global rate limiter
 app.use(cors({
-    origin: ["http://uhsocial.in", "https://uhsocial.in"],
+    origin: ["http://ultimatehealth.blog", "https://ultimatehealth.blog"],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true
 }));
@@ -143,12 +143,12 @@ app.get("/hello", (req, res) => {
 });
 app.get('/', (req, res) => {
     //res.sendFile(path.join(__dirname, "public", "home.html"));
-    res.redirect(302, 'https://uhsocial.in/frontend/v2');
+    res.redirect(302, 'https://ultimatehealth.blog/frontend/v2');
 });
 
 app.get('/publish', (req, res) => {
     res.sendFile(path.join(__dirname, "public", "publisher.html"));
-    //res.redirect(302, 'https://uhsocial.in/frontend/v2');
+    //res.redirect(302, 'https://ultimatehealth.blog/frontend/v2');
 });
 
 // app.get('/.well-known/assetlinks.json', (req, res) => {
@@ -164,7 +164,7 @@ const server = app.listen(port, () => {
 
 let io = require('socket.io')(server, {
     cors: {
-        origin: ["http://uhsocial.in", "https://uhsocial.in"],
+        origin: ["http://ultimatehealth.blog", "https://ultimatehealth.blog"],
         methods: ["GET", "POST"],
         credentials: true
     }

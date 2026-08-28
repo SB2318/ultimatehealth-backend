@@ -9,10 +9,10 @@
 
 <br/>
 
-[![Live Web Demo](https://img.shields.io/badge/Live%20Web%20Demo-4CAF50?style=for-the-badge&logo=globe&logoColor=white)](https://uhsocial.in)
+[![Live Web Demo](https://img.shields.io/badge/Live%20Web%20Demo-4CAF50?style=for-the-badge&logo=globe&logoColor=white)](https://ultimatehealth.blog)
 [![Android App](https://img.shields.io/badge/Android%20App-Play%20Store-34A853?style=for-the-badge&logo=googleplay&logoColor=white)](https://play.google.com/store/apps/details?id=com.anonymous.UltimateHealth)
-[![API Docs](https://img.shields.io/badge/API%20Docs-007ACC?style=for-the-badge&logo=swagger&logoColor=white)](https://uhsocial.in/docs)
-[![Content API](https://img.shields.io/badge/Content%20API-FF6B00?style=for-the-badge&logo=python&logoColor=white)](https://uhsocial.in/content-intel/docs)
+[![API Docs](https://img.shields.io/badge/API%20Docs-007ACC?style=for-the-badge&logo=swagger&logoColor=white)](https://ultimatehealth.blog/docs)
+[![Content API](https://img.shields.io/badge/Content%20API-FF6B00?style=for-the-badge&logo=python&logoColor=white)](https://ultimatehealth.blog/content-intel/docs)
 
 </div>
 
@@ -48,7 +48,7 @@
 </div>
 
 
-**The core backend engine** powering **[UltimateHealth](https://uhsocial.in)** — a community-driven open-source health platform.
+**The core backend engine** powering **[UltimateHealth](https://ultimatehealth.blog)** — a community-driven open-source health platform.
 
 Provides secure, scalable REST APIs for:
 - Multilingual health articles & podcasts
@@ -75,7 +75,7 @@ Provides secure, scalable REST APIs for:
 - Environment-based configuration
 - Error handling & validation
 
-**Live API Docs**: [https://uhsocial.in/docs](https://uhsocial.in/docs)
+**Live API Docs**: [https://ultimatehealth.blog/docs](https://ultimatehealth.blog/docs)
 
 ---
 

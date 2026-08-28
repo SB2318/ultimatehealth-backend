@@ -461,7 +461,7 @@ const uploadAgreementPDF = expressAsyncHandler(
             res.status(200).send({
                 message: "Agreement uploaded successfully",
                 key: uniqueKey,
-                pdfUrl: `https://uhsocial.in/api/getFile/${uniqueKey}`,
+                pdfUrl: `https://ultimatehealth.blog/api/getFile/${uniqueKey}`,
             });
 
         } catch (err) {

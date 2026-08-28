@@ -206,7 +206,7 @@ const approvePodcast = expressAsyncHandler(
                 timestamp: Date.now()
             });
 
-            const dynamicLink = `https://uhsocial.in/api/share/podcast?trackId=${podcast._id}&audioUrl=${podcast.audio_url}`;
+            const dynamicLink = `https://ultimatehealth.blog/api/share/podcast?trackId=${podcast._id}&audioUrl=${podcast.audio_url}`;
             // send mail
             //sendPodcastPublishedEmail(podcast.user_id.email, dynamicLink, podcast.title);
             await publishContentEmailEvent({

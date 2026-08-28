@@ -14,7 +14,7 @@ Create these Postman environment variables before testing:
 
 | Variable | Example | Notes |
 | --- | --- | --- |
-| `baseUrl` | `https://uhsocial.in/api` or `http://localhost:8080/api` | API base URL |
+| `baseUrl` | `https://ultimatehealth.blog/api` or `http://localhost:8080/api` | API base URL |
 | `authToken` | `eyJ...` | Valid user JWT |
 | `authorId` | `665f1f1f1f1f1f1f1f1f1f1f` | Existing active user ID |
 | `sourceArticleId` | `101` | Existing source article numeric ID |
@@ -55,14 +55,14 @@ Body:
   "title": "Understanding Hydration - Hindi Translation",
   "authorName": "UltimateHealth Contributor",
   "description": "Hindi translation of the hydration article.",
-  "content": "https://uhsocial.in/api/getfile/{{pbRecordId}}",
+  "content": "https://ultimatehealth.blog/api/getfile/{{pbRecordId}}",
   "tags": [
     {
       "_id": "{{tagId}}"
     }
   ],
   "imageUtils": [
-    "https://uhsocial.in/api/getfile/sample-image"
+    "https://ultimatehealth.blog/api/getfile/sample-image"
   ],
   "pb_recordId": "{{pbRecordId}}",
   "allow_podcast": true,
@@ -85,7 +85,7 @@ Expected success response:
     "title": "Understanding Hydration - Hindi Translation",
     "description": "Hindi translation of the hydration article.",
     "authorName": "UltimateHealth Contributor",
-    "content": "https://uhsocial.in/api/getfile/pb_translation_record_id",
+    "content": "https://ultimatehealth.blog/api/getfile/pb_translation_record_id",
     "language": "hi-IN",
     "isTranslation": true,
     "sourceArticleId": 101,

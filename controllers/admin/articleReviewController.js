@@ -442,9 +442,9 @@ module.exports.publishArticle = expressAsyncHandler(
                 timestamp: new Date()
             });
 
-            const dynamicLink = `https://uhsocial.in/api/share/article?articleId=${article._id}&recordId=${article.pb_recordId}&authorId=${article.authorId._id}`;
+            const dynamicLink = `https://ultimatehealth.blog/api/share/article?articleId=${article._id}&recordId=${article.pb_recordId}&authorId=${article.authorId._id}`;
 
-            const blogLink = `https://uhsocial.in/api/share/blog/${article.pb_recordId}`;
+            const blogLink = `https://ultimatehealth.blog/api/share/blog/${article.pb_recordId}`;
             // send mail to user
             //sendArticlePublishedEmail(article.authorId.email, blogLink, article.title);
 

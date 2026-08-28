@@ -626,7 +626,7 @@ module.exports.publishImprovement = expressAsyncHandler(
             await publishContentEmailEvent({
                 email: contributor.email,
                 title: article.title,
-                articleLink: `https://uhsocial.in/api/share/blog/${article.pb_recordId}`,
+                articleLink: `https://ultimatehealth.blog/api/share/blog/${article.pb_recordId}`,
                 groupIndex: EMAIL_EVENT_TYPES.CONTENT.ARTICLE_PUBLISHED
             })
 

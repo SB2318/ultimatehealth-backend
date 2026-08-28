@@ -73,7 +73,7 @@ const sendVerificationEmail = (email, token) => {
 
 const sendContributorVerificationEmail = (email, password) => {
   // const verifyUrl = `${process.env.PROD_URL}/api/user/verifyEmail?token=${token}&isAdmin=${isAdmin}`;
-  const deleteAccountUrl = `https://uhsocial.in/api/delete-account`;
+  const deleteAccountUrl = `https://ultimatehealth.blog/api/delete-account`;
 
   const mailOptions = {
     from: process.env.EMAIL_USER,

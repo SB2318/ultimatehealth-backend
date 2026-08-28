@@ -21,7 +21,7 @@ module.exports.shareArticle = expressAsyncHandler(async (req, res) => {
     if (!article || article.status !== statusEnum.PUBLISHED) {
       return res.status(404).json({ message: "Article not found" });
     }
-    const dynamicLink = `https://uhsocial.in/api/share/article?articleId=${article._id}&authorId=${authorId}&recordId=${recordId}`;
+    const dynamicLink = `https://ultimatehealth.blog/api/share/article?articleId=${article._id}&authorId=${authorId}&recordId=${recordId}`;
 
     const htmlContent = generateProfessionalHTML(article, dynamicLink);
     res.setHeader("Content-Type", "text/html");
@@ -46,7 +46,7 @@ module.exports.sharePodcast = expressAsyncHandler(async (req, res) => {
     if (!podcast || podcast.status !== statusEnum.PUBLISHED) {
       return res.status(404).json({ message: "Podcast not found" });
     }
-    const dynamicLink = `https://uhsocial.in/api/share/podcast?trackId=${podcast._id}&audioUrl=${audioUrl}`;
+    const dynamicLink = `https://ultimatehealth.blog/api/share/podcast?trackId=${podcast._id}&audioUrl=${audioUrl}`;
 
     const htmlContent = generatePodcastHTML(podcast, dynamicLink);
     res.setHeader("Content-Type", "text/html");
@@ -75,8 +75,8 @@ module.exports.generateBlogPage = expressAsyncHandler(async (req, res) => {
 
     article.viewCount += 1;
     await article.save();
-    const profileImageUrl = article.authorId.Profile_image && article.authorId.Profile_image.startsWith("https") ? article.authorId.Profile_image : `https://uhsocial.in/api/getfile/${article.authorId.Profile_image}`;
-    const bannerImageUrl = article.imageUtils.length > 0 && article.imageUtils[0].startsWith("https") ? article.imageUtils[0] : `https://uhsocial.in/api/getfile/${article.imageUtils[0]}`;
+    const profileImageUrl = article.authorId.Profile_image && article.authorId.Profile_image.startsWith("https") ? article.authorId.Profile_image : `https://ultimatehealth.blog/api/getfile/${article.authorId.Profile_image}`;
+    const bannerImageUrl = article.imageUtils.length > 0 && article.imageUtils[0].startsWith("https") ? article.imageUtils[0] : `https://ultimatehealth.blog/api/getfile/${article.imageUtils[0]}`;
     const htmlRes = await getHTMLFileContent("content", slug);
 
     const htmlContent = generateBlogContent(htmlRes.htmlContent, article, profileImageUrl, bannerImageUrl);
@@ -445,7 +445,7 @@ function generateProfessionalHTML(article, dynamicLink) {
         <h1>${article.title}</h1>
         <p>${article.description}</p>
 
-        <a href="https://uhsocial.in/api/share/blog/${article.pb_recordId}" class="btn primary">
+        <a href="https://ultimatehealth.blog/api/share/blog/${article.pb_recordId}" class="btn primary">
           See the blog
         </a>
 
