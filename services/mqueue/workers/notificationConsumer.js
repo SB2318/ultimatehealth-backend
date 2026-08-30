@@ -162,4 +162,13 @@ const handleBroadcastNotification = async (event) => {
     }
 };
 
+const handleFanoutBroadcastNotification = async (event)=>{
+
+    // TODO
+    // 1. New article Published
+    // 2. Select all followers
+    // 3. Select all users who set their preferences for this particular category
+    // 4. send notification
+}
+
 module.exports = { handleNotificationEvent };
