@@ -1,13 +1,14 @@
-const User = require('../../models/UserModel')
-const UnverifiedUser = require('../../models/UnverifiedUserModel')
+const User = require('../../models/UserModel');
+const UnverifiedUser = require('../../models/UnverifiedUserModel');
 const {
     generateVerificationToken,
     hashToken,
-} = require('../security/tokenService')
-const { generateHashPassword } = require('../security/encryptService')
-const { ROLES } = require('../../constants/roles')
-const { throwError } = require('../../utils/throwError')
-const { HTTP_STATUS, ERROR_CODES } = require('../../constants/errorConstants')
+} = require('../security/tokenService');
+const { generateHashPassword } = require('../security/encryptService');
+const { ROLES } = require('../../constants/roles');
+const { throwError } = require('../../utils/throwError');
+const { HTTP_STATUS, ERROR_CODES } = require('../../constants/errorConstants');
+const Article = require('../../models/Articles');
 
 const createUser = async ({
     user_name,
@@ -586,41 +587,97 @@ const updateUserPasswordById = async (userId, newPassword) => {
 }
 
 const updateUserGeneralDetailsById = async (
-  userId,
-  { user_name, user_handle, about }
-) => {
-  return User.findByIdAndUpdate(
     userId,
-    {
-      $set: {
-        user_name,
-        user_handle,
-        about,
-      },
-    },
-    {
-      new: true,
-      runValidators: true,
-    }
-  );
+    { user_name, user_handle, about }
+) => {
+    return User.findByIdAndUpdate(
+        userId,
+        {
+            $set: {
+                user_name,
+                user_handle,
+                about,
+            },
+        },
+        {
+            new: true,
+            runValidators: true,
+        }
+    );
 };
 
 const updateUserContactDetailsById = async (
-  userId,
-  { contact_detail }
-) => {
-  return User.findByIdAndUpdate(
     userId,
-    {
-      $set: {
-        contact_detail,
-      },
-    },
-    {
-      new: true,
-      runValidators: true,
-     }
-  );
+    { contact_detail }
+) => {
+    return User.findByIdAndUpdate(
+        userId,
+        {
+            $set: {
+                contact_detail,
+            },
+        },
+        {
+            new: true,
+            runValidators: true,
+        }
+    );
+};
+
+const getUsersToBroadcast = async (articleId) => {
+
+    try {
+
+        // 1. Fetch the newly published article with author and tags populated
+        const article = await Article.findById(parseInt(articleId))
+            .populate('authorId', 'followers')
+            .populate('tags', 'subscribers')
+            .lean();
+
+        if (!article || article.is_removed) return [];
+
+        // 2 & 3. Select all followers and all users interested in these categories
+        // I want to return all of their emails and fcmTokens to send notifications
+        const uniqueUserIds = new Set();
+
+        // Add author's followers
+        if (article.authorId && article.authorId.followers) {
+            article.authorId.followers.forEach(userId => uniqueUserIds.add(userId.toString()));
+        }
+        
+        // Add tag subscribers
+        if (article.tags && article.tags.length > 0) {
+            article.tags.forEach(tag => {
+                if (tag.subscribers && tag.subscribers.length > 0) {
+                    tag.subscribers.forEach(userId => uniqueUserIds.add(userId.toString()));
+                }
+            });
+        }
+
+        // Exclude the author themselves from the broadcast list
+        // if (article.authorId && article.authorId._id) {
+        //     uniqueUserIds.delete(article.authorId._id.toString());
+        // }
+
+        // Fetch users to get emails and fcmTokens
+        const usersToBroadcast = await User.find({
+            _id: { $in: Array.from(uniqueUserIds) },
+            isBlockUser: false,
+            isBannedUser: false
+        }).select('email user_name fcmToken').lean();
+
+        return usersToBroadcast.map(user => ({
+            _id: user._id,
+            email: user.email,
+            user_name: user.user_name,
+            fcmToken: user.fcmToken,
+            isAuthor: article.authorId && user._id.toString() === article.authorId._id.toString()
+        }));
+
+    } catch (err) {
+        console.error('Error fetching users to broadcast:', err);
+        return [];
+    }
 }
 
 module.exports = {
@@ -654,6 +711,7 @@ module.exports = {
     updateUserPasswordById,
     updateUserGeneralDetailsById,
     updateUserContactDetailsById,
+    getUsersToBroadcast,
 }
 // Left
 // 1. Update User

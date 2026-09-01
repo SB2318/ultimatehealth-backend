@@ -13,7 +13,12 @@ const articleTagSchema = new Schema({
   name: {
     type: String,
     required: true
-  }
+  },
+  // Bidirectional relation: Users who have this tag in their notificationPreferences.contentClusters
+  subscribers: [{
+    type: Schema.Types.ObjectId,
+    ref: 'User'
+  }]
 });
 
 const ArticleTag = mongoose.model('ArticleTag', articleTagSchema);

@@ -1,3 +1,5 @@
+const { sendPushNotification } = require('../../controllers/notifications/notificationHelper');
+const { sendNewArticleEmail } = require('../../controllers/emailservice');
 const Notification = require('../../models/notificationSchema');
 const Article = require('../../models/Articles');
 const User = require('../../models/UserModel');
@@ -172,8 +174,6 @@ const saveMentionNotifications = async ({ mentionedUsers, articleId, podcastId, 
 
     return results;
 };
-
-
 
 const saveArticleReviewNotification = async ({ userId, articleId, articleRecordId, requestId, title, message, timestamp }) => {
     const user = await User.findById(userId);
@@ -353,6 +353,81 @@ const broadcastNewArticleNotifications = async ({ articleId, timestamp }) => {
     return results;
 };
 
+const broadcastSubscribers = async (event) => {
+
+    try {
+        const { articleId, userIds } = event;
+        // const [article, users] = await Promise.all([
+        //     Article.findById(articleId).populate('authorId', 'name').lean(),
+        //     User.find({ _id: { $in: userIds }, isBlockUser: false, isBannedUser: false })
+        //         .select('email fcmToken notificationPreferences')
+        //         .lean()
+        // ]);
+
+        const article = await Article.findById(articleId).populate('authorId', 'user_name').lean();
+
+        if (!article || article.is_removed) return;
+
+        if(!userIds || userIds.length === 0 || !Array.isArray(userIds) ) {
+            console.log(`No users to notify for article ${articleId}`);
+            return;
+        }
+
+        /**
+         * {
+         *   email: user.email || null,
+         *   user_name: user.user_name || null,
+         *   fcmToken: user.fcmToken || null,
+         * }
+         */
+
+        const notificationsToSave = [];
+        const pushPromises = [];
+        const emailPromises = [];
+
+        for (const user of userIds) {
+
+            if(!user || !user._id || !user.fcmToken || !user.email) {
+                console.log(`Skipping user due to missing data: ${JSON.stringify(user)}`);
+                continue;
+            }
+            const notificationMsg = `${article.authorId.user_name} published a new article: ${article.title}`;
+
+            notificationsToSave.push({
+                userId: user._id,
+                articleId: article._id,
+                type: 'article',
+                title: "New Article Published",
+                message: notificationMsg,
+                read: false,
+                timestamp: new Date()
+            });
+
+            if (user.fcmToken) {
+                pushPromises.push(
+                    sendPushNotification(user.fcmToken, { title: "New Article Published", body: notificationMsg }).catch(e => console.error(e))
+                );
+            }
+
+            if (user.email) {
+                emailPromises.push(
+                    sendNewArticleEmail(user.email, article.title, article.authorId.user_name, `https://ultimatehealth.blog/article/${article._id}`).catch(e => console.error(e))
+                );
+            }
+        }
+
+        if (notificationsToSave.length > 0) {
+            await Notification.insertMany(notificationsToSave);
+        }
+
+        await Promise.allSettled([...pushPromises, ...emailPromises]);
+      
+    } catch (err) {
+        console.error('Error in handleBroadcastNotification:', err);
+        throw err;
+    }
+}
+
 module.exports = {
     // Social
     savePostLikeNotification,
@@ -367,5 +442,6 @@ module.exports = {
     saveArticleSubmitAdminNotification,
     // Broadcast
     savePostPublishedNotifications,
-    broadcastNewArticleNotifications
+    broadcastNewArticleNotifications,
+    broadcastSubscribers
 };

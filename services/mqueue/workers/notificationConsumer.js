@@ -3,7 +3,10 @@ const { sendPushNotification } = require('../../../controllers/notifications/not
 const { sendNewArticleEmail } = require("../../../controllers/emailservice");
 
 const { SUBSCRIBED_EVENT_TYPES } = require("./kafkaConsumer");
-const { NOTIFICATION_EVENT_TYPES } = require("../producers/notificationProducer");
+
+const {broadcastSubscribers} = require("../../db/notificationService");
+const {getUsersToBroadcast} = require("../../db/userService");
+const { publishBroadcastNotificationEvent, NOTIFICATION_EVENT_TYPES } = require("../producers/notificationProducer");
 
 const {
     savePostLikeNotification,
@@ -153,6 +156,16 @@ const handleBroadcastNotification = async (event) => {
                 break;
             }
 
+            case NOTIFICATION_EVENT_TYPES.BROADCAST.NEW_ARTICLE_BROADCAST_INIT: {
+                await handleFanoutBroadcastNotification(event);
+                break;
+            }
+
+            case NOTIFICATION_EVENT_TYPES.BROADCAST.NEW_ARTICLE_BROADCAST_BATCH: {
+                await broadcastSubscribers(event);
+                break;
+            }
+
             default:
                 console.log('Broadcast Notification type not found:', event.type);
         }
@@ -162,13 +175,28 @@ const handleBroadcastNotification = async (event) => {
     }
 };
 
-const handleFanoutBroadcastNotification = async (event)=>{
+const handleFanoutBroadcastNotification = async (event) => {
+    try {
+        const { articleId } = event;
+        const BATCH_SIZE = 500;
+        const userIdsArray = await getUsersToBroadcast(articleId);
 
-    // TODO
-    // 1. New article Published
-    // 2. Select all followers
-    // 3. Select all users who set their preferences for this particular category
-    // 4. send notification
-}
+        for (let i = 0; i < userIdsArray.length; i += BATCH_SIZE) {
+            const batch = userIdsArray.slice(i, i + BATCH_SIZE);
+            
+            await publishBroadcastNotificationEvent({
+                type: NOTIFICATION_EVENT_TYPES.BROADCAST.NEW_ARTICLE_BROADCAST_BATCH,
+                articleId: articleId,
+                userIds: batch
+            });
+        }
+        
+        console.log(`Fan-out init complete: Queued ${Math.ceil(userIdsArray.length / BATCH_SIZE)} batches for ${userIdsArray.length} total users.`);
 
-module.exports = { handleNotificationEvent };
+    } catch (err) {
+        console.error('Error in handleFanoutBroadcastNotification:', err);
+        throw err;
+    }
+};
+
+module.exports = { handleNotificationEvent, handleFanoutBroadcastNotification };

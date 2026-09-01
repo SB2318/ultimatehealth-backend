@@ -468,7 +468,7 @@ module.exports.publishArticle = expressAsyncHandler(
             });
             // send notification
             await publishBroadcastNotificationEvent({
-                type: NOTIFICATION_EVENT_TYPES.BROADCAST.NEW_ARTICLE_BROADCAST,
+                type: NOTIFICATION_EVENT_TYPES.BROADCAST.NEW_ARTICLE_BROADCAST_INIT,
                 articleId: article._id,
                 timestamp: Date.now()
             });
