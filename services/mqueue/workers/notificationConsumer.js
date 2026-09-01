@@ -2,7 +2,7 @@ const { sendPushNotification } = require('../../../controllers/notifications/not
 
 const { sendNewArticleEmail } = require("../../../controllers/emailservice");
 
-const { SUBSCRIBED_EVENT_TYPES } = require("./kafkaConsumer");
+const { SUBSCRIBED_EVENT_TYPES } = require("./kafkaTopics");
 
 const {broadcastSubscribers} = require("../../db/notificationService");
 const {getUsersToBroadcast} = require("../../db/userService");

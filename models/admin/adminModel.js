@@ -6,7 +6,6 @@ const adminSchema = new Schema({
   _id: {
     type: Schema.Types.ObjectId,
     auto: true,
-    unique: true,
   },
   user_name: {
     type: String,

@@ -6,7 +6,6 @@ const reasonSchema = new Schema({
     _id: {
         type: Schema.Types.ObjectId,
         auto: true,
-        unique:true,
     },
     reason: {
         type: String,

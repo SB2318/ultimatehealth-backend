@@ -153,18 +153,8 @@ const connectDLQConsumer = async () => {
     }
 }
 
-const SUBSCRIBED_EVENT_TYPES = {
-    ARTICLE_ANALYTICS: 'article-analytics-events',
-    PODCAST_ANALYTICS: 'podcast-analytics-events',
-    ADMIN_ANALYTICS: 'admin-analytics-events',
-    CONTENT_NOTIFICATION: 'content-notification-events',
-    CONTENT_MODERATION: 'content-moderation-events',
-    ACCOUNT_MODERATION: 'account-moderation-events',
-    SUPPORT_EMAIL: 'support-email-events',
-    SOCIAL_NOTIFICATION: 'social-notification-events',
-    CONTENT_REVIEW: 'content-review-notifications',
-    BROADCAST_NOTIFICATION: 'broadcast-notifications'
-}
+// Re-export from the dedicated constants file to avoid circular dependencies
+const { SUBSCRIBED_EVENT_TYPES } = require('./kafkaTopics');
 
 module.exports = {
     connectEmailConsumer,

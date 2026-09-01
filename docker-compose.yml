@@ -14,6 +14,7 @@ services:
       - PORT=4000
       - MONGODB_URL=mongodb://mongodb:27017/ultimate_health
       - KAFKA_BROKERS=kafka1:9092,kafka2:9092,kafka3:9092
+      - KAFKAJS_NO_PARTITIONER_WARNING=1
     depends_on:
       mongodb:
         condition: service_healthy
@@ -124,6 +125,7 @@ services:
 
       # Scaling  Strategy 2: Protect broker memory with max concurrent connection limit
       KAFKA_MAX_CONNECTIONS: 5000
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
 
   kafka2:
     image: apache/kafka:latest
@@ -162,6 +164,7 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
       KAFKA_MAX_CONNECTIONS: 5000
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
 
   kafka3:
     image: apache/kafka:latest
@@ -200,6 +203,7 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
       KAFKA_MAX_CONNECTIONS: 5000
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
 
   # ─────────────────────────────────────────────
   # 🖥️  Kafdrop — Kafka Web UI

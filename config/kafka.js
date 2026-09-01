@@ -9,7 +9,7 @@ const kafkaClient = new Kafka({
 });
 
 const globalProducer = kafkaClient.producer({
-  allowAutoTopicCreation: false
+  allowAutoTopicCreation: true
 }); // Create a Kafka producer instance, to handle DLQ
 
 //const globalCconsumer = kafkaClient.consumer({ groupId: 'ultimatehealth-group' }); // Create a Kafka consumer instance, to consume messages from Kafka topics

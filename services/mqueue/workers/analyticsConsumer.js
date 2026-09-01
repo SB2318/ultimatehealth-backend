@@ -8,7 +8,7 @@ const {
     recordAdminContribution
 } = require("../../db/analyticService");
 
-const {SUBSCRIBED_EVENT_TYPES} = require("../workers/kafkaConsumer");
+const {SUBSCRIBED_EVENT_TYPES} = require("../workers/kafkaTopics");
 const {ANALYTICS_EVENT_TYPES} = require("../producers/analyticsProducer");
 
 const handleAnalyticsEvent = async (topic, event)=>{

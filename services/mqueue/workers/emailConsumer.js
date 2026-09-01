@@ -1,4 +1,4 @@
-const { SUBSCRIBED_EVENT_TYPES } = require("../workers/kafkaConsumer");
+const { SUBSCRIBED_EVENT_TYPES } = require("../workers/kafkaTopics");
 const { EMAIL_EVENT_TYPES } = require("../producers/emailProducer");
 const {
     // Content
