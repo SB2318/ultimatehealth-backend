@@ -19,7 +19,7 @@ const statusEnum = require("./utils/StatusEnum");
 const mongoSanitize = require('express-mongo-sanitize');
 const { xss } = require('express-xss-sanitizer');
 const helmet = require('helmet');
-//const assetLinks = require('./assetlink.json');
+const assetLinks = require('./assetlink.json');
 
 const Article = require('./models/Articles');
 const User = require('./models/UserModel');
@@ -151,9 +151,9 @@ app.get('/', (req, res) => {
 //     //res.redirect(302, 'https://ultimatehealth.blog/frontend/v2');
 // });
 
-// app.get('/.well-known/assetlinks.json', (req, res) => {
-//   res.status(200).json(assetLinks);
-// });
+app.get('/.well-known/assetlinks.json', (req, res) => {
+  res.status(200).json(assetLinks);
+});
 
 
 
