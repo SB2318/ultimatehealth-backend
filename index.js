@@ -76,9 +76,9 @@ process.on('unhandledRejection', (reason, promise) => {
 const port = process.env.PORT || 8080;
 const url = process.env.PROD_URL;
 app.use(express.static('public'));
-app.get('/publish', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'publisher.html'));
-});
+// app.get('/publish', (req, res) => {
+//     res.sendFile(path.join(__dirname, 'public', 'publisher.html'));
+// });
 
 app.use(cookieParser()); 
 app.use(compression()); 
@@ -146,10 +146,10 @@ app.get('/', (req, res) => {
     res.redirect(302, 'https://ultimatehealth.blog/frontend/v2');
 });
 
-app.get('/publish', (req, res) => {
-    res.sendFile(path.join(__dirname, "public", "publisher.html"));
-    //res.redirect(302, 'https://ultimatehealth.blog/frontend/v2');
-});
+// app.get('/publish', (req, res) => {
+//     res.sendFile(path.join(__dirname, "public", "publisher.html"));
+//     //res.redirect(302, 'https://ultimatehealth.blog/frontend/v2');
+// });
 
 // app.get('/.well-known/assetlinks.json', (req, res) => {
 //   res.status(200).json(assetLinks);
