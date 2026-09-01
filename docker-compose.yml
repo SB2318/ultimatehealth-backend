@@ -1,8 +1,12 @@
 version: "3.8"
 services:
+  # ─────────────────────────────────────────────
+  #  UltimateHealth Node.js API
+  # ─────────────────────────────────────────────
   api:
     build: .
     container_name: ultimatehealth-backend
+    restart: unless-stopped
     ports:
       - "4000:4000"
     environment:
@@ -15,13 +19,21 @@ services:
         condition: service_healthy
       kafka1:
         condition: service_healthy
+      kafka2:
+        condition: service_healthy
+      kafka3:
+        condition: service_healthy
     volumes:
       - .env:/usr/src/app/.env
       - ./ultimatehealth-firebase-adminsdk.json:/usr/src/app/ultimatehealth-firebase-adminsdk.json
-      
+
+  # ─────────────────────────────────────────────
+  # 🍃 MongoDB Database
+  # ─────────────────────────────────────────────
   mongodb:
     image: mongo:6.0
     container_name: ultimatehealth-mongo
+    restart: unless-stopped
     ports:
       - "27017:27017"
     volumes:
@@ -31,40 +43,35 @@ services:
       interval: 10s
       timeout: 10s
       retries: 5
-      start_period: 15s
+      start_period: 20s
+
+  # ─────────────────────────────────────────────
+  # 📨 Kafka Cluster (3-node KRaft mode)
+  # ─────────────────────────────────────────────
   kafka1:
     image: apache/kafka:latest
     container_name: kafka1-ultimatehealth
+    restart: unless-stopped
     ports:
       - "9092:9092"
-
-    # VOLUMES: By default, Docker containers are ephemeral (stateless). If a container stops or restarts,
-    # all Kafka topics and messages are lost. Volumes map a directory inside the container (/var/lib/kafka/data)
-    # to persistent storage on your host machine, ensuring your data survives restarts.
     volumes:
       - kafka1-data:/var/lib/kafka/data
-
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "kafka-topics.sh",
-          "--bootstrap-server",
-          "localhost:9092",
-          "--list",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-    # Scaling Strategy 3: Increase open descriptor file size limit
-    # Kafka opens a lot of files (one for every log segment of every partition) and network sockets.
-    # Docker defaults to a low limit
     ulimits:
       nofile:
         soft: 65535
         hard: 65535
-
+    healthcheck:
+      # FIX: Use the correct full path for apache/kafka image
+      # and add start_period so Kafka gets time to fully boot
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
     environment:
       # Tells the Bitnami image to use the modern KRaft mode instead of looking for a ZooKeeper server.
       # KAFKA_ENABLED_KRAFT: 'true'
@@ -121,29 +128,25 @@ services:
   kafka2:
     image: apache/kafka:latest
     container_name: kafka2-ultimatehealth
+    restart: unless-stopped
     ports:
       - "9093:9092"
     volumes:
       - kafka2-data:/var/lib/kafka/data
-
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "kafka-topics.sh",
-          "--bootstrap-server",
-          "localhost:9092",
-          "--list",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
     ulimits:
       nofile:
         soft: 65535
         hard: 65535
-
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
     environment:
       KAFKA_CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
       KAFKA_NODE_ID: 2
@@ -153,7 +156,7 @@ services:
       KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka2:9092
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka1:9093, 2@kafka2:9093, 3@kafka3:9093
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka1:9093,2@kafka2:9093,3@kafka3:9093
       KAFKA_NUM_PARTITIONS: 12
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
@@ -163,29 +166,25 @@ services:
   kafka3:
     image: apache/kafka:latest
     container_name: kafka3-ultimatehealth
+    restart: unless-stopped
     ports:
       - "9094:9092"
     volumes:
       - kafka3-data:/var/lib/kafka/data
-
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "kafka-topics.sh",
-          "--bootstrap-server",
-          "localhost:9092",
-          "--list",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
     ulimits:
       nofile:
         soft: 65535
         hard: 65535
-
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
     environment:
       KAFKA_CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
       KAFKA_NODE_ID: 3
@@ -195,21 +194,25 @@ services:
       KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka3:9092
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka1:9093, 2@kafka2:9093, 3@kafka3:9093
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka1:9093,2@kafka2:9093,3@kafka3:9093
       KAFKA_NUM_PARTITIONS: 12
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
       KAFKA_MAX_CONNECTIONS: 5000
 
+  # ─────────────────────────────────────────────
+  # 🖥️  Kafdrop — Kafka Web UI
+  # ─────────────────────────────────────────────
   kafdrop:
     image: obsidiandynamics/kafdrop:latest
     container_name: kafdrop-ultimatehealth
+    restart: unless-stopped
     ports:
       - "9000:9000"
     environment:
       KAFKA_BROKERCONNECT: "kafka1:9092,kafka2:9092,kafka3:9092"
-      JVM_OPTS: "-Xms16M -Xmx48M -Xss180K -XX:-TieredCompilation -XX:+UseStringDeduplication -noverify"
+      JVM_OPTS: "-Xms32M -Xmx64M -Xss180K -XX:-TieredCompilation -XX:+UseStringDeduplication -noverify"
     depends_on:
       kafka1:
         condition: service_healthy
