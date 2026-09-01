@@ -29,7 +29,8 @@ const {
   incrementOtpAttemptsUser,
   updateUserPasswordAndClearOtp,
   logoutUser,
-  deleteUserById,
+  softDeleteUser,
+  hardDeleteUser,
   updateUserProfilePictureById,
   updateUserGeneralDetailsById,
   updateUserContactDetailsById,
@@ -700,9 +701,10 @@ module.exports.refreshToken = expressAsyncHandler(async (req, res) => {
   });
 });
 
-module.exports.deleteByUser = expressAsyncHandler(async (req, res) => {
-  const { password } = req.validateBody;
-  const { userId, role } = req.user;
+// ── Soft Delete (Deactivate) ────────────────────────────────────────────────
+module.exports.softDeleteByUser = expressAsyncHandler(async (req, res) => {
+  const { password } = req.body;
+  const { userId } = req.user;
 
   const user = await findUserById(userId);
 
@@ -714,20 +716,26 @@ module.exports.deleteByUser = expressAsyncHandler(async (req, res) => {
     );
   }
 
-  const isPasswordValid = await isSamePassword(
-    password,
-    user.password
-  );
-
-  if (!isPasswordValid) {
-    throwError(
-      HTTP_STATUS.UNAUTHORIZED,
-      ERROR_CODES.ACCESS_DENIED,
-      "Invalid password"
-    );
+  // Only require password if the user actually has one (e.g. not Google Auth)
+  if (user.password) {
+    if (!password) {
+      throwError(
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.INVALID_INPUT,
+        "Password is required to deactivate account"
+      );
+    }
+    const isPasswordValid = await isSamePassword(password, user.password);
+    if (!isPasswordValid) {
+      throwError(
+        HTTP_STATUS.UNAUTHORIZED,
+        ERROR_CODES.ACCESS_DENIED,
+        "Invalid password"
+      );
+    }
   }
 
-  await deleteUserById(userId);
+  await softDeleteUser(userId);
 
   res.clearCookie("refreshToken", {
     httpOnly: true,
@@ -738,7 +746,55 @@ module.exports.deleteByUser = expressAsyncHandler(async (req, res) => {
   return sendSuccess(
     res,
     HTTP_STATUS.OK,
-    "Account deleted successfully"
+    "Account deactivated successfully"
+  );
+});
+
+// ── Hard Delete ────────────────────────────────────────────────────────────
+module.exports.hardDeleteByUser = expressAsyncHandler(async (req, res) => {
+  const { password } = req.body;
+  const { userId } = req.user;
+
+  const user = await findUserById(userId);
+
+  if (!user) {
+    throwError(
+      HTTP_STATUS.NOT_FOUND,
+      ERROR_CODES.RESOURCE_NOT_FOUND,
+      "User not found"
+    );
+  }
+
+  if (user.password) {
+    if (!password) {
+      throwError(
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.INVALID_INPUT,
+        "Password is required to delete account"
+      );
+    }
+    const isPasswordValid = await isSamePassword(password, user.password);
+    if (!isPasswordValid) {
+      throwError(
+        HTTP_STATUS.UNAUTHORIZED,
+        ERROR_CODES.ACCESS_DENIED,
+        "Invalid password"
+      );
+    }
+  }
+
+  await hardDeleteUser(userId);
+
+  res.clearCookie("refreshToken", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+  });
+
+  return sendSuccess(
+    res,
+    HTTP_STATUS.OK,
+    "Account and all related data deleted permanently"
   );
 });
 

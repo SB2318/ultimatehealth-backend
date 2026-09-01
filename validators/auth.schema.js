@@ -222,7 +222,7 @@ const verifyOtpSchema = z.object({
 })
 
 const deleteAccountSchema = z.object({
-    password: passwordSchema,
+    password: passwordSchema.optional(),
 })
 
 const resendVerificationSchema = z.object({

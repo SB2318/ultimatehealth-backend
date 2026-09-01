@@ -609,8 +609,57 @@ const logoutUser = async (userId) => {
     return isUpdated
 }
 
-const deleteUserById = async (userId) => {
-    return User.deleteOne({ _id: userId })
+const softDeleteUser = async (userId) => {
+    // 1. Mark as deactivated
+    await User.findByIdAndUpdate(userId, {
+        $set: {
+            isDeactivated: true,
+            deactivatedAt: new Date()
+        }
+    });
+
+    // 2. Remove their login tokens
+    await logoutUser(userId);
+
+    return true;
+};
+
+const hardDeleteUser = async (userId) => {
+    const Comment = require('../../models/commentSchema');
+    const Notification = require('../../models/notificationSchema');
+    const ArticleTag = require('../../models/ArticleModel');
+
+    // 1. Delete the user
+    await User.deleteOne({ _id: userId });
+
+    // 2. Delete all their articles
+   // await Article.deleteMany({ authorId: userId });
+
+    // 3. Delete all their comments
+    await Comment.deleteMany({ userId: userId });
+
+    // 4. Delete notifications involving them
+    await Notification.deleteMany({ $or: [{ senderId: userId }, { recipientId: userId }] });
+
+    // 5. Remove from followers and followings arrays in other users
+    await User.updateMany(
+        { $or: [{ followers: userId }, { followings: userId }] },
+        { $pull: { followers: userId, followings: userId } }
+    );
+
+    // 6. Remove likes and bookmarks from all articles
+    await Article.updateMany(
+        { $or: [{ likedBy: userId }, { savedBy: userId }] },
+        { $pull: { likedBy: userId, savedBy: userId } }
+    );
+
+    // 7. Remove from ArticleTags subscribers
+    await ArticleTag.updateMany(
+        { subscribers: userId },
+        { $pull: { subscribers: userId } }
+    );
+
+    return true;
 }
 
 const updateUserProfilePictureById = async (userId, profilePictureUrl) => {
@@ -746,7 +795,8 @@ module.exports = {
     clearOtpUser,
     updateUserPasswordAndClearOtp,
     logoutUser,
-    deleteUserById,
+    softDeleteUser,
+    hardDeleteUser,
     updateUserProfilePictureById,
     updateUserPasswordById,
     updateUserGeneralDetailsById,

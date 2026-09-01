@@ -9,7 +9,8 @@ const {
   logout,
   sendOTPForForgotPassword,
   verifyOtpForForgotPassword,
-  deleteByUser,
+  softDeleteByUser,
+  hardDeleteByUser,
   deleteByAdmin,
   getprofile,
   getProfileImage,
@@ -192,11 +193,19 @@ router.post(
 )
 
 router.post(
+    '/user/deactivate',
+    authenticate,
+    authorize(ROLES.USER, ROLES.DOCTOR),
+    validateBody(deleteAccountSchema),
+    softDeleteByUser
+)
+
+router.post(
     '/user/delete',
     authenticate,
     authorize(ROLES.USER, ROLES.DOCTOR),
     validateBody(deleteAccountSchema),
-    deleteByUser
+    hardDeleteByUser
 )
 
 router.get('/user/socials', authenticateToken, getSocials)

@@ -209,6 +209,14 @@ const userSchema = new mongoose.Schema({
             ref: 'ArticleTag',
             default: []
         }]
+    },
+    isDeactivated: {
+        type: Boolean,
+        default: false,
+    },
+    deactivatedAt: {
+        type: Date,
+        default: null,
     }
 
 });
