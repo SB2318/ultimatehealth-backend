@@ -1,6 +1,7 @@
 const express = require("express");
 const authToken = require("../middleware/authentcatetoken");
-const { logMetrics, getWeeklyMetrics, generateAIPlan, getLatestPlan } = require("../controllers/wellnessController");
+const { logMetrics, getWeeklyMetrics, generateAIPlan, getLatestPlan, getPlanHistory } = require("../controllers/wellnessController");
+const { aiPlanLimiter } = require("../middleware/ratelimit");
 
 const router = express.Router();
 
@@ -163,7 +164,32 @@ router.get("/weekly", authToken, getWeeklyMetrics);
  *       502:
  *         description: The AI provider failed to generate a valid plan
  */
-router.post("/plan/generate", authToken, generateAIPlan);
+router.post("/plan/generate", authToken, aiPlanLimiter, generateAIPlan);
+
+/**
+ * @swagger
+ * /wellness/plan/history:
+ *   get:
+ *     summary: Get all past wellness plans (newest first)
+ *     tags: [Wellness]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *     responses:
+ *       200:
+ *         description: Successfully retrieved plan history
+ */
+router.get("/plan/history", authToken, getPlanHistory);
 
 /**
  * @swagger

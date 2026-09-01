@@ -628,12 +628,14 @@ const hardDeleteUser = async (userId) => {
     const Comment = require('../../models/commentSchema');
     const Notification = require('../../models/notificationSchema');
     const ArticleTag = require('../../models/ArticleModel');
+    const WellnessLog = require('../../models/WellnessLog');
+    const WellnessPlan = require('../../models/WellnessPlan');
 
     // 1. Delete the user
     await User.deleteOne({ _id: userId });
 
     // 2. Delete all their articles
-   // await Article.deleteMany({ authorId: userId });
+    await Article.deleteMany({ authorId: userId });
 
     // 3. Delete all their comments
     await Comment.deleteMany({ userId: userId });
@@ -658,6 +660,10 @@ const hardDeleteUser = async (userId) => {
         { subscribers: userId },
         { $pull: { subscribers: userId } }
     );
+
+    // 8. Delete all wellness data
+    await WellnessLog.deleteMany({ userId });
+    await WellnessPlan.deleteMany({ userId });
 
     return true;
 }

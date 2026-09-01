@@ -307,7 +307,7 @@ const verifyEmail = expressAsyncHandler(async (req, res) => {
     );
   }
 
-  await User.create({
+  const newUser = await User.create({
     user_name: unverifiedUser.user_name,
     user_handle: unverifiedUser.user_handle,
     email: unverifiedUser.email,
@@ -321,6 +321,10 @@ const verifyEmail = expressAsyncHandler(async (req, res) => {
     Profile_image: unverifiedUser.Profile_image,
     isVerified: true,
   });
+
+  // Sync the newly verified user to Firebase Firestore
+  const { cloneUserToFirebase } = require("../services/db/firebaseService");
+  await cloneUserToFirebase(newUser);
 
   await UnverifiedUser.deleteOne({
     _id: unverifiedUser._id,

@@ -20,6 +20,7 @@ const articleRoutes = require("./routes/articleRoutes");
 const analyticsRoute = require('./routes/analyticsRoute');
 const uploadRoute = require('./routes/uploadRoute');
 const glossaryRoutes = require('./routes/glossaryRoutes');
+const wellnessRoutes = require('./routes/wellnessRoute');
 require('./controllers/commentController');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
@@ -58,6 +59,7 @@ app.use("/api", articleRoutes);
 app.use("/api", uploadRoute);
 app.use("/api/analytics", analyticsRoute);
 app.use("/api/glossary", glossaryRoutes);
+app.use("/api/wellness", wellnessRoutes);
 
 // Swagger
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
@@ -363,11 +365,13 @@ io.on('connection', (socket) => {
 
 });
 
-// Start server
-server.listen(PORT, () => {
-   // console.log(`Server is running on port ${PORT}`);
-    console.log(`Docs: http://localhost:${PORT}/docs`);
-});
+// Start server only if not in test environment
+if (process.env.NODE_ENV !== 'test') {
+    server.listen(PORT, () => {
+       // console.log(`Server is running on port ${PORT}`);
+        console.log(`Docs: http://localhost:${PORT}/docs`);
+    });
+}
 
 // Export the app for testing or other purposes
 module.exports = app;

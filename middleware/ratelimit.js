@@ -122,6 +122,25 @@ const uploadLimiter = rateLimit({
 });
 
 /**
+ * AI plan generation limiter
+ * Prevent Gemini API abuse — authenticated by userId
+ */
+const aiPlanLimiter = rateLimit({
+  ...baseConfig,
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 3, // max 3 plan generations per hour per user
+  handler: (req, res) => {
+    res.status(429).json({
+      success: false,
+      error: {
+        code: 'RATE_LIMITED',
+        message: 'You can only generate 3 wellness plans per hour. Please try again later.',
+      },
+    });
+  },
+});
+
+/**
  * download/report generation
  */
 const heavyOperationLimiter = rateLimit({
@@ -141,4 +160,5 @@ module.exports = {
   searchLimiter,
   uploadLimiter,
   heavyOperationLimiter,
+  aiPlanLimiter,
 };

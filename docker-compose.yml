@@ -1,5 +1,37 @@
 version: "3.8"
 services:
+  api:
+    build: .
+    container_name: ultimatehealth-backend
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - MONGODB_URL=mongodb://mongodb:27017/ultimate_health
+      - KAFKA_BROKERS=kafka1:9092,kafka2:9092,kafka3:9092
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      kafka1:
+        condition: service_healthy
+    volumes:
+      - .env:/usr/src/app/.env
+      - ./ultimatehealth-firebase-adminsdk.json:/usr/src/app/ultimatehealth-firebase-adminsdk.json
+      
+  mongodb:
+    image: mongo:6.0
+    container_name: ultimatehealth-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
   kafka1:
     image: apache/kafka:latest
     container_name: kafka1-ultimatehealth
@@ -190,6 +222,7 @@ volumes:
   kafka1-data:
   kafka2-data:
   kafka3-data:
+  mongodb_data:
 
 # To Run :
 # docker-compose down

@@ -1,9 +1,11 @@
 const { Kafka } = require('kafkajs');
 
 // Create a Kafka client instance with the specified configuration
+const kafkaBrokers = process.env.KAFKA_BROKERS ? process.env.KAFKA_BROKERS.split(',') : ['kafka1:9092', 'kafka2:9092', 'kafka3:9092'];
+
 const kafkaClient = new Kafka({
   clientId: 'ultimatehealth-backend',
-  brokers: ['kafka1:9092', 'kafka2:9092', 'kafka3:9092'] // Apache Kafka clusture with  3 brokers
+  brokers: kafkaBrokers // Apache Kafka cluster
 });
 
 const globalProducer = kafkaClient.producer({
