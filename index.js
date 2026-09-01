@@ -5,6 +5,7 @@ const cors = require('cors');
 const path = require("path");
 const {connectProducer} = require('./services/mqueue/kafkaProducer');
 const {
+initKafkaTopics,
 connectEmailConsumer,
 connectAnalyticsConsumer,
 connectNotificationConsumer
@@ -59,9 +60,11 @@ const app = express();
 dotenv.config();
 db.dbConnect();
 connectProducer(); // Connect the Kafka producer to the Kafka cluster
-connectEmailConsumer();
-connectAnalyticsConsumer();
-connectNotificationConsumer();
+initKafkaTopics().then(() => {
+    connectEmailConsumer();
+    connectAnalyticsConsumer();
+    connectNotificationConsumer();
+});
 
 // Prevent process crash on unhandled errors
 process.on('uncaughtException', (err) => {

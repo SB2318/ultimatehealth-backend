@@ -3,6 +3,8 @@ const { handleEmailEvent } = require("./emailConsumer");
 const { handleAnalyticsEvent } = require("./analyticsConsumer");
 const { handleNotificationEvent } = require("./notificationConsumer");
 const { publishDLQEvent } = require("./dlqConsumer");
+const { SUBSCRIBED_EVENT_TYPES } = require('./kafkaTopics');
+const { kafkaClient } = require("../../../config/kafka");
 
 const connectEmailConsumer = async () => {
     try {
@@ -154,9 +156,33 @@ const connectDLQConsumer = async () => {
 }
 
 // Re-export from the dedicated constants file to avoid circular dependencies
-const { SUBSCRIBED_EVENT_TYPES } = require('./kafkaTopics');
+
+
+const initKafkaTopics = async () => {
+    const admin = kafkaClient.admin();
+    try {
+        console.log("Connecting Kafka Admin to ensure topics exist...");
+        await admin.connect();
+        const existingTopics = await admin.listTopics();
+        const topicsToCreate = Object.values(SUBSCRIBED_EVENT_TYPES)
+            .filter(topic => !existingTopics.includes(topic))
+            .map(topic => ({ topic, numPartitions: 1, replicationFactor: 3 }));
+        
+        if (topicsToCreate.length > 0) {
+            await admin.createTopics({ topics: topicsToCreate });
+            console.log(`Successfully created ${topicsToCreate.length} missing Kafka topics.`);
+        } else {
+            console.log("All required Kafka topics already exist.");
+        }
+    } catch (err) {
+        console.error("Failed to initialize Kafka topics (they might be auto-created later):", err.message);
+    } finally {
+        await admin.disconnect();
+    }
+};
 
 module.exports = {
+    initKafkaTopics,
     connectEmailConsumer,
     connectAnalyticsConsumer,
     connectNotificationConsumer,
