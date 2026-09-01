@@ -29,9 +29,17 @@ const userSchema = new mongoose.Schema({
         },
         index: true,
     },
+    uid: {
+        type: String,
+        default: null,
+        sparse: true,
+        unique: true,
+        index: true,
+    },
     password: {
         type: String,
-        required: true,
+        required: false,
+        default: null,
         minlength: [6, 'Password must be at least 6 characters long'],
     },
     isDoctor: {

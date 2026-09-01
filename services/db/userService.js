@@ -107,8 +107,48 @@ const findUnverifiedUserById = async (_id) => {
 
 
 const findUserByEmail = async (email) => {
-    return User.findOne({ email }).lean()
-}
+    return User.findOne({ email }).lean();
+};
+
+const findUserByUid = async (uid) => {
+    return User.findOne({ uid }).lean();
+};
+
+const createGoogleUnverifiedUser = async ({
+    user_name,
+    user_handle,
+    email,
+    uid,
+    isDoctor,
+    Profile_image,
+    qualification,
+    specialization,
+    Years_of_experience,
+    contact_detail,
+}) => {
+    const role = isDoctor ? ROLES.DOCTOR : ROLES.USER;
+    const { verificationToken, jti } = generateVerificationToken({ email, role });
+    const hashedJti = await hashToken(jti);
+
+    const newUser = new UnverifiedUser({
+        user_name,
+        user_handle,
+        email,
+        uid,
+        password: null,        // Google users have no password
+        isDoctor,
+        specialization,
+        qualification,
+        Years_of_experience,
+        contact_detail,
+        Profile_image,
+        hashedJti,
+    });
+
+    await newUser.save();
+
+    return verificationToken;
+};
 
 const findUserByHandle = async (user_handle) => {
     const user = await User.findOne({ user_handle: user_handle })
@@ -712,6 +752,8 @@ module.exports = {
     updateUserGeneralDetailsById,
     updateUserContactDetailsById,
     getUsersToBroadcast,
+    findUserByUid,
+    createGoogleUnverifiedUser,
 }
 // Left
 // 1. Update User

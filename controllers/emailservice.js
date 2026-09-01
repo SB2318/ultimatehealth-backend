@@ -312,6 +312,7 @@ const verifyEmail = expressAsyncHandler(async (req, res) => {
     user_handle: unverifiedUser.user_handle,
     email: unverifiedUser.email,
     password: unverifiedUser.password,
+    uid: unverifiedUser.uid || null,
     isDoctor: unverifiedUser.isDoctor,
     specialization: unverifiedUser.specialization,
     qualification: unverifiedUser.qualification,

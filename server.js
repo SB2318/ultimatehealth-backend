@@ -19,6 +19,7 @@ const specializationRoutes = require("./routes/SpecializationsRoutes");
 const articleRoutes = require("./routes/articleRoutes");
 const analyticsRoute = require('./routes/analyticsRoute');
 const uploadRoute = require('./routes/uploadRoute');
+const glossaryRoutes = require('./routes/glossaryRoutes');
 require('./controllers/commentController');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
@@ -56,6 +57,7 @@ app.use("/api", specializationRoutes);
 app.use("/api", articleRoutes);
 app.use("/api", uploadRoute);
 app.use("/api/analytics", analyticsRoute);
+app.use("/api/glossary", glossaryRoutes);
 
 // Swagger
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));

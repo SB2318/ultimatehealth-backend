@@ -1,6 +1,7 @@
 
 const expressAsyncHandler = require("express-async-handler");
 const User = require("../models/UserModel");
+const ArticleTag = require("../models/ArticleModel");
 const {
   createUnverifiedUser,
   findUserById,
@@ -8,6 +9,7 @@ const {
   findUnverifiedUserByHandle,
   findUserByEmail,
   findUserByHandle,
+  findUserByUid,
   checkExistingUser,
   getMyProfile,
   getPublicProfile,
@@ -30,7 +32,8 @@ const {
   deleteUserById,
   updateUserProfilePictureById,
   updateUserGeneralDetailsById,
-  updateUserContactDetailsById
+  updateUserContactDetailsById,
+  createGoogleUnverifiedUser,
 } = require("../services/db/userService");
 
 const {
@@ -225,6 +228,163 @@ module.exports.login = expressAsyncHandler(async (req, res) => {
 
   return sendSuccess(res, HTTP_STATUS.OK, "Login successful", responsePayload);
 });
+
+// ─── Google Sign-In / Sign-Up ────────────────────────────────────────────────
+// Single endpoint for both Google login and Google registration.
+// Google users are NOT auto-verified — they go through the same email
+// verification flow as regular users.
+module.exports.googleAuth = expressAsyncHandler(async (req, res) => {
+  const {
+    email,
+    uid,
+    user_name,
+    user_handle,
+    isDoctor,
+    Profile_image,
+    qualification,
+    specialization,
+    Years_of_experience,
+    contact_detail,
+    fcmToken,
+  } = req.validateBody;
+
+  // ── Case 1: Verified user already exists → Log them in ───────────────────
+  const existingVerifiedUser = await findUserByEmail(email);
+
+  if (existingVerifiedUser) {
+    if (existingVerifiedUser.isBannedUser || existingVerifiedUser.isBlockUser) {
+      throwError(
+        HTTP_STATUS.FORBIDDEN,
+        ERROR_CODES.ACCESS_DENIED,
+        "Account access restricted",
+      );
+    }
+
+    // Attach uid if this is their first Google login (uid not yet stored)
+    if (!existingVerifiedUser.uid && uid) {
+      await User.findByIdAndUpdate(existingVerifiedUser._id, { uid });
+    }
+
+    // Clear any existing refresh token before issuing a new one
+    if (existingVerifiedUser.refreshToken?.hashedRefreshToken) {
+      await logoutUser(existingVerifiedUser._id);
+    }
+
+    const { refreshToken, jti } = generateRefreshToken({
+      userId: existingVerifiedUser._id,
+      role: existingVerifiedUser.isDoctor ? ROLES.DOCTOR : ROLES.USER,
+    }, "7d");
+
+    await loginUser(existingVerifiedUser._id, refreshToken, jti, fcmToken ?? null);
+
+    const accessToken = generateAccessToken({
+      userId: existingVerifiedUser._id,
+      role: existingVerifiedUser.isDoctor ? ROLES.DOCTOR : ROLES.USER,
+    });
+
+    const isMobile = req.headers['x-client-type']?.toLowerCase() === 'mobile';
+
+    const payload = {
+      user: {
+        _id: existingVerifiedUser._id,
+        email: existingVerifiedUser.email,
+        user_name: existingVerifiedUser.user_name,
+        isDoctor: existingVerifiedUser.isDoctor,
+        isVerified: true,
+        user_handle: existingVerifiedUser.user_handle,
+      },
+      accessToken,
+    };
+
+    if (isMobile) payload.refreshToken = refreshToken;
+
+    return sendSuccess(res, HTTP_STATUS.OK, "Login successful", payload);
+  }
+
+  // ── Case 2: Unverified user exists → Gate them ───────────────────────────
+  const unverifiedUser = await findUnverifiedUserByEmail(email);
+
+  if (unverifiedUser) {
+    throwError(
+      HTTP_STATUS.FORBIDDEN,
+      ERROR_CODES.ACCESS_DENIED,
+      "This email is registered but not yet verified. Please check your inbox or request a new verification email.",
+    );
+  }
+
+  // ── Case 3: Fresh registration ────────────────────────────────────────────
+
+  // Auto-generate a unique user_handle if not provided
+  let finalUserHandle = user_handle;
+  if (!finalUserHandle) {
+    const baseHandle = user_name.replace(/[^a-zA-Z0-9_]/g, "").toLowerCase() || "user";
+    let isUnique = false;
+    let attempt = 0;
+    while (!isUnique) {
+      finalUserHandle = attempt === 0 ? baseHandle : `${baseHandle}_${Math.floor(Math.random() * 10000)}`;
+      const handleExists = await checkExistingUser({ email: "__no_match__@x.com", user_handle: finalUserHandle });
+      if (!handleExists) isUnique = true;
+      attempt++;
+    }
+  }
+
+  // Check for duplicate email or handle across both tables
+  const [emailTaken, handleTaken] = await Promise.all([
+    checkExistingUser({ email, user_handle: "__no_match__" }),
+    checkExistingUser({ email: "__no_match__@x.com", user_handle: finalUserHandle }),
+  ]);
+
+  if (emailTaken) {
+    throwError(
+      HTTP_STATUS.BAD_REQUEST,
+      ERROR_CODES.USER_ALREADY_EXISTS,
+      "An account with this email already exists",
+    );
+  }
+
+  if (handleTaken && user_handle) {
+    throwError(
+      HTTP_STATUS.BAD_REQUEST,
+      ERROR_CODES.USER_ALREADY_EXISTS,
+      "This handle is already taken",
+    );
+  }
+
+  const verificationToken = await createGoogleUnverifiedUser({
+    user_name,
+    user_handle: finalUserHandle,
+    email,
+    uid,
+    isDoctor,
+    Profile_image,
+    qualification,
+    specialization,
+    Years_of_experience,
+    contact_detail,
+  });
+
+  if (!verificationToken) {
+    throwError(
+      HTTP_STATUS.INTERNAL_SERVER_ERROR,
+      ERROR_CODES.INTERNAL_ERROR,
+      "Failed to create account",
+    );
+  }
+
+  // Send verification email (same as the normal registration flow)
+  if (process.env.NODE_ENV === "production") {
+    const { sendVerificationEmail } = require("./emailservice");
+    await sendVerificationEmail(email, verificationToken, false);
+  }
+
+  return sendSuccess(
+    res,
+    HTTP_STATUS.CREATED,
+    "Account created successfully. Please verify your email to continue.",
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 module.exports.getprofile = expressAsyncHandler(async (req, res) => {
   const user = await getMyProfile(req.user.userId);
@@ -1121,12 +1281,34 @@ module.exports.updateNotificationPreferences = expressAsyncHandler(
       const user = await User.findById(req.userId);
       if (!user) return res.status(404).json({ error: "User not found" });
 
+      const oldClusters = user.notificationPreferences?.contentClusters || [];
+      const oldClusterStrings = oldClusters.map(id => id.toString());
+      const newClusterStrings = contentClusters.map(id => id.toString());
+
+      const addedClusters = newClusterStrings.filter(id => !oldClusterStrings.includes(id));
+      const removedClusters = oldClusterStrings.filter(id => !newClusterStrings.includes(id));
+
       if (!user.notificationPreferences) {
         user.notificationPreferences = { contentClusters: [] };
       }
 
       user.notificationPreferences.contentClusters = contentClusters;
       await user.save();
+
+      // Update ArticleTag subscribers for bidirectional relationship
+      if (addedClusters.length > 0) {
+        await ArticleTag.updateMany(
+          { _id: { $in: addedClusters } },
+          { $addToSet: { subscribers: user._id } }
+        );
+      }
+
+      if (removedClusters.length > 0) {
+        await ArticleTag.updateMany(
+          { _id: { $in: removedClusters } },
+          { $pull: { subscribers: user._id } }
+        );
+      }
 
       res.status(200).json({ message: "Notification preferences updated successfully", preferences: user.notificationPreferences });
     } catch (error) {

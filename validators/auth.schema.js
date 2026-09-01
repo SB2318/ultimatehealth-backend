@@ -292,9 +292,73 @@ const updateProfessionalDetailsSchema = z.object({
         .min(0, 'Cannot be negative')
         .max(60, 'Experience looks unrealistic'),
 }).strict()
+
+// ---- Google Sign-In Schema ----
+const googleAuthSchema = z.discriminatedUnion('isDoctor', [
+    z.object({
+        // ── Required ──────────────────────────────
+        email: baseFields.email,
+        uid: z
+            .string({ error: 'uid is required' })
+            .trim()
+            .min(1, 'uid is required')
+            .max(128, 'uid is too long'),
+        user_name: baseFields.user_name,
+        isDoctor: z.literal(false),
+
+        // ── Optional ──────────────────────────────
+        user_handle: baseFields.user_handle.optional(),
+        Profile_image: z.url('Invalid image URL').optional(),
+        fcmToken: z
+            .string()
+            .trim()
+            .min(100, 'Invalid FCM token')
+            .max(4096, 'FCM token is too long')
+            .regex(/^[A-Za-z0-9\-_:]+$/, 'Invalid FCM token format')
+            .optional(),
+    }).strict(),
+
+    z.object({
+        // ── Required ──────────────────────────────
+        email: baseFields.email,
+        uid: z
+            .string({ error: 'uid is required' })
+            .trim()
+            .min(1, 'uid is required')
+            .max(128, 'uid is too long'),
+        user_name: baseFields.user_name,
+        isDoctor: z.literal(true),
+
+        // ── Optional ──────────────────────────────
+        user_handle: baseFields.user_handle.optional(),
+        Profile_image: z.url('Invalid image URL').optional(),
+        fcmToken: z
+            .string()
+            .trim()
+            .min(100, 'Invalid FCM token')
+            .max(4096, 'FCM token is too long')
+            .regex(/^[A-Za-z0-9\-_:]+$/, 'Invalid FCM token format')
+            .optional(),
+        qualification: z.string().trim().min(2).max(100).optional(),
+        specialization: z.string().trim().min(2).max(100).optional(),
+        Years_of_experience: z
+            .number({ error: 'Experience must be a number' })
+            .int()
+            .min(0)
+            .max(60)
+            .optional(),
+        contact_detail: z
+            .string()
+            .trim()
+            .regex(/^[+]?[0-9]{10,15}$/, 'Contact number must be 10-15 digits')
+            .optional(),
+    }).strict(),
+]);
+
 module.exports = {
     registerSchema,
     loginSchema,
+    googleAuthSchema,
     profileImageParamSchema,
     userProfileQuerySchema,
     followUnfollowSchema,

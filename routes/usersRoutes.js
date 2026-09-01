@@ -4,6 +4,7 @@ const path = require('path')
 const {
   register,
   login,
+  googleAuth,
   getTokenStatus,
   logout,
   sendOTPForForgotPassword,
@@ -50,6 +51,7 @@ const {
 const {
     registerSchema,
     loginSchema,
+    googleAuthSchema,
     profileImageParamSchema,
     userProfileQuerySchema,
     followUnfollowSchema,
@@ -121,6 +123,14 @@ router.post(
     loginLimiter,
     validateBody(loginSchema),
     login
+)
+
+router.post(
+    '/user/google-auth',
+    enforceMinDuration(700),
+    loginLimiter,
+    validateBody(googleAuthSchema),
+    googleAuth
 )
 
 /**
