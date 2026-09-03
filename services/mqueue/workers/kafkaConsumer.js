@@ -166,7 +166,7 @@ const initKafkaTopics = async () => {
         const existingTopics = await admin.listTopics();
         const topicsToCreate = Object.values(SUBSCRIBED_EVENT_TYPES)
             .filter(topic => !existingTopics.includes(topic))
-            .map(topic => ({ topic, numPartitions: 1, replicationFactor: 3 }));
+            .map(topic => ({ topic, numPartitions: 1, replicationFactor: 2 }));
         
         if (topicsToCreate.length > 0) {
             await admin.createTopics({ topics: topicsToCreate });
