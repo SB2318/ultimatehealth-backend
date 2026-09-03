@@ -225,11 +225,26 @@ services:
       kafka3:
         condition: service_healthy
 
+  # ─────────────────────────────────────────────
+  # 📦 PocketBase
+  # ─────────────────────────────────────────────
+  pocketbase:
+    build:
+      context: .
+      dockerfile: Dockerfile.pocketbase
+    container_name: ultimatehealth-pocketbase
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    volumes:
+      - pb_data:/pb/pb_data
+
 volumes:
   kafka1-data:
   kafka2-data:
   kafka3-data:
   mongodb_data:
+  pb_data:
 
 # To Run :
 # docker-compose down
