@@ -145,8 +145,8 @@ app.get("/hello", (req, res) => {
     res.send('Hello World');
 });
 app.get('/', (req, res) => {
-    //res.sendFile(path.join(__dirname, "public", "home.html"));
-    res.redirect(302, 'https://ultimatehealth.blog/frontend/v2');
+    res.sendFile(path.join(__dirname, "public", "home.html"));
+    //res.redirect(302, 'https://ultimatehealth.blog/frontend/v2');
 });
 
 // app.get('/publish', (req, res) => {
