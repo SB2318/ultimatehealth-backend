@@ -66,6 +66,19 @@ initKafkaTopics().then(() => {
     connectNotificationConsumer();
 });
 
+const { getCircuitBreakerHealth } = require('./utils/circuitBreaker');
+
+// Diagnostic endpoint to monitor health of external service Circuit Breakers
+app.get('/api/health/circuit-breakers', (req, res) => {
+    const health = getCircuitBreakerHealth();
+    const allHealthy = health.every(b => b.state === 'CLOSED');
+    res.status(allHealthy ? 200 : 503).json({
+        status: allHealthy ? 'HEALTHY' : 'DEGRADED',
+        timestamp: new Date().toISOString(),
+        breakers: health
+    });
+});
+
 // Prevent process crash on unhandled errors
 process.on('uncaughtException', (err) => {
     console.error('CRITICAL: Uncaught Exception:', err);

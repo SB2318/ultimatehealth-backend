@@ -5,19 +5,28 @@
 
 let cachePBClient = null;
 
+const { pocketbaseBreaker } = require("./circuitBreaker");
+
 const getHTMLFileContent = async (collectionName, recordId) => {
-    const pb = await getPocketbaseClient();
-    await authenticateAdmin(pb);
+    return await pocketbaseBreaker.execute(
+        async () => {
+            const pb = await getPocketbaseClient();
+            await authenticateAdmin(pb);
 
-    const record = await pb.collection(collectionName).getOne(recordId);
+            const record = await pb.collection(collectionName).getOne(recordId);
+            const fileName = collectionName === 'content' ? record.html_file : record.edited_html_file;
 
-    const fileName = collectionName === 'content' ? record.html_file : record.edited_html_file;
+            const htmlFileUrl = pb.files.getURL(record, fileName);
+            const response = await fetch(htmlFileUrl);
+            const htmlContent = await response.text();
 
-    const htmlFileUrl = pb.files.getURL(record, fileName);
-    const response = await fetch(htmlFileUrl);
-    const htmlContent = await response.text();
-
-    return { htmlContent, fileName };
+            return { htmlContent, fileName };
+        },
+        (error) => {
+            console.warn("[PocketBaseBreaker] Fallback triggered for getHTMLFileContent:", error.message);
+            return { htmlContent: "<p>Content temporarily unavailable.</p>", fileName: "unavailable.html" };
+        }
+    );
 }
 
 
