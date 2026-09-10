@@ -1,5 +1,10 @@
 # Environment variables
 .env
+!.env.example
+*.pem
+*.key
+*.p12
+*.crt
 
 # Node modules
 node_modules/
