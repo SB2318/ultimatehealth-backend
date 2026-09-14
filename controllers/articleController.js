@@ -1,17 +1,18 @@
 const expressAsyncHandler = require("express-async-handler");
 const ArticleTag = require("../models/ArticleModel");
 const Article = require("../models/Articles");
+const Glossary = require("../models/Glossary");
 const User = require("../models/UserModel");
 const EditRequest = require('../models/admin/articleEditRequestModel');
 const ReadAggregate = require("../models/events/readEventSchema");
 const WriteAggregate = require("../models/events/writeEventSchema");
 const statusEnum = require("../utils/StatusEnum");
-// const { sendArticleForReviewEmail } = require("./emailservice");
 const { publishContentEmailEvent, EMAIL_EVENT_TYPES } = require("../services/mqueue/producers/emailProducer");
 const { publishArticleAnalyticsEvent, ANALYTICS_EVENT_TYPES } = require("../services/mqueue/producers/analyticsProducer");
 const { getReadingHistory } = require("../services/db/articleService");
 const { throwError } = require("../utils/throwError");
 const { HTTP_STATUS, ERROR_CODES } = require("../constants/errorConstants");
+const { detectGlossaryForArticle } = require("../utils/glossaryDetector");
 const mongoose = require('mongoose');
 
 module.exports.createArticle = expressAsyncHandler(
@@ -25,6 +26,7 @@ module.exports.createArticle = expressAsyncHandler(
         description,
         content,
         tags,
+        glossaryTerms = [],
         imageUtils,
         pb_recordId,
         allow_podcast,
@@ -58,13 +60,47 @@ module.exports.createArticle = expressAsyncHandler(
       }
 
 
-      // Later will be there language schema check
-      const validTags = tags.map(tag => new mongoose.Types.ObjectId(tag._id));
       // validate tags
+      const validTags = tags.map(tag => new mongoose.Types.ObjectId(tag._id));
       const validTagsFromDB = await ArticleTag.find({ _id: { $in: validTags } });
       if (validTags.length !== validTagsFromDB.length) {
         return res.status(400).json({ error: "Invalid tags provided" });
       }
+
+      // validate glossary terms if explicitly provided
+      let validGlossaryTerms = [];
+      if (glossaryTerms && Array.isArray(glossaryTerms) && glossaryTerms.length > 0) {
+        const glossaryIds = glossaryTerms.map(g => {
+          if (typeof g === 'object' && g !== null && g._id) return g._id;
+          return g;
+        });
+
+        for (const gid of glossaryIds) {
+          if (!mongoose.Types.ObjectId.isValid(gid)) {
+            return res.status(400).json({ error: "Invalid glossary term ID format" });
+          }
+        }
+
+        const validGlossariesFromDB = await Glossary.find({ _id: { $in: glossaryIds } });
+        if (validGlossariesFromDB.length !== glossaryIds.length) {
+          return res.status(400).json({ error: "One or more invalid glossary terms provided" });
+        }
+        validGlossaryTerms = glossaryIds;
+      }
+
+      // Auto-detect glossary terms from article file content and metadata
+      const { glossaryIds: autoDetectedIds } = await detectGlossaryForArticle({
+        pb_recordId,
+        content,
+        title,
+        description,
+      });
+
+      const combinedGlossaryIds = Array.from(new Set([
+        ...validGlossaryTerms.map(id => id.toString()),
+        ...autoDetectedIds.map(id => id.toString())
+      ]));
+
       // Find the user by ID
       const user = await User.findById(authorId);
 
@@ -119,6 +155,7 @@ module.exports.createArticle = expressAsyncHandler(
         authorName,
         content,
         tags,
+        glossaryTerms: combinedGlossaryIds,
         description,
         imageUtils,
         language,
@@ -145,11 +182,8 @@ module.exports.createArticle = expressAsyncHandler(
         });
       }
 
-      // await updateWriteEvents(newArticle._id, user.id);
-
       await user.save();
 
-      // sendArticleForReviewEmail(user.email, title);
       await publishContentEmailEvent({
         email: user.email,
         title: title,
@@ -456,6 +490,10 @@ module.exports.getArticleById = expressAsyncHandler(
       const article = await Article.findById(req.params.id)
         .populate('tags')
         .populate({
+          path: 'glossaryTerms',
+          select: 'term slug shortDescription definition categories'
+        })
+        .populate({
           path: 'likedUsers',
           select: 'user_handle user_name Profile_image',
           match: {
@@ -594,12 +632,27 @@ module.exports.updateArticle = expressAsyncHandler(
         return res.status(403).json({ message: "Forbidden" });
       }
 
+      const updatePayload = { ...req.body };
+
+      // If content, pb_recordId, title, or description updated, refresh auto-detected glossary terms
+      if (req.body.pb_recordId || req.body.content || req.body.title || req.body.description) {
+        const { glossaryIds: autoDetectedIds } = await detectGlossaryForArticle({
+          pb_recordId: req.body.pb_recordId || existingArticle.pb_recordId,
+          content: req.body.content || existingArticle.content,
+          title: req.body.title || existingArticle.title,
+          description: req.body.description || existingArticle.description,
+          summary: req.body.summary || existingArticle.summary
+        });
+        updatePayload.glossaryTerms = autoDetectedIds;
+      }
+
       const article = await Article.findByIdAndUpdate(
         req.params.id,
-        req.body,
+        updatePayload,
         { new: true }
       )
         .populate('tags')
+        .populate('glossaryTerms', 'term slug shortDescription definition')
         .exec();
 
       res.status(200).json({
@@ -1346,3 +1399,291 @@ module.exports.getTrustedUsers = expressAsyncHandler(
     }
   }
 );
+
+module.exports.searchArticles = expressAsyncHandler(async (req, res) => {
+  try {
+    const { q, page = 1, limit = 10, tag, language, glossaryId } = req.query;
+
+    if (!q && !tag && !glossaryId) {
+      return res.status(400).json({ error: "Search query 'q', 'tag', or 'glossaryId' is required" });
+    }
+
+    const skip = (Number(page) - 1) * Number(limit);
+    let matchConditions = {
+      is_removed: false,
+      status: statusEnum.statusEnum.PUBLISHED,
+    };
+
+    if (language) {
+      matchConditions.language = language;
+    }
+
+    if (tag && mongoose.Types.ObjectId.isValid(tag)) {
+      matchConditions.tags = new mongoose.Types.ObjectId(tag);
+    }
+
+    if (glossaryId && mongoose.Types.ObjectId.isValid(glossaryId)) {
+      matchConditions.glossaryTerms = new mongoose.Types.ObjectId(glossaryId);
+    }
+
+    let searchQuery = { ...matchConditions };
+
+    if (q && q.trim() !== '') {
+      const trimmedQuery = q.trim();
+
+      const matchingGlossaries = await Glossary.find({
+        $or: [
+          { term: { $regex: trimmedQuery, $options: 'i' } },
+          { synonyms: { $regex: trimmedQuery, $options: 'i' } },
+          { $text: { $search: trimmedQuery } }
+        ]
+      }).select('_id').lean();
+
+      const matchingGlossaryIds = matchingGlossaries.map(g => g._id);
+
+      const textAndRegexConditions = [
+        { $text: { $search: trimmedQuery } },
+        { title: { $regex: trimmedQuery, $options: 'i' } },
+        { description: { $regex: trimmedQuery, $options: 'i' } },
+        { summary: { $regex: trimmedQuery, $options: 'i' } }
+      ];
+
+      if (matchingGlossaryIds.length > 0) {
+        textAndRegexConditions.push({ glossaryTerms: { $in: matchingGlossaryIds } });
+      }
+
+      searchQuery.$or = textAndRegexConditions;
+    }
+
+    const [articles, totalCount] = await Promise.all([
+      Article.find(searchQuery)
+        .select('_id title description summary imageUtils publishedDate lastUpdated viewCount likeCount tags glossaryTerms authorId authorName language')
+        .populate('tags', 'name slug')
+        .populate('glossaryTerms', 'term slug shortDescription definition')
+        .populate({
+          path: 'authorId',
+          select: 'user_name user_handle Profile_image',
+          match: {
+            isBlockUser: false,
+            isBannedUser: false
+          }
+        })
+        .sort({ lastUpdated: -1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .lean()
+        .exec(),
+      Article.countDocuments(searchQuery)
+    ]);
+
+    const validArticles = articles.filter(a => a.authorId !== null);
+
+    return res.status(200).json({
+      articles: validArticles,
+      pagination: {
+        totalArticles: totalCount,
+        currentPage: Number(page),
+        totalPages: Math.ceil(totalCount / Number(limit)),
+        limit: Number(limit)
+      }
+    });
+  } catch (error) {
+    console.error("Article Search Error:", error);
+    return res.status(500).json({ error: "Error searching articles", details: error.message });
+  }
+});
+
+module.exports.attachGlossaryToArticle = expressAsyncHandler(async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { glossaryIds } = req.body;
+
+    if (!glossaryIds || !Array.isArray(glossaryIds) || glossaryIds.length === 0) {
+      return res.status(400).json({ error: "glossaryIds must be a non-empty array of IDs" });
+    }
+
+    const article = await Article.findById(Number(id));
+    if (!article || article.is_removed) {
+      return res.status(404).json({ error: "Article not found" });
+    }
+
+    const validGlossaries = await Glossary.find({ _id: { $in: glossaryIds } });
+    if (validGlossaries.length === 0) {
+      return res.status(400).json({ error: "No valid glossary terms found for provided IDs" });
+    }
+
+    const validIds = validGlossaries.map(g => g._id);
+
+    const updatedArticle = await Article.findByIdAndUpdate(
+      Number(id),
+      { $addToSet: { glossaryTerms: { $each: validIds } } },
+      { new: true }
+    )
+      .populate('tags', 'name slug')
+      .populate('glossaryTerms', 'term slug shortDescription definition')
+      .lean();
+
+    return res.status(200).json({
+      message: "Glossary terms attached successfully",
+      article: updatedArticle
+    });
+  } catch (error) {
+    return res.status(500).json({ error: "Error attaching glossary terms", details: error.message });
+  }
+});
+
+module.exports.detachGlossaryFromArticle = expressAsyncHandler(async (req, res) => {
+  try {
+    const { id, glossaryId } = req.params;
+
+    const article = await Article.findById(Number(id));
+    if (!article || article.is_removed) {
+      return res.status(404).json({ error: "Article not found" });
+    }
+
+    const updatedArticle = await Article.findByIdAndUpdate(
+      Number(id),
+      { $pull: { glossaryTerms: glossaryId } },
+      { new: true }
+    )
+      .populate('tags', 'name slug')
+      .populate('glossaryTerms', 'term slug shortDescription definition')
+      .lean();
+
+    return res.status(200).json({
+      message: "Glossary term detached successfully",
+      article: updatedArticle
+    });
+  } catch (error) {
+    return res.status(500).json({ error: "Error detaching glossary term", details: error.message });
+  }
+});
+
+module.exports.getArticlesByGlossary = expressAsyncHandler(async (req, res) => {
+  try {
+    const { glossaryId } = req.params;
+    const { page = 1, limit = 10 } = req.query;
+
+    if (!mongoose.Types.ObjectId.isValid(glossaryId)) {
+      return res.status(400).json({ error: "Invalid glossary ID format" });
+    }
+
+    const skip = (Number(page) - 1) * Number(limit);
+    const query = {
+      glossaryTerms: glossaryId,
+      status: statusEnum.statusEnum.PUBLISHED,
+      is_removed: false
+    };
+
+    const [articles, totalArticles] = await Promise.all([
+      Article.find(query)
+        .select('_id title description summary imageUtils publishedDate lastUpdated viewCount likeCount tags glossaryTerms authorId authorName language')
+        .populate('tags', 'name slug')
+        .populate('glossaryTerms', 'term slug shortDescription')
+        .populate({
+          path: 'authorId',
+          select: 'user_name user_handle Profile_image',
+          match: { isBlockUser: false, isBannedUser: false }
+        })
+        .sort({ lastUpdated: -1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .lean()
+        .exec(),
+      Article.countDocuments(query)
+    ]);
+
+    const validArticles = articles.filter(a => a.authorId !== null);
+
+    return res.status(200).json({
+      articles: validArticles,
+      pagination: {
+        totalArticles,
+        currentPage: Number(page),
+        totalPages: Math.ceil(totalArticles / Number(limit)),
+        limit: Number(limit)
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({ error: "Error fetching articles for glossary", details: error.message });
+  }
+});
+
+module.exports.autoDetectGlossaryForArticle = expressAsyncHandler(async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const article = await Article.findById(Number(id));
+    if (!article || article.is_removed) {
+      return res.status(404).json({ error: "Article not found" });
+    }
+
+    const { glossaryIds, matchedTerms } = await detectGlossaryForArticle({
+      pb_recordId: article.pb_recordId,
+      content: article.content,
+      title: article.title,
+      description: article.description,
+      summary: article.summary
+    });
+
+    article.glossaryTerms = glossaryIds;
+    await article.save();
+
+    const populatedArticle = await Article.findById(Number(id))
+      .populate('tags', 'name slug')
+      .populate('glossaryTerms', 'term slug shortDescription definition')
+      .lean();
+
+    return res.status(200).json({
+      message: `Auto-detected ${glossaryIds.length} glossary terms successfully`,
+      detectedCount: glossaryIds.length,
+      matchedTerms,
+      article: populatedArticle
+    });
+  } catch (error) {
+    console.error("Auto-detect Glossary Error:", error);
+    return res.status(500).json({ error: "Error auto-detecting glossary terms", details: error.message });
+  }
+});
+
+module.exports.syncAllArticlesGlossary = expressAsyncHandler(async (req, res) => {
+  try {
+    const articles = await Article.find({
+      is_removed: false,
+      status: statusEnum.statusEnum.PUBLISHED
+    });
+
+    let updatedCount = 0;
+    const summary = [];
+
+    for (const article of articles) {
+      const { glossaryIds, matchedTerms } = await detectGlossaryForArticle({
+        pb_recordId: article.pb_recordId,
+        content: article.content,
+        title: article.title,
+        description: article.description,
+        summary: article.summary
+      });
+
+      article.glossaryTerms = glossaryIds;
+      await article.save();
+      updatedCount++;
+      summary.push({
+        articleId: article._id,
+        title: article.title,
+        detectedCount: glossaryIds.length,
+        terms: matchedTerms.map(t => t.term)
+      });
+    }
+
+    return res.status(200).json({
+      message: `Successfully synchronized glossary terms for ${updatedCount} articles`,
+      totalArticlesUpdated: updatedCount,
+      summary
+    });
+  } catch (error) {
+    console.error("Sync All Articles Glossary Error:", error);
+    return res.status(500).json({ error: "Error synchronizing glossary terms", details: error.message });
+  }
+});
+

@@ -13,7 +13,6 @@ const articleSchema = new Schema({
     type: String,
     require: true,
     default: null
-
   },
   title: {
     type: String,
@@ -29,17 +28,15 @@ const articleSchema = new Schema({
     required: true,
   },
   authorId: {
-    type: Schema.Types.ObjectId, // Reference to User
+    type: Schema.Types.ObjectId,
     required: true,
     ref: 'User'
   },
-  contributors:
-    [{
-      type: Schema.Types.ObjectId, // Reference to User ho edited the article
-      ref: 'User',
-      default: []
-    }],
-
+  contributors: [{
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    default: []
+  }],
   content: {
     type: String,
     required: true,
@@ -59,11 +56,15 @@ const articleSchema = new Schema({
     default: Date.now,
   },
   tags: {
-    type: [Schema.Types.ObjectId], // Reference to ArticleTag
+    type: [Schema.Types.ObjectId],
     ref: 'ArticleTag',
     default: []
   },
-
+  glossaryTerms: [{
+    type: Schema.Types.ObjectId,
+    ref: 'Glossary',
+    default: []
+  }],
   imageUtils: {
     type: [String],
     required: true,
@@ -78,7 +79,6 @@ const articleSchema = new Schema({
     required: true,
     default: 0,
   },
-
   language: {
     type: String,
     required: true,
@@ -118,18 +118,17 @@ const articleSchema = new Schema({
   },
   likedUsers: [{
     type: Schema.Types.ObjectId,
-    ref: 'User', // Reference to User
+    ref: 'User',
     default: []
   }],
-
   repostUsers: [{
     type: Schema.Types.ObjectId,
-    ref: 'User', // Reference to User
+    ref: 'User',
     default: []
   }],
   savedUsers: [{
     type: Schema.Types.ObjectId,
-    ref: 'User', // Reference to User
+    ref: 'User',
     default: []
   }],
   viewUsers: [{
@@ -142,19 +141,16 @@ const articleSchema = new Schema({
     ref: 'User',
     default: []
   }],
-
   trustUsers: [{
     type: Schema.Types.ObjectId,
     ref: 'User',
     default: []
   }],
-
   status: {
     type: String,
     enum: ['unassigned', 'in-progress', 'review-pending', 'published', 'discarded', 'awaiting-user', 'deleted'],
     default: 'unassigned'
   },
-
   assigned_date: {
     type: Date,
     default: null
@@ -164,20 +160,15 @@ const articleSchema = new Schema({
     ref: 'admin',
     default: null
   },
-
-  review_comments:
-    [{
-      type: Schema.Types.ObjectId,
-      ref: 'Comment',
-      default: []
-    }],
-
-
+  review_comments: [{
+    type: Schema.Types.ObjectId,
+    ref: 'Comment',
+    default: []
+  }],
   discardReason: {
     type: String,
     default: "Discarded by system"
   },
-
   is_removed: {
     type: Boolean,
     default: false
@@ -187,19 +178,13 @@ const articleSchema = new Schema({
     default: null,
     ref: "ReportAction"
   },
-
-
   allow_for_podcast: {
     type: Boolean,
     default: false
   },
-
 });
 
-
-// Apply pre hook, to check whether status deleted or not
 articleSchema.pre(/^find/, function (next) {
-  // this refers to current query
   this.find({
     status: {
       $ne: 'deleted'
@@ -208,9 +193,7 @@ articleSchema.pre(/^find/, function (next) {
   next();
 });
 
-// Apply to aggregation pipelines so soft-deleted articles don't show up in charts
 articleSchema.pre('aggregate', function (next) {
-  // this -> current query
   this.pipeline().unshift({
     $match: {
       status: {
@@ -221,8 +204,32 @@ articleSchema.pre('aggregate', function (next) {
   next();
 });
 
-// Apply the autoIncrement plugin to the schema
 articleSchema.plugin(AutoIncrement, { id: 'article_id_counter', inc_field: '_id' });
+
+articleSchema.index(
+  {
+    title: 'text',
+    description: 'text',
+    content: 'text',
+    summary: 'text',
+  },
+  {
+    weights: {
+      title: 10,
+      summary: 5,
+      description: 3,
+      content: 1,
+    },
+    name: 'ArticleFullTextIndex',
+  }
+);
+
+articleSchema.index({ glossaryTerms: 1, status: 1, is_removed: 1 });
+articleSchema.index({ status: 1, is_removed: 1, lastUpdated: -1 });
+articleSchema.index({ authorId: 1, is_removed: 1, status: 1 });
+articleSchema.index({ tags: 1, status: 1, is_removed: 1 });
+articleSchema.index({ pb_recordId: 1 });
+articleSchema.index({ reviewer_id: 1, is_removed: 1, status: 1 });
 
 const Article = mongoose.model('Article', articleSchema);
 

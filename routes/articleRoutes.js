@@ -1420,7 +1420,221 @@ router.post('/articles/trust', authenticateToken, articleController.trustArticle
  *       '500':
  *         description: Internal server error
  */
-router.get('/articles/trusted-users', articleController.getTrustedUsers); // need to protect the route
-router.get('/articles/read-history', authenticateToken, articleController.getReadingHistoriesOfUser); // need to be place in user route, later will replace
+router.get('/articles/trusted-users', articleController.getTrustedUsers);
+router.get('/articles/read-history', authenticateToken, articleController.getReadingHistoriesOfUser);
+
+/**
+ * @openapi
+ * /articles/search:
+ *   get:
+ *     summary: Full-text search for articles with glossary term enhancement
+ *     description: Search articles by keyword across title, description, summary, content, and attached glossary terms/synonyms.
+ *     tags:
+ *       - Articles
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         schema:
+ *           type: string
+ *         description: Search keyword
+ *       - in: query
+ *         name: tag
+ *         schema:
+ *           type: string
+ *         description: Filter by Tag ObjectId
+ *       - in: query
+ *         name: glossaryId
+ *         schema:
+ *           type: string
+ *         description: Filter by Glossary ObjectId
+ *       - in: query
+ *         name: language
+ *         schema:
+ *           type: string
+ *         description: Filter by language code
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *     responses:
+ *       '200':
+ *         description: List of matched articles
+ *       '400':
+ *         description: Missing query parameter
+ *       '500':
+ *         description: Internal server error
+ */
+router.get('/articles/search', articleController.searchArticles);
+
+/**
+ * @openapi
+ * /articles/glossary/{glossaryId}:
+ *   get:
+ *     summary: Get all articles associated with a glossary term
+ *     tags:
+ *       - Articles
+ *       - Glossary
+ *     parameters:
+ *       - in: path
+ *         name: glossaryId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Glossary ObjectId
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *     responses:
+ *       '200':
+ *         description: List of articles associated with the glossary term
+ *       '400':
+ *         description: Invalid glossary ID
+ *       '500':
+ *         description: Internal server error
+ */
+router.get('/articles/glossary/:glossaryId', articleController.getArticlesByGlossary);
+
+/**
+ * @openapi
+ * /articles/{id}/glossary:
+ *   post:
+ *     summary: Attach glossary terms to an article
+ *     tags:
+ *       - Articles
+ *       - Glossary
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Article ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - glossaryIds
+ *             properties:
+ *               glossaryIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Array of Glossary ObjectIds
+ *     responses:
+ *       '200':
+ *         description: Successfully attached glossary terms
+ *       '400':
+ *         description: Invalid request body
+ *       '401':
+ *         description: Unauthorized
+ *       '404':
+ *         description: Article not found
+ *       '500':
+ *         description: Internal server error
+ */
+router.post('/articles/:id/glossary', authenticateToken, articleController.attachGlossaryToArticle);
+
+/**
+ * @openapi
+ * /articles/{id}/glossary/{glossaryId}:
+ *   delete:
+ *     summary: Detach a glossary term from an article
+ *     tags:
+ *       - Articles
+ *       - Glossary
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Article ID
+ *       - in: path
+ *         name: glossaryId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Glossary ObjectId to detach
+ *     responses:
+ *       '200':
+ *         description: Successfully detached glossary term
+ *       '401':
+ *         description: Unauthorized
+ *       '404':
+ *         description: Article not found
+ *       '500':
+ *         description: Internal server error
+ */
+router.delete('/articles/:id/glossary/:glossaryId', authenticateToken, articleController.detachGlossaryFromArticle);
+
+/**
+ * @openapi
+ * /articles/{id}/auto-detect-glossary:
+ *   post:
+ *     summary: Trigger auto-detection of glossary terms for an article from its stored file / content
+ *     description: Scans the article file content against the medical glossary and automatically updates attached terms.
+ *     tags:
+ *       - Articles
+ *       - Glossary
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Article ID
+ *     responses:
+ *       '200':
+ *         description: Successfully auto-detected and linked glossary terms
+ *       '401':
+ *         description: Unauthorized
+ *       '404':
+ *         description: Article not found
+ *       '500':
+ *         description: Internal server error
+ */
+router.post('/articles/:id/auto-detect-glossary', authenticateToken, articleController.autoDetectGlossaryForArticle);
+
+/**
+ * @openapi
+ * /articles/sync-glossary-all:
+ *   post:
+ *     summary: Bulk re-scan and synchronize glossary terms across all published articles
+ *     tags:
+ *       - Articles
+ *       - Glossary
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       '200':
+ *         description: Successfully synchronized all published articles
+ *       '401':
+ *         description: Unauthorized
+ *       '500':
+ *         description: Internal server error
+ */
+router.post('/articles/sync-glossary-all', adminAuthenticateToken, articleController.syncAllArticlesGlossary);
 
 module.exports = router;
