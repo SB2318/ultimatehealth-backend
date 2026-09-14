@@ -47,6 +47,14 @@
 </table>
 </div>
 
+# Article & Podcast Query Analysis
+
+Currently analyzing the **Article** and **Podcast** data models to understand their real application use cases and query patterns.
+Based on the identified use cases, appropriate indexes and search strategies will be evaluated. (Deadline <17th September)
+
+**Current phase:** Use-case and query-pattern analysis
+**Next phase:** Index and search strategy design
+
 
 **The core backend engine** powering **[UltimateHealth](https://ultimatehealth.blog)** — a community-driven open-source health platform.
 
