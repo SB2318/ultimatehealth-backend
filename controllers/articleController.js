@@ -6,13 +6,13 @@ const EditRequest = require('../models/admin/articleEditRequestModel');
 const ReadAggregate = require("../models/events/readEventSchema");
 const WriteAggregate = require("../models/events/writeEventSchema");
 const statusEnum = require("../utils/StatusEnum");
-// const { sendArticleForReviewEmail } = require("./emailservice");
 const { publishContentEmailEvent, EMAIL_EVENT_TYPES } = require("../services/mqueue/producers/emailProducer");
 const { publishArticleAnalyticsEvent, ANALYTICS_EVENT_TYPES } = require("../services/mqueue/producers/analyticsProducer");
 const { getReadingHistory } = require("../services/db/articleService");
 const { throwError } = require("../utils/throwError");
 const { HTTP_STATUS, ERROR_CODES } = require("../constants/errorConstants");
 const mongoose = require('mongoose');
+const { extractPlainText, matchGlossaryTerms } = require('../utils/glossaryDetector');
 
 module.exports.createArticle = expressAsyncHandler(
   async (req, res) => {
@@ -1343,6 +1343,28 @@ module.exports.getTrustedUsers = expressAsyncHandler(
     } catch (err) {
       console.error(err);
       res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
+module.exports.suggestGlossaryForPreview = expressAsyncHandler(
+  async (req, res) => {
+    try {
+      const { htmlContent, title = '', description = '' } = req.body;
+      
+      if (!htmlContent) {
+        return res.status(400).json({ message: "htmlContent is required" });
+      }
+
+      const plainText = extractPlainText(htmlContent);
+      const combinedText = `${title} ${description} ${plainText}`;
+      
+      const suggestedTerms = await matchGlossaryTerms(combinedText);
+
+      res.status(200).json({ suggestedTerms });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Error suggesting glossary terms", details: error.message });
     }
   }
 );

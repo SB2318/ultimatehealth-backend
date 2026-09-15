@@ -1420,7 +1420,9 @@ router.post('/articles/trust', authenticateToken, articleController.trustArticle
  *       '500':
  *         description: Internal server error
  */
-router.get('/articles/trusted-users', articleController.getTrustedUsers); // need to protect the route
-router.get('/articles/read-history', authenticateToken, articleController.getReadingHistoriesOfUser); // need to be place in user route, later will replace
+router.get('/articles/trusted-users', articleController.getTrustedUsers);
+router.get('/articles/read-history', authenticateToken, articleController.getReadingHistoriesOfUser);
+
+router.post('/articles/preview/suggest-glossary', authenticateToken, articleController.suggestGlossaryForPreview);
 
 module.exports = router;
