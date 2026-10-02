@@ -11,9 +11,14 @@ const User = require("../../models/UserModel");
 const UnverifiedUser = require('../../models/UnverifiedUserModel');
 const { deleteFileFn } = require('../uploadController');
 const {
+  generateAccessToken,
   generateRefreshToken,
-  generateVerificationToken
+  generateVerificationToken,
+  revokeRefreshToken,
+  blacklistAccessToken,
+  revokeAllUserTokens,
 } = require("../../services/security/tokenService");
+const redis = require("../../config/redis");
 
 
 module.exports.register = expressAsyncHandler(
@@ -133,27 +138,28 @@ module.exports.login = expressAsyncHandler(
         return res.status(401).json({ error: "Invalid password" });
       }
 
-      // Blacklist the token
-      if (user.refreshToken != null) {
-        const blacklistedToken = new BlacklistedToken({ token: user.refreshToken });
-        await blacklistedToken.save();
+      let tokenVersion = await redis.get(`user_token_version:${user._id}`);
+      if (tokenVersion === null) {
+        tokenVersion = 0;
+        await redis.set(`user_token_version:${user._id}`, 0);
       }
-    
-      // Generate Refresh Token
-      const refreshToken = generateRefreshToken({
+
+      const { accessToken } = generateAccessToken({
         userId: user._id,
         email: user.email,
-        role: 'admin'
+        role: 'admin',
+        tokenVersion: parseInt(tokenVersion, 10),
       });
 
-      // Store refresh token in the database
-      user.refreshToken = refreshToken;
+      const { refreshToken, jti } = await generateRefreshToken(user._id, {
+        userId: user._id,
+        email: user.email,
+        role: 'admin',
+      });
+
       user.fcmToken = fcmToken;
       await user.save();
 
-      // Set cookies for tokens
-      // res.cookie("accessToken", accessToken, { httpOnly: true, maxAge: 900000 }); // 15 minutes
-      
       res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
@@ -163,19 +169,22 @@ module.exports.login = expressAsyncHandler(
 
       res.status(200).json({
         message: "Login Successful",
+        accessToken,
+        refreshToken,
         user: {
           _id: user._id,
           email: user.email,
           user_name: user.user_name,
           user_handle: user.user_handle,
           isVerified: user.isVerified,
+          role: 'admin',
         }
       });
     } catch (error) {
       console.log("Login Error", error);
 
       if (error.name === "ValidationError") {
-        return res.status(400).json({ error: error.message }); // Validation errors
+        return res.status(400).json({ error: error.message });
       } else {
         return res.status(500).json({ error: "Internal server error" });
       }
@@ -186,35 +195,18 @@ module.exports.login = expressAsyncHandler(
 module.exports.logout = expressAsyncHandler(
   async (req, res) => {
     try {
-      // Find the admin and remove the refresh token
-      const user = await admin.findById(req.userId);
-
-      if (user) {
-        // Get access token from request (used for authentication)
-        const accessToken = req.cookies.accessToken || req.headers['authorization']?.split(' ')[1];
-
-        // Blacklist both access and refresh tokens
-        const tokensToBlacklist = [];
-
-        if (accessToken) {
-          tokensToBlacklist.push({ token: accessToken });
-        }
-
-        if (user.refreshToken) {
-          tokensToBlacklist.push({ token: user.refreshToken });
-        }
-
-        // Bulk insert blacklisted tokens
-        if (tokensToBlacklist.length > 0) {
-          await BlacklistedToken.insertMany(tokensToBlacklist);
-        }
-
-        // Clear refresh token from admin document
-        user.refreshToken = null;
-        await user.save();
+      if (req.tokenJti && req.tokenExp) {
+        await blacklistAccessToken(req.tokenJti, req.tokenExp);
       }
 
-      // Clear cookies
+      const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
+      if (refreshToken) {
+        const decoded = require('jsonwebtoken').decode(refreshToken);
+        if (decoded?.jti && decoded?.userId) {
+          await revokeRefreshToken(decoded.userId, decoded.jti);
+        }
+      }
+
       res.clearCookie("accessToken");
       res.clearCookie("refreshToken");
 

@@ -58,6 +58,7 @@ const { globalLimiter } = require('./middleware/ratelimit');
 
 const app = express();
 dotenv.config();
+require('./config/env');
 db.dbConnect();
 connectProducer(); // Connect the Kafka producer to the Kafka cluster
 initKafkaTopics().then(() => {
