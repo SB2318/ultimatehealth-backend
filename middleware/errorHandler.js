@@ -11,7 +11,7 @@ function isAppError(err) {
   );
 }
 
-// ── Error Handler ──────────────────────────────────────────
+// Error Handler
 
 function errorHandler(err, req, res, _next) {
   let statusCode = 500;
@@ -19,7 +19,7 @@ function errorHandler(err, req, res, _next) {
   let message = "Internal server error";
   let details = undefined;
 
-  // ── Mongoose: ValidationError ────────────────────────────
+  //  Mongoose: ValidationError 
   if (err instanceof mongoose.Error.ValidationError) {
     statusCode = 400;
     code = "VALIDATION_ERROR";
@@ -31,14 +31,14 @@ function errorHandler(err, req, res, _next) {
     }));
   }
 
-  // ── Mongoose: CastError ──────────────────────────────────
+  //  Mongoose: CastError 
   else if (err instanceof mongoose.Error.CastError) {
     statusCode = 400;
     code = "INVALID_ID";
     message = `Invalid ${err.path}`;
   }
 
-  // ── MongoDB: Duplicate Key ───────────────────────────────
+  //  MongoDB: Duplicate Key 
   else if (err.code === 11000) {
     statusCode = 409;
     code = "DUPLICATE_RESOURCE";
@@ -47,7 +47,7 @@ function errorHandler(err, req, res, _next) {
     message = `${field} already exists`;
   }
 
-  // ── Custom App Error ─────────────────────────────────────
+  //  Custom App Error 
   else if (isAppError(err)) {
     statusCode = err.statusCode;
     code = err.code;
@@ -55,7 +55,7 @@ function errorHandler(err, req, res, _next) {
     details = err.details;
   }
 
-  // ── Fallback ─────────────────────────────────────────────
+  //  Fallback 
   else {
     // Optional dev debug
     // if (process.env.NODE_ENV === "development") {
@@ -68,7 +68,7 @@ function errorHandler(err, req, res, _next) {
     console.error(err);
   }
   
-  // ── Production Safety ────────────────────────────────────
+  //  Production Safety
   if (process.env.NODE_ENV === "PRODUCTION" && !isAppError(err)) {
     message = "Internal server error";
     details = undefined;

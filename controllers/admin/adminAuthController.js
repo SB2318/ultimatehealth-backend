@@ -11,10 +11,15 @@ const User = require("../../models/UserModel");
 const UnverifiedUser = require('../../models/UnverifiedUserModel');
 const { deleteFileFn } = require('../uploadController');
 const {
+  generateAccessToken,
   generateRefreshToken,
+  revokeRefreshToken,
+  blacklistAccessToken,
+  revokeAllUserTokens,
   generateVerificationToken
 } = require("../../services/security/tokenService");
 
+const redis = require("../../config/redis");
 
 module.exports.register = expressAsyncHandler(
   async (req, res) => {
