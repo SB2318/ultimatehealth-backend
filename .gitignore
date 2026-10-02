@@ -20,3 +20,4 @@ assetlink.json
 test.js
 #public/assets/
 useSocket.txt
+keys/private.pem
