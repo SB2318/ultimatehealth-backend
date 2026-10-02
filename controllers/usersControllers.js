@@ -1,5 +1,6 @@
 
 const expressAsyncHandler = require("express-async-handler");
+const jwt = require("jsonwebtoken");
 const User = require("../models/UserModel");
 const ArticleTag = require("../models/ArticleModel");
 const {
@@ -52,13 +53,19 @@ const {
   findArticleById,
   getArticleContributors,
 } = require("../services/db/articleService");
+const redis = require("../config/redis");
+const { sendVerificationEmail } = require("./emailservice");
 
 const {
   generateAccessToken,
   verifyToken,
   generateRefreshToken,
+  verifyRefreshToken,
   generateOtp,
   hashToken,
+  blacklistAccessToken,
+  revokeRefreshToken,
+  revokeAllUserTokens
 } = require("../services/security/tokenService");
 const {
   isSamePassword,
@@ -183,18 +190,20 @@ module.exports.login = expressAsyncHandler(async (req, res) => {
     "7d",
   );
 
+
+
   await loginUser(user._id, refreshToken, jti, fcmToken);
 
   console.log("Login Request Headers:", req.headers);
   console.log("X-Client-Type received:", req.headers['x-client-type']);
 
   const userAgent = req.headers['user-agent']?.toLowerCase() || '';
-  const isMobile = req.headers['x-client-type']?.toLowerCase() === 'mobile' || 
-                   userAgent.includes('okhttp') || 
-                   userAgent.includes('dart') ||
-                   userAgent.includes('alamofire') ||
-                   userAgent.includes('cfnetwork');
-                   
+  const isMobile = req.headers['x-client-type']?.toLowerCase() === 'mobile' ||
+    userAgent.includes('okhttp') ||
+    userAgent.includes('dart') ||
+    userAgent.includes('alamofire') ||
+    userAgent.includes('cfnetwork');
+
   console.log("isMobile evaluated to:", isMobile);
 
   if (!isMobile) {
@@ -206,9 +215,17 @@ module.exports.login = expressAsyncHandler(async (req, res) => {
     });
   }
 
+  // Fetch token version from redis
+  let tokenVersion = await redis.get(`user_token_version:${user._id}`);
+  if (tokenVersion === null) {
+    tokenVersion = 0;
+    await redis.set(`user_token_version:${user._id}`, 0);
+  }
+
   const accessToken = generateAccessToken({
     userId: user._id,
     role: user.isDoctor ? "doctor" : "user",
+    tokenVersion: parseInt(tokenVersion, 10),
   });
 
   const responsePayload = {
@@ -230,7 +247,7 @@ module.exports.login = expressAsyncHandler(async (req, res) => {
   return sendSuccess(res, HTTP_STATUS.OK, "Login successful", responsePayload);
 });
 
-// ─── Google Sign-In / Sign-Up ────────────────────────────────────────────────
+//Google Sign-In / Sign-Up
 // Single endpoint for both Google login and Google registration.
 // Google users are NOT auto-verified — they go through the same email
 // verification flow as regular users.
@@ -249,7 +266,7 @@ module.exports.googleAuth = expressAsyncHandler(async (req, res) => {
     fcmToken,
   } = req.validateBody;
 
-  // ── Case 1: Verified user already exists → Log them in ───────────────────
+  // Case 1: Verified user already exists → Log them in
   const existingVerifiedUser = await findUserByEmail(email);
 
   if (existingVerifiedUser) {
@@ -278,9 +295,16 @@ module.exports.googleAuth = expressAsyncHandler(async (req, res) => {
 
     await loginUser(existingVerifiedUser._id, refreshToken, jti, fcmToken ?? null);
 
+    let tokenVersion = await redis.get(`user_token_version:${existingVerifiedUser._id}`);
+    if (tokenVersion === null) {
+      tokenVersion = 0;
+      await redis.set(`user_token_version:${existingVerifiedUser._id}`, 0);
+    }
+
     const accessToken = generateAccessToken({
       userId: existingVerifiedUser._id,
       role: existingVerifiedUser.isDoctor ? ROLES.DOCTOR : ROLES.USER,
+      tokenVersion: parseInt(tokenVersion, 10),
     });
 
     const isMobile = req.headers['x-client-type']?.toLowerCase() === 'mobile';
@@ -302,7 +326,7 @@ module.exports.googleAuth = expressAsyncHandler(async (req, res) => {
     return sendSuccess(res, HTTP_STATUS.OK, "Login successful", payload);
   }
 
-  // ── Case 2: Unverified user exists → Gate them ───────────────────────────
+  // Case 2: Unverified user exists → Gate them 
   const unverifiedUser = await findUnverifiedUserByEmail(email);
 
   if (unverifiedUser) {
@@ -313,7 +337,7 @@ module.exports.googleAuth = expressAsyncHandler(async (req, res) => {
     );
   }
 
-  // ── Case 3: Fresh registration ────────────────────────────────────────────
+  // Case 3: Fresh registration
 
   // Auto-generate a unique user_handle if not provided
   let finalUserHandle = user_handle;
@@ -374,7 +398,6 @@ module.exports.googleAuth = expressAsyncHandler(async (req, res) => {
 
   // Send verification email (same as the normal registration flow)
   if (process.env.NODE_ENV === "production") {
-    const { sendVerificationEmail } = require("./emailservice");
     await sendVerificationEmail(email, verificationToken, false);
   }
 
@@ -385,7 +408,6 @@ module.exports.googleAuth = expressAsyncHandler(async (req, res) => {
   );
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
 
 module.exports.getprofile = expressAsyncHandler(async (req, res) => {
   const user = await getMyProfile(req.user.userId);
@@ -462,76 +484,76 @@ module.exports.checkUserHandle = expressAsyncHandler(async (req, res) => {
 
 module.exports.sendOTPForForgotPassword = expressAsyncHandler(
   async (req, res) => {
-      const { email } = req.validateBody;
+    const { email } = req.validateBody;
 
-      const [user, admin] = await Promise.all([
-        findUserByEmail(email),
-        findAdminByEmail(email),
-      ]);
+    const [user, admin] = await Promise.all([
+      findUserByEmail(email),
+      findAdminByEmail(email),
+    ]);
 
-      const account = user || admin;
+    const account = user || admin;
 
-      // Always return same message for enumeration protection
-      const successMessage =
-        "If an account exists, OTP has been sent to your email.";
+    // Always return same message for enumeration protection
+    const successMessage =
+      "If an account exists, OTP has been sent to your email.";
 
-        console.log("Account found:", account);
-      if (!account) {
-        return sendSuccess(res, HTTP_STATUS.OK, successMessage);
-      }
-      if (account.isBlockUser || account.isBannedUser) {
-        return sendSuccess(res, HTTP_STATUS.OK, successMessage);
-      }
+    console.log("Account found:", account);
+    if (!account) {
+      return sendSuccess(res, HTTP_STATUS.OK, successMessage);
+    }
+    if (account.isBlockUser || account.isBannedUser) {
+      return sendSuccess(res, HTTP_STATUS.OK, successMessage);
+    }
 
-      if (admin && !admin.isVerified) {
-        return sendSuccess(res, HTTP_STATUS.OK, successMessage);
-      }
+    if (admin && !admin.isVerified) {
+      return sendSuccess(res, HTTP_STATUS.OK, successMessage);
+    }
 
-      // Rate limit resend (example: 60 sec)
-      const cooldownMs = Number(process.env.OTP_RESEND_COOLDOWN_SECONDS) * 1000;
-      if (
-        account.otpLastSentAt &&
-        Date.now() - new Date(account.otpLastSentAt).getTime() < cooldownMs
-      ) {
-        console.log(`OTP resend requested too soon for ${email}`);
+    // Rate limit resend (example: 60 sec)
+    const cooldownMs = Number(process.env.OTP_RESEND_COOLDOWN_SECONDS) * 1000;
+    if (
+      account.otpLastSentAt &&
+      Date.now() - new Date(account.otpLastSentAt).getTime() < cooldownMs
+    ) {
+      console.log(`OTP resend requested too soon for ${email}`);
+      throwError(
+        429,
+        "TOO_MANY_REQUESTS",
+        "Please wait before requesting a new OTP."
+      );
+    }
+
+    const otp = generateOtp(); // 6 digit
+    const hashedOtp = await hashToken(otp);
+    const otpExpires = new Date(
+      Date.now() + Number(process.env.OTP_EXPIRY_MINUTES) * 60 * 1000,
+    );
+
+    const updatePayload = {
+      otp: hashedOtp,
+      otpExpires,
+      otpLastSentAt: new Date(),
+      otpAttempts: 0,
+    };
+
+    if (process.env.NODE_ENV === "production") {
+      const result = await sendOtpMail(email, otp);
+
+      if (!result) {
         throwError(
-          429,
-          "TOO_MANY_REQUESTS",
-          "Please wait before requesting a new OTP."
+          HTTP_STATUS.INTERNAL_SERVER_ERROR,
+          ERROR_CODES.INTERNAL_ERROR,
+          "Failed to send OTP email",
         );
       }
+    }
 
-      const otp = generateOtp(); // 6 digit
-      const hashedOtp = await hashToken(otp);
-      const otpExpires = new Date(
-        Date.now() + Number(process.env.OTP_EXPIRY_MINUTES) * 60 * 1000,
-      );
-
-      const updatePayload = {
-        otp: hashedOtp,
-        otpExpires,
-        otpLastSentAt: new Date(),
-        otpAttempts: 0,
-      };
-
-      if (process.env.NODE_ENV === "production") {
-        const result = await sendOtpMail(email, otp);
-
-        if (!result) {
-          throwError(
-            HTTP_STATUS.INTERNAL_SERVER_ERROR,
-            ERROR_CODES.INTERNAL_ERROR,
-            "Failed to send OTP email",
-          );
-        }
-      }
-
-      if (user) {
-        await updateUserOtp(user._id, updatePayload);
-      } else {
-        await updateAdminOtp(admin._id, updatePayload);
-      }
-      sendSuccess(res, HTTP_STATUS.OK, successMessage);
+    if (user) {
+      await updateUserOtp(user._id, updatePayload);
+    } else {
+      await updateAdminOtp(admin._id, updatePayload);
+    }
+    sendSuccess(res, HTTP_STATUS.OK, successMessage);
   },
 );
 
@@ -614,7 +636,7 @@ module.exports.verifyOtpForForgotPassword = expressAsyncHandler(
       );
     }
     if (user) {
-      await updateUserPasswordAndClearOtp(account._id,newPassword);
+      await updateUserPasswordAndClearOtp(account._id, newPassword);
     } else {
       await updateAdminPasswordAndClearOtp(account._id, newPassword);
     }
@@ -626,23 +648,26 @@ module.exports.verifyOtpForForgotPassword = expressAsyncHandler(
 module.exports.logout = expressAsyncHandler(async (req, res) => {
   const { userId, role } = req.user;
   console.log("Logging out userId:", userId, "role:", role);
-  if (role === ROLES.DOCTOR || role === ROLES.USER) {
-    await logoutUser(userId);
-  }
-  if(role === ROLES.ADMIN){
-    await logoutAdmin(userId);
+  // if (role === ROLES.DOCTOR || role === ROLES.USER) {
+  //   await logoutUser(userId);
+  // }
+  // if (role === ROLES.ADMIN) {
+  //   await logoutAdmin(userId);
+  // }
+
+  if (req.tokenJti && req.tokenExp) {
+    await blacklistAccessToken(req.tokenJti, req.tokenExp);
   }
 
-  res.clearCookie("refreshToken", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-  });
-    res.clearCookie("accessToken", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-  });
+  if (req.body.refreshToken) {
+    const decoded = jwt.decode(req.body.refreshToken);
+    if (decoded?.jti && decoded?.userId) {
+      await revokeRefreshToken(decoded.userId, decoded.jti);
+    }
+  }
+
+  res.clearCookie("refreshToken");
+  res.clearCookie("accessToken");
 
   return sendSuccess(
     res,
@@ -662,46 +687,32 @@ module.exports.refreshToken = expressAsyncHandler(async (req, res) => {
     );
   }
   // Verify the refresh token
-  const decoded = verifyToken(refreshToken);
+  const decoded = await verifyRefreshToken(refreshToken);
+  // Revoke refresh token from redis
+  await revokeRefreshToken(decoded.userId, decoded.jti);
 
-  const user = await User.findById(decoded.userId);
-  if (!user) {
-    throwError(
-      HTTP_STATUS.FORBIDDEN,
-      ERROR_CODES.ACCESS_DENIED,
-      "Invalid refresh token",
-    );
-  }
+  const tokenVersion = (await redis.get(`user_token_version:${decoded.userId}`)) || 0;
 
-  const newAccessToken = generateAccessToken(
-    { userId: user._id, email: user.email, role: "user" },
-    "15m",
-  );
-  const { refreshToken: newRefreshToken, jti } = generateRefreshToken(
-    { userId: user._id, email: user.email, role: "user" },
-    "7d",
-  );
 
-  const hashedRefreshToken = await hashToken(newRefreshToken);
-  user.refreshToken = { hashedRefreshToken, jti };
-  await user.save();
-
-  res.cookie("accessToken", newAccessToken, {
-    httpOnly: true,
-    maxAge: 900000,
-  }); // 15 minutes
-  res.cookie("refreshToken", newRefreshToken, {
-    httpOnly: true,
-    maxAge: 604800000,
-  }); // 7 days
+  //  Issue NEW Access Token
+  const { accessToken: newAccessToken } = generateAccessToken({
+    userId: decoded.userId,
+    role: decoded.role,
+    tokenVersion: parseInt(tokenVersion, 10),
+  });
+  //  Issue NEW Refresh Token (Stores new JTI in Redis)
+  const { refreshToken: newRefreshToken } = await generateRefreshToken(decoded.userId, {
+    role: decoded.role,
+  });
 
   sendSuccess(res, HTTP_STATUS.OK, "Refresh token generated successfully", {
     accessToken: newAccessToken,
     refreshToken: newRefreshToken,
   });
+
 });
 
-// ── Soft Delete (Deactivate) ────────────────────────────────────────────────
+//  Soft Delete (Deactivate) 
 module.exports.softDeleteByUser = expressAsyncHandler(async (req, res) => {
   const { password } = req.body;
   const { userId } = req.user;
@@ -750,7 +761,7 @@ module.exports.softDeleteByUser = expressAsyncHandler(async (req, res) => {
   );
 });
 
-// ── Hard Delete ────────────────────────────────────────────────────────────
+//  Hard Delete
 module.exports.hardDeleteByUser = expressAsyncHandler(async (req, res) => {
   const { password } = req.body;
   const { userId } = req.user;
@@ -1205,7 +1216,7 @@ module.exports.updateUserContactDetails = expressAsyncHandler(
         phone_no: phone,
       },
     });
-    
+
     if (!updatedUserContactDetailsById) {
 
       throwError(

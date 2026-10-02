@@ -1,7 +1,7 @@
 version: "3.8"
 services:
   # ─────────────────────────────────────────────
-  # 🚀 UltimateHealth Node.js API
+  #  UltimateHealth Node.js API
   # ─────────────────────────────────────────────
   api:
     build: .
@@ -34,8 +34,8 @@ services:
       kafka2:
         condition: service_healthy
     volumes:
-       - ./ultimatehealth-firebase-adminsdk.json:/usr/src/app/ultimatehealth-firebase-adminsdk.json:ro
-
+      - ./ultimatehealth-firebase-adminsdk.json:/usr/src/app/ultimatehealth-firebase-adminsdk.json:ro
+      - ./keys:/usr/src/app/keys:ro
 
   mongodb:
     image: mongo:6.0
@@ -51,7 +51,6 @@ services:
       timeout: 10s
       retries: 5
       start_period: 20s
-
 
   kafka1:
     image: apache/kafka:latest
@@ -69,7 +68,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"
+          "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1",
         ]
       interval: 15s
       timeout: 10s
@@ -108,7 +107,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"
+          "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1",
         ]
       interval: 15s
       timeout: 10s
@@ -145,8 +144,23 @@ services:
     volumes:
       - pb_data:/pb/pb_data
 
+  redis:
+    image: redis:7-alpine
+    container_name: ultimatehealth-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   kafka1-data:
   kafka2-data:
   mongodb_data:
   pb_data:
+  redis_data:

@@ -1,12 +1,6 @@
-// moderator registration
-// moderator verification
-// moderator and admin login
-// moderator and admin logout
-// moderator account deletion
 const bcrypt = require("bcrypt");
 const expressAsyncHandler = require("express-async-handler");
 const admin = require('../../models/admin/adminModel')
-const BlacklistedToken = require('../../models/blackListedToken');
 const User = require("../../models/UserModel");
 const UnverifiedUser = require('../../models/UnverifiedUserModel');
 const { deleteFileFn } = require('../uploadController');
@@ -19,7 +13,6 @@ const {
   revokeAllUserTokens,
 } = require("../../services/security/tokenService");
 const redis = require("../../config/redis");
-
 
 module.exports.register = expressAsyncHandler(
   async (req, res) => {

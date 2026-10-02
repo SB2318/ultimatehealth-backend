@@ -40,7 +40,6 @@ loadKeys();
 
 const getSignSecret = (type = "access") => {
     if (privateKey) return { key: privateKey, algorithm: "RS256" };
-    
     if (type === "access") return { key: process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || "fallback_access_secret", algorithm: "HS256" };
     if (type === "refresh") return { key: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || "fallback_refresh_secret", algorithm: "HS256" };
     if (type === "verification") return { key: process.env.JWT_VERIFICATION_SECRET || process.env.JWT_SECRET || "fallback_verification_secret", algorithm: "HS256" };
@@ -57,8 +56,8 @@ const generateJti = () => crypto.randomUUID();
 const generateAccessToken = (payload, expiresIn) => {
     const expiry = expiresIn || process.env.JWT_ACCESS_EXPIRY || "15m";
     const { key, algorithm } = getSignSecret("access");
-
     const jti = generateJti();
+
     const accessToken = jwt.sign(
         { ...payload, type: "access", jti },
         key,
@@ -125,6 +124,10 @@ const verifyAccessToken = async (token) => {
             audience: AUDIENCE,
         });
 
+        if (decoded.type !== "access") {
+            throwError(HTTP_STATUS.UNAUTHORIZED, ERROR_CODES.UNAUTHORIZED_ACCESS, "Invalid token type");
+        }
+
         try {
             const isBlacklisted = await redis.exists(`blacklist:${decoded.jti}`);
             if (isBlacklisted) {
@@ -142,6 +145,11 @@ const verifyAccessToken = async (token) => {
         return decoded;
     } catch (err) {
         if (err.status) throw err;
+        if (err.name === "TokenExpiredError") {
+            throwError(HTTP_STATUS.UNAUTHORIZED, ERROR_CODES.UNAUTHORIZED_ACCESS, "Token has expired");
+        } else if (err.name === "JsonWebTokenError") {
+            throwError(HTTP_STATUS.UNAUTHORIZED, ERROR_CODES.UNAUTHORIZED_ACCESS, "Invalid token");
+        }
         throwError(HTTP_STATUS.UNAUTHORIZED, ERROR_CODES.UNAUTHORIZED_ACCESS, "Invalid or expired access token");
     }
 };
@@ -162,7 +170,6 @@ const verifyRefreshToken = async (token) => {
         try {
             const exists = await redis.exists(`refresh_token:${decoded.userId}:${decoded.jti}`);
             if (!exists) {
-                // If Redis has records, enforce check
                 const keys = await redis.keys(`refresh_token:${decoded.userId}:*`);
                 if (keys.length > 0) {
                     throwError(HTTP_STATUS.UNAUTHORIZED, ERROR_CODES.UNAUTHORIZED_ACCESS, "Refresh token revoked or used");
@@ -262,5 +269,5 @@ module.exports = {
     blacklistAccessToken,
     revokeAllUserTokens,
     verifyToken,
-    hashToken
+    hashToken,
 };

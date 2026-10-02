@@ -36,6 +36,11 @@ const {
 
 const {
   generateAccessToken,
+  generateRefreshToken,
+  verifyRefreshToken,
+  revokeRefreshToken,
+  blacklistAccessToken,
+  revokeAllUserTokens,
   verifyToken,
   generateOtp,
   hashToken,
@@ -51,6 +56,7 @@ const { verifyUser } = require("../../middleware/authMiddleware");
 const { throwError } = require("../../utils/throwError");
 const { sendSuccess } = require("../../utils/response");
 const { HTTP_STATUS, ERROR_CODES } = require("../../constants/errorConstants");
+const redis = require("../../config/redis");
 
 module.exports.register = expressAsyncHandler(async (req, res) => {
   const {
@@ -245,52 +251,52 @@ module.exports.sendOTPForForgotPassword = expressAsyncHandler(
 );
 
 module.exports.verifyOtpForForgotPassword = expressAsyncHandler(
-    async (req, res) => {
-        const { email, otp, newPassword } = req.body
+  async (req, res) => {
+    const { email, otp, newPassword } = req.body
 
-        if (!email || !otp || !newPassword) {
-            throwError(
-                HTTP_STATUS.BAD_REQUEST,
-                ERROR_CODES.VALIDATION_ERROR,
-                'Email, OTP, and new password are required.'
-            )
-        }
-
-        const user = await findUserByEmail(email)
-        if (!user) {
-            throwError(
-                HTTP_STATUS.NOT_FOUND,
-                ERROR_CODES.RESOURCE_NOT_FOUND,
-                'User not found'
-            )
-        }
-
-        // Verify OTP
-        const hashedInput = await hashToken(otp)
-        if (hashedInput !== user.otp || user.otpExpires < Date.now()) {
-            throwError(
-                HTTP_STATUS.BAD_REQUEST,
-                ERROR_CODES.VALIDATION_ERROR,
-                'Invalid or expired OTP.'
-            )
-        }
-
-        const isPasswordSame = await isSamePassword(user.password, newPassword)
-        if (isPasswordSame) {
-            throwError(
-                HTTP_STATUS.BAD_REQUEST,
-                ERROR_CODES.VALIDATION_ERROR,
-                'New password should not be same as old password.'
-            )
-        }
-
-        // Clear used OTP
-        await updateUserOtp(user, null, null)
-
-        await updateUserPassword(user, newPassword)
-
-        sendSuccess(res, HTTP_STATUS.OK, 'Password reset successful.')
+    if (!email || !otp || !newPassword) {
+      throwError(
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR,
+        'Email, OTP, and new password are required.'
+      )
     }
+
+    const user = await findUserByEmail(email)
+    if (!user) {
+      throwError(
+        HTTP_STATUS.NOT_FOUND,
+        ERROR_CODES.RESOURCE_NOT_FOUND,
+        'User not found'
+      )
+    }
+
+    // Verify OTP
+    const hashedInput = await hashToken(otp)
+    if (hashedInput !== user.otp || user.otpExpires < Date.now()) {
+      throwError(
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR,
+        'Invalid or expired OTP.'
+      )
+    }
+
+    const isPasswordSame = await isSamePassword(user.password, newPassword)
+    if (isPasswordSame) {
+      throwError(
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR,
+        'New password should not be same as old password.'
+      )
+    }
+
+    // Clear used OTP
+    await updateUserOtp(user, null, null)
+
+    await updateUserPassword(user, newPassword)
+
+    sendSuccess(res, HTTP_STATUS.OK, 'Password reset successful.')
+  }
 );
 
 module.exports.checkOtp = expressAsyncHandler(async (req, res) => {
@@ -330,136 +336,147 @@ module.exports.checkOtp = expressAsyncHandler(async (req, res) => {
 });
 
 module.exports.login = expressAsyncHandler(async (req, res) => {
-    const { email, password, fcmToken } = req.body;
+  const { email, password, fcmToken } = req.body;
 
-    if (!email || !password || !fcmToken) {
-      throwError(
-        HTTP_STATUS.BAD_REQUEST,
-        ERROR_CODES.VALIDATION_ERROR,
-        "Please provide email and password and FCM Token",
-      );
-    }
+  if (!email || !password || !fcmToken) {
+    throwError(
+      HTTP_STATUS.BAD_REQUEST,
+      ERROR_CODES.VALIDATION_ERROR,
+      "Please provide email and password and FCM Token",
+    );
+  }
 
-    let user = await findUserByEmail(email);
+  let user = await findUserByEmail(email);
 
+  if (!user) {
+    user = await findUnverifiedUserByEmail(email);
     if (!user) {
-      user = await findUnverifiedUserByEmail(email);
-      if (!user) {
-        throwError(
-          HTTP_STATUS.NOT_FOUND,
-          ERROR_CODES.RESOURCE_NOT_FOUND,
-          "User not found",
-        );
-      }
       throwError(
-        HTTP_STATUS.FORBIDDEN,
-        ERROR_CODES.ACCESS_DENIED,
-        "Email not verified. Please check your email.",
+        HTTP_STATUS.NOT_FOUND,
+        ERROR_CODES.RESOURCE_NOT_FOUND,
+        "User not found",
       );
     }
-
-    if (!user.isVerified) {
-      throwError(
-        HTTP_STATUS.FORBIDDEN,
-        ERROR_CODES.ACCESS_DENIED,
-        "Email not verified. Please check your email.",
-      );
-    }
-
-    if (user.isBannedUser || user.isBlockUser) {
-      throwError(
-        HTTP_STATUS.FORBIDDEN,
-        ERROR_CODES.ACCESS_DENIED,
-        "User is banned or blocked",
-      );
-    }
-
-    const isPasswordValid =  await isSamePassword(password, user.password);
-    if (!isPasswordValid) {
-      throwError(
-        HTTP_STATUS.UNAUTHORIZED,
-        ERROR_CODES.ACCESS_DENIED,
-        "Invalid password",
-      );
-    }
-
-    // Blacklist the token
-    if (user.refreshToken != null) {
-      await blackListToken(user.refreshToken);
-    }
-
-    // Generate JWT Access Token
-    const accessToken = generateAccessToken(
-      { userId: user._id, email: user.email, role: "user" },
-      "15m",
+    throwError(
+      HTTP_STATUS.FORBIDDEN,
+      ERROR_CODES.ACCESS_DENIED,
+      "Email not verified. Please check your email.",
     );
+  }
 
-    // Generate Refresh Token
-    const refreshToken = generateAccessToken(
-      { userId: user._id, email: user.email, role: "user" },
-      "7d",
+  if (!user.isVerified) {
+    throwError(
+      HTTP_STATUS.FORBIDDEN,
+      ERROR_CODES.ACCESS_DENIED,
+      "Email not verified. Please check your email.",
     );
+  }
 
-    await loginUser(user, refreshToken, fcmToken);
+  if (user.isBannedUser || user.isBlockUser) {
+    throwError(
+      HTTP_STATUS.FORBIDDEN,
+      ERROR_CODES.ACCESS_DENIED,
+      "User is banned or blocked",
+    );
+  }
 
-    const userAgent = req.headers['user-agent']?.toLowerCase() || '';
-    const isMobile = req.headers['x-client-type']?.toLowerCase() === 'mobile' || 
-                     userAgent.includes('okhttp') || 
-                     userAgent.includes('dart') ||
-                     userAgent.includes('alamofire') ||
-                     userAgent.includes('cfnetwork');
+  const isPasswordValid = await isSamePassword(password, user.password);
+  if (!isPasswordValid) {
+    throwError(
+      HTTP_STATUS.UNAUTHORIZED,
+      ERROR_CODES.ACCESS_DENIED,
+      "Invalid password",
+    );
+  }
 
-    if (!isMobile) {
-      res.cookie("accessToken", accessToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        maxAge: 15 * 60 * 1000,
-      });
-      res.cookie("refreshToken", refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-      });
+  // Blacklist the token
+  if (user.refreshToken != null) {
+    await blackListToken(user.refreshToken);
+  }
+
+  // Fetch token version from Redis
+  let tokenVersion = await redis.get(`user_token_version:${user._id}`);
+  if (tokenVersion === null) {
+    tokenVersion = 0;
+    await redis.set(`user_token_version:${user._id}`, 0);
+  }
+
+  //  Generate Access Token (RS256 with tokenVersion)
+  const { accessToken } = generateAccessToken({
+    userId: user._id,
+    email: user.email,
+    role: "user",
+    tokenVersion: parseInt(tokenVersion, 10),
+  });
+
+  //  Generate Refresh Token (RS256 with Redis JTI storage)
+  const { refreshToken, jti } = await generateRefreshToken(user._id, {
+    role: "user",
+    email: user.email,
+  });
+
+
+
+  await loginUser(user, refreshToken, fcmToken);
+
+  const userAgent = req.headers['user-agent']?.toLowerCase() || '';
+  const isMobile = req.headers['x-client-type']?.toLowerCase() === 'mobile' ||
+    userAgent.includes('okhttp') ||
+    userAgent.includes('dart') ||
+    userAgent.includes('alamofire') ||
+    userAgent.includes('cfnetwork');
+
+  if (!isMobile) {
+    res.cookie("accessToken", accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 15 * 60 * 1000,
+    });
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+  }
+
+  const responsePayload = {
+    user: {
+      _id: user._id,
+      email: user.email,
+      user_name: user.user_name,
+      isDoctor: user.isDoctor,
+      isVerified: user.isVerified,
+      user_handle: user.user_handle,
     }
+  };
 
-    const responsePayload = {
-      user: {
-        _id: user._id,
-        email: user.email,
-        user_name: user.user_name,
-        isDoctor: user.isDoctor,
-        isVerified: user.isVerified,
-        user_handle: user.user_handle,
-      }
-    };
+  if (isMobile) {
+    responsePayload.refreshToken = refreshToken;
+  }
 
-    if (isMobile) {
-      responsePayload.refreshToken = refreshToken;
-    }
-
-    sendSuccess(res, HTTP_STATUS.OK, "Login Successful", responsePayload);
+  sendSuccess(res, HTTP_STATUS.OK, "Login Successful", responsePayload);
 
 });
 
 module.exports.logout = expressAsyncHandler(async (req, res) => {
-    // Find the user and remove the refresh token
-    const user = await findUserById(req.userId);
+  // Find the user and remove the refresh token
+  const user = await findUserById(req.userId);
 
-    if (user) {
-      // BlackList the token first
-      await blackListToken(user.refreshToken);
+  if (user) {
+    // BlackList the token first
+    await blackListToken(user.refreshToken);
 
-      user.refreshToken = null;
-      await user.save();
-    }
+    user.refreshToken = null;
+    await user.save();
+  }
 
-    // Clear cookies
-    res.clearCookie("accessToken");
-    res.clearCookie("refreshToken");
+  // Clear cookies
+  res.clearCookie("accessToken");
+  res.clearCookie("refreshToken");
 
-    sendSuccess(res, HTTP_STATUS.OK, "Logout successful");
+  sendSuccess(res, HTTP_STATUS.OK, "Logout successful");
 });
 
 module.exports.refreshToken = expressAsyncHandler(async (req, res) => {
@@ -472,49 +489,30 @@ module.exports.refreshToken = expressAsyncHandler(async (req, res) => {
       "Refresh token required",
     );
   }
-    // Verify the refresh token
-    const decoded = verifyToken(refreshToken);
+  // Verify the refresh token
+  const decoded = await verifyRefreshToken(refreshToken);
+  // Revoke refresh token from redis
+  await revokeRefreshToken(decoded.userId, decoded.jti);
 
-    const user = await findUserById(decoded.userId);
-    if (!user) {
-      throwError(
-        HTTP_STATUS.FORBIDDEN,
-        ERROR_CODES.ACCESS_DENIED,
-        "Invalid refresh token",
-      );
-    }
+  const tokenVersion = (await redis.get(`user_token_version:${decoded.userId}`)) || 0;
 
-    const newAccessToken = generateAccessToken(
-      { userId: user._id, email: user.email, role: "user" },
-      "15m",
-    );
-    const newRefreshToken = generateAccessToken(
-      { userId: user._id, email: user.email, role: "user" },
-      "7d",
-    );
 
-    user.refreshToken = newRefreshToken;
-    await user.save();
+  //  Issue NEW Access Token
+  const { accessToken: newAccessToken } = generateAccessToken({
+    userId: decoded.userId,
+    role: decoded.role,
+    tokenVersion: parseInt(tokenVersion, 10),
+  });
+  //  Issue NEW Refresh Token (Stores new JTI in Redis)
+  const { refreshToken: newRefreshToken } = await generateRefreshToken(decoded.userId, {
+    role: decoded.role,
+  });
 
-    res.cookie("accessToken", newAccessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 15 * 60 * 1000,
-    });
-    res.cookie("refreshToken", newRefreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+  sendSuccess(res, HTTP_STATUS.OK, "Refresh token generated successfully", {
+    accessToken: newAccessToken,
+    refreshToken: newRefreshToken,
+  });
 
-    sendSuccess(
-      res,
-      HTTP_STATUS.OK,
-      "Refresh token generated successfully",
-      { accessToken: newAccessToken }
-    );
 });
 
 module.exports.deleteByUser = expressAsyncHandler(async (req, res) => {
@@ -532,161 +530,161 @@ module.exports.deleteByUser = expressAsyncHandler(async (req, res) => {
       "Authorization token missing",
     );
   }
-    const { password } = req.body;
-    const email = await verifyUser(token);
-    const user = await findUserByEmail(email);
+  const { password } = req.body;
+  const email = await verifyUser(token);
+  const user = await findUserByEmail(email);
 
-    if (!user) {
-      throwError(
-        HTTP_STATUS.NOT_FOUND,
-        ERROR_CODES.RESOURCE_NOT_FOUND,
-        "User not found",
-      );
-    }
+  if (!user) {
+    throwError(
+      HTTP_STATUS.NOT_FOUND,
+      ERROR_CODES.RESOURCE_NOT_FOUND,
+      "User not found",
+    );
+  }
 
-    if (!user.isVerified) {
-      throwError(
-        HTTP_STATUS.FORBIDDEN,
-        ERROR_CODES.ACCESS_DENIED,
-        "Email not verified. Please check your email.",
-      );
-    }
-    const isPasswordValid = await isSamePassword(user.password, password);
+  if (!user.isVerified) {
+    throwError(
+      HTTP_STATUS.FORBIDDEN,
+      ERROR_CODES.ACCESS_DENIED,
+      "Email not verified. Please check your email.",
+    );
+  }
+  const isPasswordValid = await isSamePassword(user.password, password);
 
-    if (!isPasswordValid) {
+  if (!isPasswordValid) {
+    throwError(
+      HTTP_STATUS.UNAUTHORIZED,
+      ERROR_CODES.ACCESS_DENIED,
+      "Invalid password",
+    );
+  }
+  // console.log("email : ", email + " password  : ", password);
+  await deleteUserByEmail(email);
+  sendSuccess(res, HTTP_STATUS.OK, "Account has been removed from database");
+});
+
+module.exports.deleteByAdmin = expressAsyncHandler(async (req, res) => {
+  const { adminEmail, adminPassword, userEmail } = req.body;
+  const admin = await findAdminByEmail(adminEmail);
+  if (!admin) {
+    throwError(
+      HTTP_STATUS.NOT_FOUND,
+      ERROR_CODES.RESOURCE_NOT_FOUND,
+      "Admin not found",
+    );
+  }
+  else {
+    // console.log(admin);
+    const validAdimin = await isSamePassword(
+      adminPassword,
+      admin.adminPassword,
+    );
+    if (!validAdimin) {
       throwError(
         HTTP_STATUS.UNAUTHORIZED,
         ERROR_CODES.ACCESS_DENIED,
         "Invalid password",
       );
     }
-    // console.log("email : ", email + " password  : ", password);
-    await deleteUserByEmail(email);
-    sendSuccess(res, HTTP_STATUS.OK, "Account has been removed from database");
-});
-
-module.exports.deleteByAdmin = expressAsyncHandler(async (req, res) => {
-    const { adminEmail, adminPassword, userEmail } = req.body;
-    const admin = await findAdminByEmail(adminEmail);
-    if (!admin) {
-      throwError(
-        HTTP_STATUS.NOT_FOUND,
-        ERROR_CODES.RESOURCE_NOT_FOUND,
-        "Admin not found",
-      );
-    }
     else {
-      // console.log(admin);
-      const validAdimin = await isSamePassword(
-        adminPassword,
-        admin.adminPassword,
-      );
-      if (!validAdimin) {
-        throwError(
-          HTTP_STATUS.UNAUTHORIZED,
-          ERROR_CODES.ACCESS_DENIED,
-          "Invalid password",
-        );
-      }
-      else {
-        const result = await deleteUserByEmail(userEmail);
-        sendSuccess(res, HTTP_STATUS.OK, "User deleted successfully", result);
-      }
+      const result = await deleteUserByEmail(userEmail);
+      sendSuccess(res, HTTP_STATUS.OK, "User deleted successfully", result);
     }
+  }
 });
 
 // follow a user
 module.exports.follow = expressAsyncHandler(async (req, res) => {
-    const { articleId, followUserId } = req.body;
-    if (!articleId && !followUserId) {
-      throwError(
-        HTTP_STATUS.BAD_REQUEST,
-        ERROR_CODES.VALIDATION_ERROR,
-        "Article id or follow user id are required",
-      );
-    }
-    let article;
-    if (articleId) {
-      article = await findArticleById(Number(articleId));
+  const { articleId, followUserId } = req.body;
+  if (!articleId && !followUserId) {
+    throwError(
+      HTTP_STATUS.BAD_REQUEST,
+      ERROR_CODES.VALIDATION_ERROR,
+      "Article id or follow user id are required",
+    );
+  }
+  let article;
+  if (articleId) {
+    article = await findArticleById(Number(articleId));
 
-      if (!article || article.is_removed) {
-        throwError(
-          HTTP_STATUS.NOT_FOUND,
-          ERROR_CODES.RESOURCE_NOT_FOUND,
-          "Article not found",
-        );
-      }
-    }
-
-    if (article && req.userId === article.authorId) {
-      throwError(
-        HTTP_STATUS.BAD_REQUEST,
-        ERROR_CODES.VALIDATION_ERROR,
-        "You cannot follow or unfollow yourself",
-      );
-    }
-
-    // Find the user who is following
-    const user = await findUserById(req.userId);
-    if (!user) {
+    if (!article || article.is_removed) {
       throwError(
         HTTP_STATUS.NOT_FOUND,
         ERROR_CODES.RESOURCE_NOT_FOUND,
-        "User not found",
+        "Article not found",
       );
     }
+  }
 
-    // Find the user to be followed
-    let userToFollow;
-    if (article) {
-      userToFollow = await findUserById(article.authorId);
-    } else {
-      userToFollow = await findUserById(followUserId);
-    }
-
-    if (!userToFollow) {
-      throwError(
-        HTTP_STATUS.NOT_FOUND,
-        ERROR_CODES.RESOURCE_NOT_FOUND,
-        "User to follow not found",
-      );
-    }
-
-    if (userToFollow.isBlockUser || userToFollow.isBannedUser) {
-      throwError(
-        HTTP_STATUS.BAD_REQUEST,
-        ERROR_CODES.VALIDATION_ERROR,
-        "User to follow is blocked or banned",
-      );
-    }
-
-    if (user.isBlockUser || user.isBannedUser) {
-      throwError(
-        HTTP_STATUS.BAD_REQUEST,
-        ERROR_CODES.VALIDATION_ERROR,
-        "You are blocked or banned",
-      );
-    }
-
-    const followerUserset = new Set(
-      userToFollow.followers.filter((id) => id).map((id) => id.toString()),
+  if (article && req.userId === article.authorId) {
+    throwError(
+      HTTP_STATUS.BAD_REQUEST,
+      ERROR_CODES.VALIDATION_ERROR,
+      "You cannot follow or unfollow yourself",
     );
-    const followingUserSet = new Set(
-      user.followings.filter((id) => id).map((id) => id.toString()),
-    );
+  }
 
-    if (
-      followerUserset.has(req.userId.toString()) ||
-      followingUserSet.has(userToFollow._id.toString())
-    ) {
-      // Unfollow
-      await unfollowUser(user._id, userToFollow._id);
-      sendSuccess(res, HTTP_STATUS.OK, "Unfollow successfully", { followStatus: false });
-    } else {
-      // Follow
-      await followUser(user._id, userToFollow._id);
-      sendSuccess(res, HTTP_STATUS.OK, "Follow successfully", { followStatus: true });
-    }
+  // Find the user who is following
+  const user = await findUserById(req.userId);
+  if (!user) {
+    throwError(
+      HTTP_STATUS.NOT_FOUND,
+      ERROR_CODES.RESOURCE_NOT_FOUND,
+      "User not found",
+    );
+  }
+
+  // Find the user to be followed
+  let userToFollow;
+  if (article) {
+    userToFollow = await findUserById(article.authorId);
+  } else {
+    userToFollow = await findUserById(followUserId);
+  }
+
+  if (!userToFollow) {
+    throwError(
+      HTTP_STATUS.NOT_FOUND,
+      ERROR_CODES.RESOURCE_NOT_FOUND,
+      "User to follow not found",
+    );
+  }
+
+  if (userToFollow.isBlockUser || userToFollow.isBannedUser) {
+    throwError(
+      HTTP_STATUS.BAD_REQUEST,
+      ERROR_CODES.VALIDATION_ERROR,
+      "User to follow is blocked or banned",
+    );
+  }
+
+  if (user.isBlockUser || user.isBannedUser) {
+    throwError(
+      HTTP_STATUS.BAD_REQUEST,
+      ERROR_CODES.VALIDATION_ERROR,
+      "You are blocked or banned",
+    );
+  }
+
+  const followerUserset = new Set(
+    userToFollow.followers.filter((id) => id).map((id) => id.toString()),
+  );
+  const followingUserSet = new Set(
+    user.followings.filter((id) => id).map((id) => id.toString()),
+  );
+
+  if (
+    followerUserset.has(req.userId.toString()) ||
+    followingUserSet.has(userToFollow._id.toString())
+  ) {
+    // Unfollow
+    await unfollowUser(user._id, userToFollow._id);
+    sendSuccess(res, HTTP_STATUS.OK, "Unfollow successfully", { followStatus: false });
+  } else {
+    // Follow
+    await followUser(user._id, userToFollow._id);
+    sendSuccess(res, HTTP_STATUS.OK, "Follow successfully", { followStatus: true });
+  }
 });
 // Get Follower
 module.exports.getFollowers = expressAsyncHandler(async (req, res) => {
@@ -788,263 +786,113 @@ module.exports.getProfileImage = expressAsyncHandler(async (req, res) => {
 
 // get User Articles,
 module.exports.getUserWithArticles = expressAsyncHandler(async (req, res) => {
-    const user = await getUserArticles(req.userId); // Populate  articles
+  const user = await getUserArticles(req.userId); // Populate  articles
 
-    if (!user) {
-      throwError(
-        HTTP_STATUS.NOT_FOUND,
-        ERROR_CODES.RESOURCE_NOT_FOUND,
-        "User not found",
-      );
-    }
-    sendSuccess(res, HTTP_STATUS.OK, "Articles fetched successfully", user);
+  if (!user) {
+    throwError(
+      HTTP_STATUS.NOT_FOUND,
+      ERROR_CODES.RESOURCE_NOT_FOUND,
+      "User not found",
+    );
+  }
+  sendSuccess(res, HTTP_STATUS.OK, "Articles fetched successfully", user);
 });
 
 // get user like and save articles
 module.exports.getUserLikeAndSaveArticles = expressAsyncHandler(
   async (req, res) => {
-      const user = await getUserLikeAndSaveArticleData(req.userId);
+    const user = await getUserLikeAndSaveArticleData(req.userId);
 
-      if (!user) {
-        throwError(
-          HTTP_STATUS.NOT_FOUND,
-          ERROR_CODES.RESOURCE_NOT_FOUND,
-          "User not found",
-        );
-      }
+    if (!user) {
+      throwError(
+        HTTP_STATUS.NOT_FOUND,
+        ERROR_CODES.RESOURCE_NOT_FOUND,
+        "User not found",
+      );
+    }
 
-      if (user.likedArticles) {
-        user.likedArticles = user.likedArticles.filter(
-          (article) => article && article.authorId !== null,
-        );
-      }
+    if (user.likedArticles) {
+      user.likedArticles = user.likedArticles.filter(
+        (article) => article && article.authorId !== null,
+      );
+    }
 
-      if (user.savedArticles) {
-        user.savedArticles = user.savedArticles.filter(
-          (article) => article && article.authorId !== null,
-        );
-      }
+    if (user.savedArticles) {
+      user.savedArticles = user.savedArticles.filter(
+        (article) => article && article.authorId !== null,
+      );
+    }
 
-      sendSuccess(res, HTTP_STATUS.OK, "Like and Save Articles fetched successfully", user);
+    sendSuccess(res, HTTP_STATUS.OK, "Like and Save Articles fetched successfully", user);
   },
 );
 
 module.exports.updateProfileImage = expressAsyncHandler(async (req, res) => {
-    const { profileImageUrl } = req.body;
+  const { profileImageUrl } = req.body;
 
-    if (!profileImageUrl) {
-      throwError(
-        HTTP_STATUS.BAD_REQUEST,
-        ERROR_CODES.VALIDATION_ERROR,
-        "Profile image URL is required",
-      );
-    }
+  if (!profileImageUrl) {
+    throwError(
+      HTTP_STATUS.BAD_REQUEST,
+      ERROR_CODES.VALIDATION_ERROR,
+      "Profile image URL is required",
+    );
+  }
 
-    let user = await findUserById(req.userId);
+  let user = await findUserById(req.userId);
 
-    if (!user) {
-      throwError(
-        HTTP_STATUS.NOT_FOUND,
-        ERROR_CODES.RESOURCE_NOT_FOUND,
-        "User not found",
-      );
-    }
+  if (!user) {
+    throwError(
+      HTTP_STATUS.NOT_FOUND,
+      ERROR_CODES.RESOURCE_NOT_FOUND,
+      "User not found",
+    );
+  }
 
-    if (user.isBannedUser || user.isBlockUser) {
-      throwError(
-        HTTP_STATUS.BAD_REQUEST,
-        ERROR_CODES.VALIDATION_ERROR,
-        "User is banned or blocked",
-      );
-    }
+  if (user.isBannedUser || user.isBlockUser) {
+    throwError(
+      HTTP_STATUS.BAD_REQUEST,
+      ERROR_CODES.VALIDATION_ERROR,
+      "User is banned or blocked",
+    );
+  }
 
-    // Update the profile image URL
-    user.Profile_image = profileImageUrl;
-    await user.save();
+  // Update the profile image URL
+  user.Profile_image = profileImageUrl;
+  await user.save();
 
-    sendSuccess(res, HTTP_STATUS.OK, "Profile image updated successfully", profileImageUrl);
+  sendSuccess(res, HTTP_STATUS.OK, "Profile image updated successfully", profileImageUrl);
 });
 
 // get user details
 module.exports.getUserDetails = expressAsyncHandler(async (req, res) => {
-    const user = await getPublicProfile(req.userId);
+  const user = await getPublicProfile(req.userId);
 
-    if (!user) {
-      throwError(
-        HTTP_STATUS.NOT_FOUND,
-        ERROR_CODES.RESOURCE_NOT_FOUND,
-        "User not found",
-      );
-    }
+  if (!user) {
+    throwError(
+      HTTP_STATUS.NOT_FOUND,
+      ERROR_CODES.RESOURCE_NOT_FOUND,
+      "User not found",
+    );
+  }
 
-    if (user.isBannedUser || user.isBlockUser) {
-      throwError(
-        HTTP_STATUS.BAD_REQUEST,
-        ERROR_CODES.VALIDATION_ERROR,
-        "User is banned or blocked",
-      );
-    }
+  if (user.isBannedUser || user.isBlockUser) {
+    throwError(
+      HTTP_STATUS.BAD_REQUEST,
+      ERROR_CODES.VALIDATION_ERROR,
+      "User is banned or blocked",
+    );
+  }
 
-    sendSuccess(res, HTTP_STATUS.OK, "User details fetched successfully", user);
+  sendSuccess(res, HTTP_STATUS.OK, "User details fetched successfully", user);
 });
 
 // update user general details
 module.exports.updateUserGeneralDetails = expressAsyncHandler(
   async (req, res) => {
-      const userId = req?.userId;
-      const { username, userHandle, email, about } = req.body;
-      // Validate input fields
-      if (!username || !userHandle || !email || !about) {
-        throwError(
-          HTTP_STATUS.BAD_REQUEST,
-          ERROR_CODES.VALIDATION_ERROR,
-          "Please provide all required fields",
-        );
-      }
-
-      const emailExists = await checkEmailExists(email, userId);
-      if (emailExists) {
-        throwError(
-          HTTP_STATUS.BAD_REQUEST,
-          ERROR_CODES.VALIDATION_ERROR,
-          "Email already in use",
-        );
-      }
-
-      const userHandleExists = await checkUserHandleExists(userHandle, userId);
-
-      if (userHandleExists) {
-        throwError(
-          HTTP_STATUS.BAD_REQUEST,
-          ERROR_CODES.VALIDATION_ERROR,
-          "User handle already in use",
-        );
-      }
-
-      // Find the user by ID
-      const user = await findUserById(req.userId);
-      if (!user) {
-        throwError(
-          HTTP_STATUS.NOT_FOUND,
-          ERROR_CODES.RESOURCE_NOT_FOUND,
-          "User not found",
-        );
-      }
-      if (user.isBannedUser || user.isBlockUser) {
-        throwError(
-          HTTP_STATUS.FORBIDDEN,
-          ERROR_CODES.ACCESS_DENIED,
-          "User is banned or blocked",
-        );
-      }
-      // Update user details
-      user.user_name = username;
-      user.user_handle = userHandle;
-      user.email = email;
-      user.about = about;
-      await user.save();
-
-      sendSuccess(res, HTTP_STATUS.OK, "User details updated successfully", user);
-  },
-);
-// update user contact details
-module.exports.updateUserContactDetails = expressAsyncHandler(
-  async (req, res) => {
-      const { phone, email } = req.body;
-
-      // Validate input fields
-      if (!email || !phone) {
-        throwError(
-          HTTP_STATUS.BAD_REQUEST,
-          ERROR_CODES.VALIDATION_ERROR,
-          "Please provide all required fields",
-        );
-      }
-
-      const emailExists = await checkEmailExists(email, req.userId);
-
-      if (emailExists) {
-        throwError(
-          HTTP_STATUS.BAD_REQUEST,
-          ERROR_CODES.VALIDATION_ERROR,
-          "Email already in use",
-        );
-      }
-
-      // Find the user by ID
-      const user = await findUserById(req.userId);
-      if (!user) {
-        throwError(
-          HTTP_STATUS.NOT_FOUND,
-          ERROR_CODES.RESOURCE_NOT_FOUND,
-          "User not found",
-        );
-      }
-
-      if (user.isBannedUser || user.isBlockUser) {
-        throwError(
-          HTTP_STATUS.FORBIDDEN,
-          ERROR_CODES.ACCESS_DENIED,
-          "User is banned or blocked",
-        );
-      }
-      // Update user details
-      user.contact_detail.email_id = email;
-      user.contact_detail.phone_no = phone;
-      await user.save();
-      // Respond with success
-      sendSuccess(res, HTTP_STATUS.OK, "User contact updated successfully", user);
-  },
-);
-
-// update user Professional details
-module.exports.updateUserProfessionalDetails = expressAsyncHandler(
-  async (req, res) => {
-      const { specialization, qualification, experience } = req.body;
-
-      // Validate input fields
-      if (!specialization || !qualification || !experience) {
-        throwError(
-          HTTP_STATUS.BAD_REQUEST,
-          ERROR_CODES.VALIDATION_ERROR,
-          "Please provide all required fields",
-        );
-      }
-
-      // Find the user by ID
-      const user = await findUserById(req.userId);
-      if (!user) {
-        throwError(
-          HTTP_STATUS.NOT_FOUND,
-          ERROR_CODES.RESOURCE_NOT_FOUND,
-          "User not found",
-        );
-      }
-
-      if (user.isBannedUser || user.isBlockUser) {
-        throwError(
-          HTTP_STATUS.FORBIDDEN,
-          ERROR_CODES.ACCESS_DENIED,
-          "User is banned or blocked",
-        );
-      }
-      // Update user details
-      user.specialization = specialization;
-      user.qualification = qualification;
-      user.Years_of_experience = experience;
-      await user.save();
-
-      // Respond with success
-      sendSuccess(res, HTTP_STATUS.OK, "User details updated successfully", user);
-  },
-);
-
-// update user password
-module.exports.updateUserPassword = expressAsyncHandler(async (req, res) => {
-    const { old_password, new_password, userId } = req.body;
-
-    // Check if both old and new passwords are provided
-    if (!old_password || !new_password || !userId) {
+    const userId = req?.userId;
+    const { username, userHandle, email, about } = req.body;
+    // Validate input fields
+    if (!username || !userHandle || !email || !about) {
       throwError(
         HTTP_STATUS.BAD_REQUEST,
         ERROR_CODES.VALIDATION_ERROR,
@@ -1052,17 +900,77 @@ module.exports.updateUserPassword = expressAsyncHandler(async (req, res) => {
       );
     }
 
-    // Check if the new password is long enough
-    if (new_password.length < 6) {
+    const emailExists = await checkEmailExists(email, userId);
+    if (emailExists) {
       throwError(
         HTTP_STATUS.BAD_REQUEST,
         ERROR_CODES.VALIDATION_ERROR,
-        "Password too short",
+        "Email already in use",
+      );
+    }
+
+    const userHandleExists = await checkUserHandleExists(userHandle, userId);
+
+    if (userHandleExists) {
+      throwError(
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR,
+        "User handle already in use",
       );
     }
 
     // Find the user by ID
-    const user = await findUserById(userId);
+    const user = await findUserById(req.userId);
+    if (!user) {
+      throwError(
+        HTTP_STATUS.NOT_FOUND,
+        ERROR_CODES.RESOURCE_NOT_FOUND,
+        "User not found",
+      );
+    }
+    if (user.isBannedUser || user.isBlockUser) {
+      throwError(
+        HTTP_STATUS.FORBIDDEN,
+        ERROR_CODES.ACCESS_DENIED,
+        "User is banned or blocked",
+      );
+    }
+    // Update user details
+    user.user_name = username;
+    user.user_handle = userHandle;
+    user.email = email;
+    user.about = about;
+    await user.save();
+
+    sendSuccess(res, HTTP_STATUS.OK, "User details updated successfully", user);
+  },
+);
+// update user contact details
+module.exports.updateUserContactDetails = expressAsyncHandler(
+  async (req, res) => {
+    const { phone, email } = req.body;
+
+    // Validate input fields
+    if (!email || !phone) {
+      throwError(
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR,
+        "Please provide all required fields",
+      );
+    }
+
+    const emailExists = await checkEmailExists(email, req.userId);
+
+    if (emailExists) {
+      throwError(
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR,
+        "Email already in use",
+      );
+    }
+
+    // Find the user by ID
+    const user = await findUserById(req.userId);
     if (!user) {
       throwError(
         HTTP_STATUS.NOT_FOUND,
@@ -1078,38 +986,128 @@ module.exports.updateUserPassword = expressAsyncHandler(async (req, res) => {
         "User is banned or blocked",
       );
     }
+    // Update user details
+    user.contact_detail.email_id = email;
+    user.contact_detail.phone_no = phone;
+    await user.save();
+    // Respond with success
+    sendSuccess(res, HTTP_STATUS.OK, "User contact updated successfully", user);
+  },
+);
 
-    // Check if the old password matches the stored password
-    const isOldPasswordValid = await isSamePassword(
-      old_password,
-      user.password,
-    );
-    if (!isOldPasswordValid) {
-      throwError(
-        HTTP_STATUS.UNAUTHORIZED,
-        ERROR_CODES.INVALID_CREDENTIALS,
-        "Invalid old password",
-      );
-    }
+// update user Professional details
+module.exports.updateUserProfessionalDetails = expressAsyncHandler(
+  async (req, res) => {
+    const { specialization, qualification, experience } = req.body;
 
-    // Ensure the new password is not the same as the old password
-    const isSameAsOldPassword = await isSamePassword(
-      new_password,
-      user.password,
-    );
-    if (isSameAsOldPassword) {
+    // Validate input fields
+    if (!specialization || !qualification || !experience) {
       throwError(
         HTTP_STATUS.BAD_REQUEST,
         ERROR_CODES.VALIDATION_ERROR,
-        "Same as old password",
+        "Please provide all required fields",
       );
     }
 
-    const newHashedPassword = await generateHashPassword(new_password);
+    // Find the user by ID
+    const user = await findUserById(req.userId);
+    if (!user) {
+      throwError(
+        HTTP_STATUS.NOT_FOUND,
+        ERROR_CODES.RESOURCE_NOT_FOUND,
+        "User not found",
+      );
+    }
 
-    // Update the user's password
-    user.password = newHashedPassword;
+    if (user.isBannedUser || user.isBlockUser) {
+      throwError(
+        HTTP_STATUS.FORBIDDEN,
+        ERROR_CODES.ACCESS_DENIED,
+        "User is banned or blocked",
+      );
+    }
+    // Update user details
+    user.specialization = specialization;
+    user.qualification = qualification;
+    user.Years_of_experience = experience;
     await user.save();
 
-    sendSuccess(res, HTTP_STATUS.OK, "Password updated successfully", user);
+    // Respond with success
+    sendSuccess(res, HTTP_STATUS.OK, "User details updated successfully", user);
+  },
+);
+
+// update user password
+module.exports.updateUserPassword = expressAsyncHandler(async (req, res) => {
+  const { old_password, new_password, userId } = req.body;
+
+  // Check if both old and new passwords are provided
+  if (!old_password || !new_password || !userId) {
+    throwError(
+      HTTP_STATUS.BAD_REQUEST,
+      ERROR_CODES.VALIDATION_ERROR,
+      "Please provide all required fields",
+    );
+  }
+
+  // Check if the new password is long enough
+  if (new_password.length < 6) {
+    throwError(
+      HTTP_STATUS.BAD_REQUEST,
+      ERROR_CODES.VALIDATION_ERROR,
+      "Password too short",
+    );
+  }
+
+  // Find the user by ID
+  const user = await findUserById(userId);
+  if (!user) {
+    throwError(
+      HTTP_STATUS.NOT_FOUND,
+      ERROR_CODES.RESOURCE_NOT_FOUND,
+      "User not found",
+    );
+  }
+
+  if (user.isBannedUser || user.isBlockUser) {
+    throwError(
+      HTTP_STATUS.FORBIDDEN,
+      ERROR_CODES.ACCESS_DENIED,
+      "User is banned or blocked",
+    );
+  }
+
+  // Check if the old password matches the stored password
+  const isOldPasswordValid = await isSamePassword(
+    old_password,
+    user.password,
+  );
+  if (!isOldPasswordValid) {
+    throwError(
+      HTTP_STATUS.UNAUTHORIZED,
+      ERROR_CODES.INVALID_CREDENTIALS,
+      "Invalid old password",
+    );
+  }
+
+  // Ensure the new password is not the same as the old password
+  const isSameAsOldPassword = await isSamePassword(
+    new_password,
+    user.password,
+  );
+  if (isSameAsOldPassword) {
+    throwError(
+      HTTP_STATUS.BAD_REQUEST,
+      ERROR_CODES.VALIDATION_ERROR,
+      "Same as old password",
+    );
+  }
+
+  const newHashedPassword = await generateHashPassword(new_password);
+
+  // Update the user's password
+  user.password = newHashedPassword;
+  await user.save();
+
+  sendSuccess(res, HTTP_STATUS.OK, "Password updated successfully", user);
 });
