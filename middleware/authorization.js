@@ -1,33 +1,20 @@
-// const { throwError } = require("../utils/throwError");
-// const { HTTP_STATUS, ERROR_CODES } = require("../constants/errorConstants");
-
-// const authorize =
-//   (...allowedRoles) =>
-//   (req, res, next) => {
-//     if (!req.user) {
-//       throwError(HTTP_STATUS.UNAUTHORIZED, ERROR_CODES.UNAUTHORIZED_ACCESS, "Unauthorized");
-//     }
-
-//     if (!allowedRoles.includes(req.user.role)) {
-//       throwError(HTTP_STATUS.FORBIDDEN, ERROR_CODES.ACCESS_DENIED, "Forbidden");
-//     }
-
-//     next();
-//   };
-
-// module.exports = {authorize};
-
 const authorize = (...allowedRoles) => {
   return (req, res, next) => {
-    if (!req.userId) {
+    // Extract userId & userRole flexibly from either req.userId/req.userRole OR req.user object
+    const userId = req.userId || req.user?.userId || req.user?._id;
+    const userRole = req.userRole || req.user?.role;
+    const isContributor = req.isContributor || req.user?.isContributor || false;
+
+    if (!userId) {
       return res.status(401).json({ error: "Authentication required" });
     }
 
     // Special check for publisher / contributor role
-    if (allowedRoles.includes("contributor") && req.isContributor) {
+    if (allowedRoles.includes("contributor") && isContributor) {
       return next();
     }
-    if (!allowedRoles.includes(req.userRole)) {
+
+    if (!userRole || !allowedRoles.includes(userRole)) {
       return res.status(403).json({
         error: "Forbidden",
         message: "You do not have required permissions to access this resource",
@@ -38,4 +25,4 @@ const authorize = (...allowedRoles) => {
   };
 };
 
-module.exports = authorize;
+module.exports = { authorize };
