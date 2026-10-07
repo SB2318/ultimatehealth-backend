@@ -34,7 +34,7 @@ services:
       kafka2:
         condition: service_healthy
     volumes:
-      - ./ultimatehealth-firebase-adminsdk.json:/usr/src/app/ultimatehealth-firebase-adminsdk.json:ro
+      - ./firebase-admin-sdk.json:/usr/src/app/firebase-admin-sdk.json:ro
       - ./keys:/usr/src/app/keys:ro
 
   mongodb:
