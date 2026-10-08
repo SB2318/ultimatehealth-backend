@@ -149,6 +149,7 @@ app.use('/docs', swaggerUi.serve, swaggerUi.setup(null, {
 
 
 
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 
