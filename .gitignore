@@ -8,11 +8,13 @@
 
 # Node modules
 node_modules/
+scripts/
 
 # Package lock file (optional; you may choose to keep it depending on your needs)
 package-lock.json
 
 ultimatehealth-firebase-adminsdk.json
+firebase-admin-sdk.json
 assetlink.json
 
 /public/delete-account-admin.html
