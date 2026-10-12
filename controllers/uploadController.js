@@ -19,7 +19,7 @@ const { verifyAccessToken } = require('../services/security/tokenService');
 require('dotenv').config();
 
 const s3Client = new S3Client({
-    region: 'ap-south-1',
+    region: 'ap-southeast-2',
     credentials: {
         accessKeyId: process.env.AWS_ACCESS_KEY_ID,
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
@@ -134,7 +134,7 @@ const uploadFile = async (req, res) => {
                     const fileNameWithoutExt = path.basename(file.originalname, path.extname(file.originalname));
                     const uniqueKey = `${fileNameWithoutExt}-${Date.now()}.webp`;
                     const params = {
-                        Bucket: 'ultimate-health-new',
+                        Bucket: process.env.BUCKET_NAME,
                         Key: uniqueKey,
                         Body: buffer,
                         ContentType: 'image/webp',
@@ -169,7 +169,7 @@ const uploadFile = async (req, res) => {
         } else if (file.mimetype === 'text/html') {
             // Handle html file upload
             const params = {
-                Bucket: 'ultimate-health-new',
+                Bucket: process.env.BUCKET_NAME,
                 Key: `${file.originalname}`, // Keep original extension, unique file name needed
                 Body: fs.createReadStream(file.path), // Use stream for larger files
                 ContentType: 'text/html; charset=UTF-8'
@@ -206,7 +206,7 @@ const uploadFile = async (req, res) => {
             }
             // Handle audio file upload
             const params = {
-                Bucket: 'ultimate-health-new',
+                Bucket: process.env.BUCKET_NAME,
                 Key: `${file.originalname}`, // Keep original filename and extension
                 // Body: fs.createReadStream(file.path),
                 ContentType: file.mimetype
@@ -444,7 +444,7 @@ const uploadAgreementPDF = expressAsyncHandler(
             const uniqueKey = `agreements-${admin._id}-${Date.now()}-${crypto.randomUUID()}.pdf`;
 
             const params = {
-                Bucket: "ultimate-health-new",
+                Bucket: process.env.BUCKET_NAME,
                 Key: uniqueKey,
                 Body: pdfBuffer,
                 ContentType: "application/pdf",
@@ -476,7 +476,7 @@ const uploadAgreementPDF = expressAsyncHandler(
 // get file
 const getFile = async (req, res) => {
     const params = {
-        Bucket: 'ultimate-health-new',
+        Bucket: process.env.BUCKET_NAME,
         Key: req.params.key,
     };
 
@@ -496,7 +496,7 @@ const getFile = async (req, res) => {
 // We will  not usually remove anything from bucket, we only remove it from our dataase
 const deleteFile = async (req, res) => {
     const params = {
-        Bucket: 'ultimate-health-new',
+        Bucket: process.env.BUCKET_NAME,
         Key: req.params.key,
     };
 
@@ -513,7 +513,7 @@ const deleteFile = async (req, res) => {
 
 const deleteFileFn = async (url) => {
     const params = {
-        Bucket: 'ultimate-health-new',
+        Bucket: process.env.BUCKET_NAME,
         Key: url,
     };
     const command = new DeleteObjectCommand(params);
