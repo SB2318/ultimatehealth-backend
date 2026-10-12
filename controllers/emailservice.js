@@ -49,7 +49,7 @@ const getAdminAgreementHTML = async () => {
   }
 };
 
-const sendVerificationEmail = (email, token) => {
+const sendVerificationEmail = (email, token, isAdmin=false) => {
   const cooldownKey = `verification-email:${email}`;
   cache.put(cooldownKey, true, cooldownTime * 1000);
 
