@@ -26,6 +26,9 @@ services:
       - ENDPOINT_URL=${ENDPOINT_URL}
       - GEMINI_API_KEY_1=${GEMINI_API_KEY_1}
       - KAFKA_BROKERS=${KAFKA_BROKERS:-kafka1:9092,kafka2:9092}
+      - DATASOURCE_URL=${DATASOURCE_URL:-http://pocketbase:8090}
+      - DATASOURCE_USERNAME=${DATASOURCE_USERNAME}
+      - DATASOURCE_PASSWORD=${DATASOURCE_PASSWORD}
     depends_on:
       mongodb:
         condition: service_healthy
