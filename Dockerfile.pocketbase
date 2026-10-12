@@ -1,7 +1,7 @@
 FROM alpine:latest
 
 # Set the PocketBase version you want to use
-ARG PB_VERSION=0.22.21
+ARG PB_VERSION=0.25.0
 
 # Install required tools
 RUN apk add --no-cache \
@@ -12,6 +12,9 @@ RUN apk add --no-cache \
 ADD https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_amd64.zip /tmp/pb.zip
 RUN unzip /tmp/pb.zip -d /pb/ \
     && rm /tmp/pb.zip
+
+# Copy schema migrations for automatic schema creation on startup
+COPY ./pb_migrations /pb/pb_migrations
 
 # Expose the PocketBase port
 EXPOSE 8090

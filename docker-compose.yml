@@ -143,6 +143,7 @@ services:
       - "8090:8090"
     volumes:
       - pb_data:/pb/pb_data
+      - ./pb_migrations:/pb/pb_migrations
 
   redis:
     image: redis:7-alpine
