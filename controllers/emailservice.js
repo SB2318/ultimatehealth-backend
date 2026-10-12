@@ -49,11 +49,11 @@ const getAdminAgreementHTML = async () => {
   }
 };
 
-const sendVerificationEmail = (email, token) => {
+const sendVerificationEmail = (email, token, isAdmin = false) => {
   const cooldownKey = `verification-email:${email}`;
   cache.put(cooldownKey, true, cooldownTime * 1000);
 
-  const url = `${process.env.PROD_URL}/api/user/verifyEmail?token=${token}&isAdmin=${false}`;
+  const url = `${process.env.PROD_URL}/api/user/verifyEmail?token=${token}&isAdmin=${isAdmin}`;
   console.log("URL", url);
   const mailOptions = {
     from: process.env.EMAIL_USER,
