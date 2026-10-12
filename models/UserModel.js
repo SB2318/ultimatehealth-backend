@@ -36,6 +36,10 @@ const userSchema = new mongoose.Schema({
         unique: true,
         index: true,
     },
+    verificationToken: {
+        type: String,
+        default: null,
+    },
     password: {
         type: String,
         required: false,
