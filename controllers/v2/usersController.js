@@ -235,7 +235,7 @@ module.exports.sendOTPForForgotPassword = expressAsyncHandler(
           "Admin is not verified.",
         );
       }
-      await updateAdminOtp(admin, hashedOtp, otpExpires);
+      await updateAdminOtp(admin._id, hashedOtp, otpExpires);
     }
     const result = await sendOtpMail(email, otp);
     if (result) {
