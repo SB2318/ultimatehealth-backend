@@ -508,8 +508,8 @@ module.exports.sendOTPForForgotPassword = expressAsyncHandler(
       return sendSuccess(res, HTTP_STATUS.OK, successMessage);
     }
 
-    // Rate limit resend (example: 60 sec)
-    const cooldownMs = Number(process.env.OTP_RESEND_COOLDOWN_SECONDS) * 1000;
+    // Rate limit resend (default: 60 sec)
+    const cooldownMs = (Number(process.env.OTP_RESEND_COOLDOWN_SECONDS) || 60) * 1000;
     if (
       account.otpLastSentAt &&
       Date.now() - new Date(account.otpLastSentAt).getTime() < cooldownMs
@@ -524,9 +524,8 @@ module.exports.sendOTPForForgotPassword = expressAsyncHandler(
 
     const otp = generateOtp(); // 6 digit
     const hashedOtp = await hashToken(otp);
-    const otpExpires = new Date(
-      Date.now() + Number(process.env.OTP_EXPIRY_MINUTES) * 60 * 1000,
-    );
+    const expiryMinutes = Number(process.env.OTP_EXPIRY_MINUTES) || 10;
+    const otpExpires = new Date(Date.now() + expiryMinutes * 60 * 1000);
 
     const updatePayload = {
       otp: hashedOtp,
@@ -591,7 +590,7 @@ module.exports.verifyOtpForForgotPassword = expressAsyncHandler(
       );
     }
 
-    const maxAttempts = Number(process.env.OTP_MAX_ATTEMPTS);
+    const maxAttempts = Number(process.env.OTP_MAX_ATTEMPTS) || 5;
 
     if (account.otpAttempts >= maxAttempts) {
       if (user) {
