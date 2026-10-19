@@ -35,6 +35,14 @@ const adminSchema = new Schema({
     type: Date,
     default: null,
   },
+  otpLastSentAt: {
+    type: Date,
+    default: null,
+  },
+  otpAttempts: {
+    type: Number,
+    default: 0,
+  },
   password: {
     type: String,
     required: true,

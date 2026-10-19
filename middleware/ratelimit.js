@@ -65,7 +65,7 @@ const registerLimiter = rateLimit({
  */
 const forgotPasswordLimiter = rateLimit({
   ...baseConfig,
-  windowMs: 60 * 60 * 1000, // 1 hour
+  windowMs: 20 * 60 * 1000, // 20 mins
   keyGenerator: (req) => `ip:${ipKeyGenerator(req.ip)}`, // use IP for forgot password attempts, as userId is not available before reset
   max: 3,
 });
@@ -123,7 +123,7 @@ const uploadLimiter = rateLimit({
 
 /**
  * AI plan generation limiter
- * Prevent Gemini API abuse — authenticated by userId
+ * Prevent Gemini API abuse  authenticated by userId
  */
 const aiPlanLimiter = rateLimit({
   ...baseConfig,

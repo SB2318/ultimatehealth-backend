@@ -17,10 +17,8 @@ const findAdminById = async (id) => {
   return Admin.findById(id).lean();
 };
 
-const updateAdminOtp = async (admin, hashedOtp, otpExpires) => {
-  admin.otp = hashedOtp;
-  admin.otpExpires = otpExpires;
-  await admin.save();
+const updateAdminOtp = async (adminId, payload) => {
+  return Admin.updateOne({ _id: adminId }, { $set: payload });
 };
 
 const incrementOtpAttemptsAdmin = (accountId) => {

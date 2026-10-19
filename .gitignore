@@ -21,3 +21,4 @@ test.js
 #public/assets/
 useSocket.txt
 keys/private.pem
+firebase-admin-sdk.json
