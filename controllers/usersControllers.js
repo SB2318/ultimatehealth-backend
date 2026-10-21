@@ -38,7 +38,6 @@ const {
   findAdminByEmail,
   findAdminByHandle,
   checkExistingAdmin,
-  logoutAdmin
 } = require("../services/db/adminService");
 const { blackListToken, addTokenToBlacklist } = require("../services/db/dbTokenService");
 const {
@@ -469,6 +468,137 @@ module.exports.checkUserHandle = expressAsyncHandler(async (req, res) => {
 
   sendSuccess(res, HTTP_STATUS.OK, "User handle is available.");
 });
+
+module.exports.sendOTPForForgotPassword = expressAsyncHandler(
+  async (req, res) => {
+    const { email } = req.validateBody;
+
+    const user = await findUserByEmail(email);
+
+    // Message expected by frontend
+    const successMessage = "OTP sent to your email.";
+
+    console.log("Account found:", user);
+    if (!user) {
+      return sendSuccess(res, HTTP_STATUS.OK, successMessage);
+    }
+    if (user.isBlockUser || user.isBannedUser) {
+      return sendSuccess(res, HTTP_STATUS.OK, successMessage);
+    }
+
+    // Rate limit resend (default: 60 sec)
+    const cooldownMs = (Number(process.env.OTP_RESEND_COOLDOWN_SECONDS) || 60) * 1000;
+    if (
+      user.otpLastSentAt &&
+      Date.now() - new Date(user.otpLastSentAt).getTime() < cooldownMs
+    ) {
+      console.log(`OTP resend requested too soon for ${email}`);
+      throwError(
+        429,
+        "TOO_MANY_REQUESTS",
+        "Please wait before requesting a new OTP."
+      );
+    }
+
+    const otp = generateOtp(); // 6 digit
+    const hashedOtp = await hashToken(otp);
+    const expiryMinutes = Number(process.env.OTP_EXPIRY_MINUTES) || 10;
+    const otpExpires = new Date(Date.now() + expiryMinutes * 60 * 1000);
+
+    const updatePayload = {
+      otp: hashedOtp,
+      otpExpires,
+      otpLastSentAt: new Date(),
+      otpAttempts: 0,
+    };
+
+    if (process.env.NODE_ENV === "production") {
+      const result = await sendOtpMail(email, otp);
+
+      if (!result) {
+        throwError(
+          HTTP_STATUS.INTERNAL_SERVER_ERROR,
+          ERROR_CODES.INTERNAL_ERROR,
+          "Failed to send OTP email",
+        );
+      }
+    }
+
+    await updateUserOtp(user._id, updatePayload);
+    sendSuccess(res, HTTP_STATUS.OK, successMessage);
+  },
+);
+
+module.exports.verifyOtpForForgotPassword = expressAsyncHandler(
+  async (req, res) => {
+    const { email, otp, newPassword } = req.validateBody;
+
+    const user = await findUserByEmail(email);
+
+    if (!user) {
+      throwError(
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR,
+        "Invalid or expired OTP",
+      );
+    }
+
+    if (user.isBlockUser || user.isBannedUser) {
+      throwError(
+        HTTP_STATUS.FORBIDDEN,
+        ERROR_CODES.ACCESS_DENIED,
+        "Account access restricted",
+      );
+    }
+
+    if (!user.otp || !user.otpExpires) {
+      throwError(
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR,
+        "Invalid or expired OTP",
+      );
+    }
+
+    const maxAttempts = Number(process.env.OTP_MAX_ATTEMPTS) || 5;
+
+    if (user.otpAttempts >= maxAttempts) {
+      await clearOtpUser(user._id);
+      throwError(
+        HTTP_STATUS.TOO_MANY_REQUESTS,
+        ERROR_CODES.ACCESS_DENIED,
+        "Too many invalid OTP attempts. Request a new OTP.",
+      );
+    }
+
+    const hashedOtp = await hashToken(otp);
+
+    const isOtpInvalid =
+      user.otp !== hashedOtp || new Date(user.otpExpires) < new Date();
+
+    if (isOtpInvalid) {
+      await incrementOtpAttemptsUser(user._id);
+      throwError(
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR,
+        "Invalid or expired OTP",
+      );
+    }
+
+    const isPasswordSame = await isSamePassword(newPassword, user.password);
+
+    if (isPasswordSame) {
+      throwError(
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR,
+        "New password must be different from old password",
+      );
+    }
+
+    await updateUserPasswordAndClearOtp(user._id, newPassword);
+
+    sendSuccess(res, HTTP_STATUS.OK, "Password reset successful");
+  },
+);
 
 module.exports.logout = expressAsyncHandler(async (req, res) => {
   const { userId, role } = req.user;

@@ -115,6 +115,26 @@ const generateVerificationToken = (payload, expiresIn) => {
     return { verificationToken, jti };
 };
 
+const generatePasswordResetToken = (payload, expiresIn) => {
+    const { key, algorithm } = getSignSecret("verification");
+    const expiry = expiresIn || process.env.JWT_RESET_PASSWORD_EXPIRY || "15m";
+    const jti = generateJti();
+
+    const resetPayload = {
+        ...payload,
+        type: "password_reset",
+        jti,
+    };
+
+    const resetToken = jwt.sign(
+        resetPayload,
+        key,
+        { algorithm, issuer: ISSUER, audience: AUDIENCE, expiresIn: expiry }
+    );
+
+    return { resetToken, jti };
+};
+
 const verifyAccessToken = async (token) => {
     try {
         const { key, algorithm } = getVerifySecret("access");
@@ -199,7 +219,26 @@ const verifyVerificationToken = (token) => {
         }
         return decoded;
     } catch (error) {
+        if (error.status) throw error;
         throwError(HTTP_STATUS.UNAUTHORIZED, ERROR_CODES.UNAUTHORIZED_ACCESS, "Invalid or expired token");
+    }
+};
+
+const verifyPasswordResetToken = (token) => {
+    try {
+        const { key, algorithm } = getVerifySecret("verification");
+        const decoded = jwt.verify(token, key, {
+            algorithms: [algorithm],
+            issuer: ISSUER,
+            audience: AUDIENCE,
+        });
+        if (!decoded || decoded.type !== "password_reset") {
+            throwError(HTTP_STATUS.UNAUTHORIZED, ERROR_CODES.UNAUTHORIZED_ACCESS, 'Invalid or expired password reset token');
+        }
+        return decoded;
+    } catch (error) {
+        if (error.status) throw error;
+        throwError(HTTP_STATUS.UNAUTHORIZED, ERROR_CODES.UNAUTHORIZED_ACCESS, "Invalid or expired password reset token");
     }
 };
 
@@ -260,11 +299,13 @@ module.exports = {
     generateAccessToken,
     generateRefreshToken,
     generateVerificationToken,
+    generatePasswordResetToken,
     generateOtp,
     verifyOtp,
     verifyAccessToken,
     verifyRefreshToken,
     verifyVerificationToken,
+    verifyPasswordResetToken,
     revokeRefreshToken,
     blacklistAccessToken,
     revokeAllUserTokens,

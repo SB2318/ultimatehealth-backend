@@ -1,0 +1,22 @@
+info:
+  name: Admin Verify OTP (Get Reset Token)
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/admin/verify-otp"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "admin@example.com",
+        "otp": "123456"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
