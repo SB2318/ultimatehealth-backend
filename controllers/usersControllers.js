@@ -499,13 +499,16 @@ module.exports.sendOTPForForgotPassword = expressAsyncHandler(
 
     console.log("Account found:", account);
     if (!account) {
+      console.log("acc not found");
       return sendSuccess(res, HTTP_STATUS.OK, successMessage);
     }
     if (account.isBlockUser || account.isBannedUser) {
+      console.log("acc user is blocked or banned");
       return sendSuccess(res, HTTP_STATUS.OK, successMessage);
     }
 
     if (admin && !admin.isVerified) {
+      console.log("acc not verified");
       return sendSuccess(res, HTTP_STATUS.OK, successMessage);
     }
 
@@ -538,6 +541,7 @@ module.exports.sendOTPForForgotPassword = expressAsyncHandler(
 
     if (process.env.NODE_ENV === "production") {
       const result = await sendOtpMail(email, otp);
+      console.log("OTP email send result:", result);
 
       if (!result) {
         throwError(
@@ -551,7 +555,7 @@ module.exports.sendOTPForForgotPassword = expressAsyncHandler(
     if (user) {
       await updateUserOtp(user._id, updatePayload);
     } else {
-      await updateAdminOtp(admin._id, updatePayload);
+      await updateAdminOtp(admin, updatePayload);
     }
     sendSuccess(res, HTTP_STATUS.OK, successMessage);
   },
