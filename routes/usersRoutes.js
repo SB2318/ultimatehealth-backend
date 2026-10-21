@@ -231,6 +231,14 @@ router.post(
 )
 
 router.post(
+    '/user/verifyOtp',
+    enforceMinDuration(700),
+    otpLimiter,
+    validateBody(verifyOtpSchema),
+    checkOtp
+)
+
+router.post(
     '/user/update-profile-image',
     authenticate,
     authorize(ROLES.USER, ROLES.DOCTOR),

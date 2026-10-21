@@ -39,9 +39,6 @@ const {
   generateRefreshToken,
   verifyRefreshToken,
   revokeRefreshToken,
-  blacklistAccessToken,
-  revokeAllUserTokens,
-  verifyToken,
   generateOtp,
   hashToken,
 } = require("../../services/security/tokenService");
@@ -410,7 +407,7 @@ module.exports.login = expressAsyncHandler(async (req, res) => {
   });
 
   //  Generate Refresh Token (RS256 with Redis JTI storage)
-  const { refreshToken, jti } = await generateRefreshToken(user._id, {
+  const { refreshToken } = await generateRefreshToken(user._id, {
     role: "user",
     email: user.email,
   });
