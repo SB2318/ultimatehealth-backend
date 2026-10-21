@@ -41,12 +41,7 @@ const {
 const {
   findAdminByEmail,
   findAdminByHandle,
-  updateAdminOtp,
   checkExistingAdmin,
-  clearOtpAdmin,
-  incrementOtpAttemptsAdmin,
-  updateAdminPasswordAndClearOtp,
-  logoutAdmin
 } = require("../services/db/adminService");
 const { blackListToken, addTokenToBlacklist } = require("../services/db/dbTokenService");
 const {
@@ -486,33 +481,24 @@ module.exports.sendOTPForForgotPassword = expressAsyncHandler(
   async (req, res) => {
     const { email } = req.validateBody;
 
-    const [user, admin] = await Promise.all([
-      findUserByEmail(email),
-      findAdminByEmail(email),
-    ]);
-
-    const account = user || admin;
+    const user = await findUserByEmail(email);
 
     // Message expected by frontend
     const successMessage = "OTP sent to your email.";
 
-    console.log("Account found:", account);
-    if (!account) {
+    console.log("Account found:", user);
+    if (!user) {
       return sendSuccess(res, HTTP_STATUS.OK, successMessage);
     }
-    if (account.isBlockUser || account.isBannedUser) {
-      return sendSuccess(res, HTTP_STATUS.OK, successMessage);
-    }
-
-    if (admin && !admin.isVerified) {
+    if (user.isBlockUser || user.isBannedUser) {
       return sendSuccess(res, HTTP_STATUS.OK, successMessage);
     }
 
     // Rate limit resend (default: 60 sec)
     const cooldownMs = (Number(process.env.OTP_RESEND_COOLDOWN_SECONDS) || 60) * 1000;
     if (
-      account.otpLastSentAt &&
-      Date.now() - new Date(account.otpLastSentAt).getTime() < cooldownMs
+      user.otpLastSentAt &&
+      Date.now() - new Date(user.otpLastSentAt).getTime() < cooldownMs
     ) {
       console.log(`OTP resend requested too soon for ${email}`);
       throwError(
@@ -546,11 +532,7 @@ module.exports.sendOTPForForgotPassword = expressAsyncHandler(
       }
     }
 
-    if (user) {
-      await updateUserOtp(user._id, updatePayload);
-    } else {
-      await updateAdminOtp(admin._id, updatePayload);
-    }
+    await updateUserOtp(user._id, updatePayload);
     sendSuccess(res, HTTP_STATUS.OK, successMessage);
   },
 );
@@ -559,14 +541,9 @@ module.exports.verifyOtpForForgotPassword = expressAsyncHandler(
   async (req, res) => {
     const { email, otp, newPassword } = req.validateBody;
 
-    const [user, admin] = await Promise.all([
-      findUserByEmail(email),
-      findAdminByEmail(email),
-    ]);
+    const user = await findUserByEmail(email);
 
-    const account = user || admin;
-
-    if (!account) {
+    if (!user) {
       throwError(
         HTTP_STATUS.BAD_REQUEST,
         ERROR_CODES.VALIDATION_ERROR,
@@ -574,7 +551,7 @@ module.exports.verifyOtpForForgotPassword = expressAsyncHandler(
       );
     }
 
-    if (account.isBlockUser || account.isBannedUser) {
+    if (user.isBlockUser || user.isBannedUser) {
       throwError(
         HTTP_STATUS.FORBIDDEN,
         ERROR_CODES.ACCESS_DENIED,
@@ -582,7 +559,7 @@ module.exports.verifyOtpForForgotPassword = expressAsyncHandler(
       );
     }
 
-    if (!account.otp || !account.otpExpires) {
+    if (!user.otp || !user.otpExpires) {
       throwError(
         HTTP_STATUS.BAD_REQUEST,
         ERROR_CODES.VALIDATION_ERROR,
@@ -592,12 +569,8 @@ module.exports.verifyOtpForForgotPassword = expressAsyncHandler(
 
     const maxAttempts = Number(process.env.OTP_MAX_ATTEMPTS) || 5;
 
-    if (account.otpAttempts >= maxAttempts) {
-      if (user) {
-        await clearOtpUser(account._id);
-      } else {
-        await clearOtpAdmin(account._id);
-      }
+    if (user.otpAttempts >= maxAttempts) {
+      await clearOtpUser(user._id);
       throwError(
         HTTP_STATUS.TOO_MANY_REQUESTS,
         ERROR_CODES.ACCESS_DENIED,
@@ -608,15 +581,10 @@ module.exports.verifyOtpForForgotPassword = expressAsyncHandler(
     const hashedOtp = await hashToken(otp);
 
     const isOtpInvalid =
-      account.otp !== hashedOtp || new Date(account.otpExpires) < new Date();
+      user.otp !== hashedOtp || new Date(user.otpExpires) < new Date();
 
     if (isOtpInvalid) {
-      if (user) {
-        await incrementOtpAttemptsUser(account._id);
-      } else {
-        await incrementOtpAttemptsAdmin(account._id);
-      }
-
+      await incrementOtpAttemptsUser(user._id);
       throwError(
         HTTP_STATUS.BAD_REQUEST,
         ERROR_CODES.VALIDATION_ERROR,
@@ -624,7 +592,7 @@ module.exports.verifyOtpForForgotPassword = expressAsyncHandler(
       );
     }
 
-    const isPasswordSame = await isSamePassword(newPassword, account.password);
+    const isPasswordSame = await isSamePassword(newPassword, user.password);
 
     if (isPasswordSame) {
       throwError(
@@ -633,11 +601,8 @@ module.exports.verifyOtpForForgotPassword = expressAsyncHandler(
         "New password must be different from old password",
       );
     }
-    if (user) {
-      await updateUserPasswordAndClearOtp(account._id, newPassword);
-    } else {
-      await updateAdminPasswordAndClearOtp(account._id, newPassword);
-    }
+
+    await updateUserPasswordAndClearOtp(user._id, newPassword);
 
     sendSuccess(res, HTTP_STATUS.OK, "Password reset successful");
   },

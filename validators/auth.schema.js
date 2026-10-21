@@ -221,6 +221,35 @@ const verifyOtpSchema = z.object({
         .regex(/^\d{6}$/, 'OTP must contain only numbers'),
 })
 
+const adminVerifyOtpSchema = z.object({
+    email: z
+        .string({
+            error: 'Email must be string',
+        })
+        .trim()
+        .min(1, 'Email is required')
+        .max(254, 'Email is too long')
+        .email('Invalid email')
+        .transform((val) => val.toLowerCase()),
+    otp: z
+        .string({
+            error: 'OTP is required',
+        })
+        .trim()
+        .length(6, 'OTP must be exactly 6 digits')
+        .regex(/^\d{6}$/, 'OTP must contain only numbers'),
+})
+
+const adminResetPasswordSchema = z.object({
+    resetToken: z
+        .string({
+            error: 'Reset token is required',
+        })
+        .trim()
+        .min(1, 'Reset token is required'),
+    newPassword: passwordSchema,
+})
+
 const deleteAccountSchema = z.object({
     password: passwordSchema.optional(),
 })
@@ -364,6 +393,8 @@ module.exports = {
     followUnfollowSchema,
     forgotPasswordSchema,
     verifyOtpSchema,
+    adminVerifyOtpSchema,
+    adminResetPasswordSchema,
     deleteAccountSchema,
     resendVerificationSchema,
     profileImageUpdateSchema,

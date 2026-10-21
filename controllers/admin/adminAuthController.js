@@ -8,10 +8,26 @@ const {
   generateAccessToken,
   generateRefreshToken,
   generateVerificationToken,
+  generatePasswordResetToken,
+  verifyPasswordResetToken,
+  generateOtp,
+  hashToken,
   revokeRefreshToken,
   blacklistAccessToken,
   revokeAllUserTokens,
 } = require("../../services/security/tokenService");
+const {
+  findAdminByEmail,
+  updateAdminOtp,
+  incrementOtpAttemptsAdmin,
+  clearOtpAdmin,
+  updateAdminPasswordAndClearOtp,
+} = require("../../services/db/adminService");
+const { isSamePassword } = require("../../services/security/encryptService");
+const { sendOtpMail } = require("../emailservice");
+const { throwError } = require("../../utils/throwError");
+const { sendSuccess } = require("../../utils/response");
+const { HTTP_STATUS, ERROR_CODES } = require("../../constants/errorConstants");
 const redis = require("../../config/redis");
 
 module.exports.register = expressAsyncHandler(
@@ -375,6 +391,272 @@ module.exports.deleteAdmin = expressAsyncHandler(
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
+  }
+);
+
+module.exports.sendAdminOTPForForgotPassword = expressAsyncHandler(
+  async (req, res) => {
+    const { email } = req.validateBody || req.body;
+
+    const adminUser = await findAdminByEmail(email);
+
+    // Uniform message to prevent user enumeration
+    const successMessage = "OTP sent to your email.";
+
+    if (!adminUser) {
+      return sendSuccess(res, HTTP_STATUS.OK, successMessage);
+    }
+    if (adminUser.isBlockUser || adminUser.isBannedUser) {
+      return sendSuccess(res, HTTP_STATUS.OK, successMessage);
+    }
+    if (!adminUser.isVerified) {
+      return sendSuccess(res, HTTP_STATUS.OK, successMessage);
+    }
+
+    // Rate limit resend (default: 60 sec)
+    const cooldownMs = (Number(process.env.OTP_RESEND_COOLDOWN_SECONDS) || 60) * 1000;
+    if (
+      adminUser.otpLastSentAt &&
+      Date.now() - new Date(adminUser.otpLastSentAt).getTime() < cooldownMs
+    ) {
+      console.log(`OTP resend requested too soon for admin ${email}`);
+      throwError(
+        HTTP_STATUS.TOO_MANY_REQUESTS,
+        "TOO_MANY_REQUESTS",
+        "Please wait before requesting a new OTP."
+      );
+    }
+
+    const otp = generateOtp(); // 6 digit
+    const hashedOtp = hashToken(otp);
+    const expiryMinutes = Number(process.env.OTP_EXPIRY_MINUTES) || 10;
+    const otpExpires = new Date(Date.now() + expiryMinutes * 60 * 1000);
+
+    const updatePayload = {
+      otp: hashedOtp,
+      otpExpires,
+      otpLastSentAt: new Date(),
+      otpAttempts: 0,
+    };
+
+    if (process.env.NODE_ENV === "production") {
+      const result = await sendOtpMail(email, otp);
+
+      if (!result) {
+        throwError(
+          HTTP_STATUS.INTERNAL_SERVER_ERROR,
+          ERROR_CODES.INTERNAL_ERROR,
+          "Failed to send OTP email",
+        );
+      }
+    } else {
+      console.log(`[DEV OTP] OTP for admin ${email}: ${otp}`);
+      try {
+        await sendOtpMail(email, otp);
+      } catch (err) {
+        console.warn("Mail sending skipped in dev:", err.message);
+      }
+    }
+
+    await updateAdminOtp(adminUser._id, updatePayload);
+    sendSuccess(res, HTTP_STATUS.OK, successMessage);
+  }
+);
+
+module.exports.verifyAdminOtp = expressAsyncHandler(
+  async (req, res) => {
+    const { email, otp } = req.validateBody || req.body;
+
+    const adminUser = await findAdminByEmail(email);
+
+    if (!adminUser) {
+      throwError(
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR,
+        "Invalid or expired OTP",
+      );
+    }
+
+    if (adminUser.isBlockUser || adminUser.isBannedUser) {
+      throwError(
+        HTTP_STATUS.FORBIDDEN,
+        ERROR_CODES.ACCESS_DENIED,
+        "Account access restricted",
+      );
+    }
+
+    if (!adminUser.otp || !adminUser.otpExpires) {
+      throwError(
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR,
+        "Invalid or expired OTP",
+      );
+    }
+
+    const maxAttempts = Number(process.env.OTP_MAX_ATTEMPTS) || 5;
+
+    if (adminUser.otpAttempts >= maxAttempts) {
+      await clearOtpAdmin(adminUser._id);
+      throwError(
+        HTTP_STATUS.TOO_MANY_REQUESTS,
+        ERROR_CODES.ACCESS_DENIED,
+        "Too many invalid OTP attempts. Request a new OTP.",
+      );
+    }
+
+    const hashedOtp = hashToken(otp);
+
+    const isOtpInvalid =
+      adminUser.otp !== hashedOtp || new Date(adminUser.otpExpires) < new Date();
+
+    if (isOtpInvalid) {
+      await incrementOtpAttemptsAdmin(adminUser._id);
+      throwError(
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR,
+        "Invalid or expired OTP",
+      );
+    }
+
+    // OTP is valid - issue temporary password reset token (15 mins)
+    const { resetToken, jti } = generatePasswordResetToken(
+      { adminId: adminUser._id.toString(), email: adminUser.email },
+      "15m"
+    );
+
+    try {
+      await redis.setex(`password_reset_token:${adminUser._id.toString()}:${jti}`, 15 * 60, "valid");
+    } catch (e) {
+      console.warn("⚠️ Redis unavailable, skipping password reset token cache");
+    }
+
+    sendSuccess(res, HTTP_STATUS.OK, "OTP verified successfully", {
+      resetToken,
+    });
+  }
+);
+
+module.exports.resetAdminPassword = expressAsyncHandler(
+  async (req, res) => {
+    const { resetToken, newPassword } = req.validateBody || req.body;
+
+    const decoded = verifyPasswordResetToken(resetToken);
+    if (!decoded || !decoded.adminId) {
+      throwError(
+        HTTP_STATUS.UNAUTHORIZED,
+        ERROR_CODES.UNAUTHORIZED_ACCESS,
+        "Invalid or expired password reset token"
+      );
+    }
+
+    try {
+      const exists = await redis.get(`password_reset_token:${decoded.adminId}:${decoded.jti}`);
+      if (exists === null && redis.status === "ready") {
+        throwError(
+          HTTP_STATUS.BAD_REQUEST,
+          ERROR_CODES.VALIDATION_ERROR,
+          "Password reset token has already been used or expired"
+        );
+      }
+      await redis.del(`password_reset_token:${decoded.adminId}:${decoded.jti}`);
+    } catch (e) {
+      if (e.status) throw e;
+    }
+
+    const adminUser = await admin.findById(decoded.adminId);
+    if (!adminUser) {
+      throwError(
+        HTTP_STATUS.NOT_FOUND,
+        ERROR_CODES.RESOURCE_NOT_FOUND,
+        "Admin account not found"
+      );
+    }
+
+    const isSame = await isSamePassword(newPassword, adminUser.password);
+    if (isSame) {
+      throwError(
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR,
+        "New password must be different from old password"
+      );
+    }
+
+    await updateAdminPasswordAndClearOtp(adminUser._id, newPassword);
+    await revokeAllUserTokens(adminUser._id.toString());
+
+    sendSuccess(res, HTTP_STATUS.OK, "Password reset successful");
+  }
+);
+
+module.exports.verifyAdminOtpForForgotPassword = expressAsyncHandler(
+  async (req, res) => {
+    const { email, otp, newPassword } = req.validateBody || req.body;
+
+    const adminUser = await findAdminByEmail(email);
+
+    if (!adminUser) {
+      throwError(
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR,
+        "Invalid or expired OTP",
+      );
+    }
+
+    if (adminUser.isBlockUser || adminUser.isBannedUser) {
+      throwError(
+        HTTP_STATUS.FORBIDDEN,
+        ERROR_CODES.ACCESS_DENIED,
+        "Account access restricted",
+      );
+    }
+
+    if (!adminUser.otp || !adminUser.otpExpires) {
+      throwError(
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR,
+        "Invalid or expired OTP",
+      );
+    }
+
+    const maxAttempts = Number(process.env.OTP_MAX_ATTEMPTS) || 5;
+
+    if (adminUser.otpAttempts >= maxAttempts) {
+      await clearOtpAdmin(adminUser._id);
+      throwError(
+        HTTP_STATUS.TOO_MANY_REQUESTS,
+        ERROR_CODES.ACCESS_DENIED,
+        "Too many invalid OTP attempts. Request a new OTP.",
+      );
+    }
+
+    const hashedOtp = hashToken(otp);
+
+    const isOtpInvalid =
+      adminUser.otp !== hashedOtp || new Date(adminUser.otpExpires) < new Date();
+
+    if (isOtpInvalid) {
+      await incrementOtpAttemptsAdmin(adminUser._id);
+      throwError(
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR,
+        "Invalid or expired OTP",
+      );
+    }
+
+    const isPasswordSame = await isSamePassword(newPassword, adminUser.password);
+
+    if (isPasswordSame) {
+      throwError(
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR,
+        "New password must be different from old password",
+      );
+    }
+
+    await updateAdminPasswordAndClearOtp(adminUser._id, newPassword);
+    await revokeAllUserTokens(adminUser._id.toString());
+
+    sendSuccess(res, HTTP_STATUS.OK, "Password reset successful");
   }
 );
 
