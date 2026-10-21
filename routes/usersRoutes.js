@@ -234,7 +234,7 @@ router.post(
     '/user/verifyOtp',
     enforceMinDuration(700),
     otpLimiter,
-    validateBody(verifyOtpSchema),
+  //  validateBody(verifyOtpSchema),
     checkOtp
 )
 
