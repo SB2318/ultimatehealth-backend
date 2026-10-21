@@ -16,7 +16,6 @@ const {
   getPublicProfile,
   // isSamePassword,
   updateUserPasswordById,
-  updateUserOtp,
   loginUser,
   deleteUserByEmail,
   followUser,
@@ -26,9 +25,6 @@ const {
   getUserLikeAndSaveArticlesData: getUserLikeAndSaveArticlesData,
   checkUserHandleExists,
   checkEmailExists,
-  clearOtpUser,
-  incrementOtpAttemptsUser,
-  updateUserPasswordAndClearOtp,
   logoutUser,
   softDeleteUser,
   hardDeleteUser,
@@ -56,8 +52,6 @@ const {
   verifyToken,
   generateRefreshToken,
   verifyRefreshToken,
-  generateOtp,
-  hashToken,
   blacklistAccessToken,
   revokeRefreshToken,
   revokeAllUserTokens
@@ -67,7 +61,6 @@ const {
   generateHashPassword,
 } = require("../services/security/encryptService");
 
-const { sendOtpMail } = require("./emailservice");
 const { verifyUser } = require("../middleware/authMiddleware");
 
 const { throwError } = require("../utils/throwError");
@@ -99,7 +92,6 @@ async function creatingUnverifiedUser(userData) {
     );
   }
   // sending verification email to user
-  // await sendOtpMail(email, verificationToken);
 }
 
 module.exports.register = expressAsyncHandler(async (req, res) => {
@@ -1362,41 +1354,3 @@ module.exports.getNotificationPreferences = expressAsyncHandler(
     }
   }
 );
-
-module.exports.checkOtp = expressAsyncHandler(async (req, res) => {
-  const { email, otp } = req.body;
-  const [user, admin] = await Promise.all([
-    findUserByEmail(email),
-    findAdminByEmail(email),
-  ]);
-
-  if (!user && !admin) {
-    throwError(
-      HTTP_STATUS.NOT_FOUND,
-      ERROR_CODES.RESOURCE_NOT_FOUND,
-      "User not found",
-    );
-  }
-  if (user) {
-    const hashedInput = await hashToken(otp);
-    if (hashedInput !== user.otp || user.otpExpires < Date.now()) {
-      throwError(
-        HTTP_STATUS.BAD_REQUEST,
-        ERROR_CODES.VALIDATION_ERROR,
-        "Invalid or expired OTP.",
-      );
-    }
-  } else {
-    const hashedInput = await hashToken(otp);
-    if (!admin || hashedInput !== admin.otp || admin.otpExpires < Date.now()) {
-      throwError(
-        HTTP_STATUS.BAD_REQUEST,
-        ERROR_CODES.VALIDATION_ERROR,
-        "Invalid or expired OTP.",
-      );
-    }
-  }
-  sendSuccess(res, HTTP_STATUS.OK, "OTP is valid.");
-});
-
-
