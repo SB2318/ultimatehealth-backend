@@ -7,8 +7,6 @@ const {
   googleAuth,
   getTokenStatus,
   logout,
-  sendOTPForForgotPassword,
-  verifyOtpForForgotPassword,
   softDeleteByUser,
   hardDeleteByUser,
   deleteByAdmin,
@@ -21,7 +19,6 @@ const {
   getUserWithArticles,
   getUserLikeAndSaveArticles,
   //getFollowings,
-  checkOtp,
   refreshToken,
   updateProfileImage,
   getUserDetails,
@@ -55,8 +52,6 @@ const {
     profileImageParamSchema,
     userProfileQuerySchema,
     followUnfollowSchema,
-    forgotPasswordSchema,
-    verifyOtpSchema,
     deleteAccountSchema,
     resendVerificationSchema,
     profileImageUpdateSchema,
@@ -68,8 +63,6 @@ const {
 const {
     registerLimiter,
     loginLimiter,
-    forgotPasswordLimiter,
-    otpLimiter,
 } = require('../middleware/ratelimit')
 
 const enforceMinDuration = (minDuration = 700) => {
@@ -169,23 +162,6 @@ router.post(
 )
 
 router.post(
-    '/user/forgotpassword',
-    enforceMinDuration(700),
-    forgotPasswordLimiter,
-    validateBody(forgotPasswordSchema),
-    sendOTPForForgotPassword
-)
-
-// verify otp for forgot password is handled by the /verifypassword route.
-router.post(
-    '/user/verifypassword',
-    enforceMinDuration(700),
-    otpLimiter,
-    validateBody(verifyOtpSchema),
-    verifyOtpForForgotPassword
-)
-
-router.post(
     '/user/logout',
     authenticate,
     authorize(ROLES.USER, ROLES.DOCTOR),
@@ -228,14 +204,6 @@ router.post(
     '/user/resend-verification-mail',
     validateBody(resendVerificationSchema),
     resendVerificationEmail
-)
-
-router.post(
-    '/user/verifyOtp',
-    enforceMinDuration(700),
-    otpLimiter,
-  //  validateBody(verifyOtpSchema),
-    checkOtp
 )
 
 router.post(
