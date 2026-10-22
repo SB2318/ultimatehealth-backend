@@ -12,8 +12,11 @@ This document tracks priority tasks to be completed today for UltimateHealth Bac
   - Hybrid scoring pipeline (tag overlap count + text score + logarithmic engagement boost).
   - Validation schemas (Zod params & query) and endpoint `GET /api/articles/:id/related`.
 
-- [ ] **2. Glossary Data Upload**
-  - Bulk ingestion / CSV / JSON upload pipeline for medical glossary terms and definitions.
+- [x] **2. Glossary Data Upload** *(Completed)*
+  - Bulk ingestion pipeline for medical glossary terms and definitions.
+  - Successfully seeded 379 unique medical terms with zero duplication across 18 medical categories.
+  - Multi-language support: English (355), Hindi (15), Bengali (9).
+  - Automatically mapped & created missing `ArticleTag` category relations.
 
 - [ ] **3. Contributor Data Upload**
   - Processing and seeding contributor profiles and credentials into the platform.
