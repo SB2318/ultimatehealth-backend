@@ -31,23 +31,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-const getAdminAgreementHTML = async () => {
-  try {
-    const filePath = path.join(
-      __dirname,
-      "..",
-      "public",
-      "admin-agreement.html",
-    );
 
-    const html = await fs.promises.readFile(filePath, "utf-8");
-
-    return html;
-  } catch (error) {
-    console.error("Error reading HTML file:", error);
-    throw new Error("Failed to load agreement HTML");
-  }
-};
 
 const sendVerificationEmail = (email, token, isAdmin=false) => {
   const cooldownKey = `verification-email:${email}`;
@@ -266,19 +250,19 @@ const verifyEmail = expressAsyncHandler(async (req, res) => {
   const decoded = verifyVerificationToken(token);
   const { role, email, jti } = decoded;
 
-  if (role === ROLES.ADMIN) {
-    const adminUser = await Admin.findOne({ email });
+  // if (role === ROLES.ADMIN) {
+  //   const adminUser = await Admin.findOne({ email });
 
-    if (!adminUser) {
-      throwError(
-        HTTP_STATUS.UNAUTHORIZED,
-        ERROR_CODES.TOKEN_INVALID,
-        "Admin user not found",
-      );
-    }
+  //   if (!adminUser) {
+  //     throwError(
+  //       HTTP_STATUS.UNAUTHORIZED,
+  //       ERROR_CODES.TOKEN_INVALID,
+  //       "Admin user not found",
+  //     );
+  //   }
 
-    return res.redirect(`/admin-agreement.html#token=${token}`);
-  }
+  //   return res.redirect(`/admin-agreement.html#token=${token}`);
+  // }
 
   const hashedJti = hashToken(jti);
 

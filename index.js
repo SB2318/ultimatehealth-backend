@@ -162,12 +162,12 @@ app.get("/hello", (req, res) => {
     res.send('Hello World');
 });
 app.get('/', (req, res) => {
-    res.redirect(301, 'https://ultimatehealth.blog/web/en');
+    res.redirect(302, 'https://ultimatehealth.blog/web/en');
 });
 
 // app.get('/publish', (req, res) => {
-//     res.sendFile(path.join(__dirname, "public", "publisher.html"));
-//     //res.redirect(302, 'https://ultimatehealth.blog/frontend/v2');
+//    // res.sendFile(path.join(__dirname, "public", "publisher.html"));
+//     res.redirect(302, 'https://ultimatehealth.blog/frontend/v2');
 // });
 
 app.get('/.well-known/assetlinks.json', (req, res) => {
