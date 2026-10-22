@@ -54,7 +54,7 @@ const glossarySchema = new Schema({
   authorId: {
     type: Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
+    default: null,
     index: true,
   },
   reviewerId: {
@@ -85,7 +85,12 @@ const glossarySchema = new Schema({
 // Compound & text indexes for fast searching and review queues
 glossarySchema.index(
   { term: 'text', synonyms: 'text', shortDescription: 'text', definition: 'text' },
-  { weights: { term: 10, synonyms: 5, shortDescription: 2, definition: 1 }, name: 'GlossaryTextSearchIndex' }
+  {
+    weights: { term: 10, synonyms: 5, shortDescription: 2, definition: 1 },
+    name: 'GlossaryTextSearchIndex',
+    default_language: 'none',
+    language_override: 'none',
+  }
 );
 
 // ESR Index: language + status + soft-deleted + alphabetical term sorting/searching
