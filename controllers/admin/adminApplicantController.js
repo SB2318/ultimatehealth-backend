@@ -1,6 +1,6 @@
 const expressAsyncHandler = require("express-async-handler");
 const crypto = require("crypto");
-const bcrypt = require("bcryptjs");
+const bcrypt = require("bcrypt");
 const { adminApplicantSchema } = require("../../validators/applicant.schema");
 const { uploadApplicantResumeToS3 } = require("../uploadController");
 const Admin = require("../../models/admin/adminModel");
