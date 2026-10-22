@@ -87,83 +87,10 @@ Provides secure, high-throughput REST & WebSocket APIs for:
 
 ---
 
-## 🔐 Authentication & Authorization Architecture
+## 🔐 Authentication & Roles
 
-UltimateHealth implements an enterprise-grade, role-based authentication and authorization system powered by **RS256 asymmetric JWTs**, **Redis-backed token blacklisting**, and **User Token Versioning**.
-
-### 1. User Authentication Flow
-
-Regular users (`user` and `doctor` roles) manage their account lifecycle through self-registration and verified authentication:
-
-- **Self-Registration (`POST /api/user/register`)**:
-  - Validates user input (name, handle, email, password) against Zod schemas.
-  - Generates a hashed password via `bcrypt` and creates an unverified user record with a verification token.
-  - Dispatches an asynchronous email containing the account verification link.
-- **Email Verification (`GET /api/user/verifyEmail`)**:
-  - Validates the verification token and transitions the unverified user into the active `User` collection.
-- **Login (`POST /api/user/login` or `POST /api/user/google-auth`)**:
-  - Verifies credentials or Google OAuth ID token.
-  - Enforces minimum response duration to protect against timing attacks.
-  - Issues an **RS256-signed Access Token** in the response body (short-lived) and an **HTTP-only Refresh Token** in secure cookies.
-  - Tracks the unique JWT ID (`jti`) and user token version in Redis for sub-millisecond session validation and instant revocation.
-- **Logout & Session Revocation (`POST /api/user/logout`)**:
-  - Blacklists the access token JTI until expiry in Redis and immediately revokes the refresh token.
-
----
-
-### 2. Admin Authentication & Onboarding Flow
-
-Admins possess privileged access to review, moderate, and publish health articles and podcasts. To ensure compliance and strict access governance:
-
-#### 🚫 No Self-Registration
-- **Admins cannot register themselves on the open platform.**
-- All admin accounts must be created directly by a **Super Admin** or **UltimateHealth Admin**.
-- Newly created admin accounts start with `isVerified: false` directly on the admin model and remain inactive until the onboarding agreement is signed.
-
-#### 📩 Candidate Application Pipeline (`POST /api/admin/apply`)
-Prospective moderators, physicians, and reviewers submit an application to the administration:
-- **Endpoint**: `POST /api/admin/apply` (alias: `POST /api/admin-agreement/apply`)
-- **Payload (`multipart/form-data`)**: `fullName`, `email`, `phone`, `role`, `experience`, `message`, and `resume` (PDF/DOC/DOCX up to 10MB).
-- **Separate Staging & Review Architecture**:
-  1. **Separate Applicant Storage**: Applications are saved in a separate `AdminApplicant` table (completely independent of the `Admin` table).
-  2. **Cloud Storage**: The resume file is uploaded to S3 / Object Storage under `applicant-resumes/` to generate a durable URL.
-  3. **Direct Email to Administration**: An email is dispatched directly to UltimateHealth administration (`ultimate.health25@gmail.com`) with `replyTo: applicant.email`, candidate details, S3 download button, and the resume attached directly for immediate preview.
-  4. **Accept/Reject**: Administration reviews the application via email. If rejected, no admin account is ever created. If approved, a Super Admin will manually provision an admin user for them.
-  5. **Applicant Confirmation**: An automatic acknowledgment receipt is emailed to the candidate.
-
-#### ✍️ Mandatory Agreement Signing
-- Before an admin can log in or access any moderation tools, they must review and digitally sign the administrator agreement through the website (`/admin/agreement`).
-- The admin signs the document digitally, which calls `POST /api/admin/upload-agreement`.
-- The system generates an archived PDF containing the agreement terms, user details, and digital signature, uploads it to S3/Object Storage, and persists the reference to `admin.signature_url`.
-- Upon successful signing and upload, the account is marked `isVerified: true`.
-- Both `POST /api/admin/login` and the `adminAuthenticateToken` middleware strictly enforce that **both** `isVerified === true` and a valid `signature_url` exist; otherwise, access is rejected with `403 Forbidden`.
-
-#### 🛡️ Secure Admin Password Reset (`resetToken` Workflow)
-Admin accounts use a secure, multi-step password reset flow utilizing a temporary, single-use `resetToken` (rather than a single-step OTP password override) to prevent race conditions and brute-force attacks:
-
-```
-[Admin Request] ───► POST /api/admin/forgot-password ───► 6-digit OTP sent to email
-                             │
-                             ▼
-[Verify OTP]    ───► POST /api/admin/verify-otp       ───► Validates OTP & returns temporary resetToken
-                             │
-                             ▼
-[Reset Password]───► POST /api/admin/reset-password   ───► Validates resetToken, checks Redis,
-                                                           updates password & revokes all sessions
-```
-
-1. **Step 1: Request OTP (`POST /api/admin/forgot-password` or `/api/admin/forgotpassword`)**:
-   - Generates a cryptographically secure 6-digit OTP (hashed before storing in the database).
-   - Enforces rate limiting (`forgotPasswordLimiter`) and resend cooldowns.
-   - Dispatches the OTP to the admin's verified email address.
-2. **Step 2: Verify OTP & Issue Reset Token (`POST /api/admin/verify-otp`)**:
-   - Validates the submitted OTP against the stored hash and checks expiry (10 minutes) and attempt counters (max 5 attempts).
-   - Upon successful verification, issues a temporary, short-lived **`resetToken`** (15-minute validity) signed with the RS256 key pair and caches its JTI in Redis (`password_reset_token:<adminId>:<jti>`).
-3. **Step 3: Reset Password (`POST /api/admin/reset-password`)**:
-   - Accepts `{ resetToken, newPassword }`.
-   - Validates the `resetToken` and confirms it has not been previously consumed or expired in Redis.
-   - Deletes the token from Redis to enforce **single-use guarantees**.
-   - Ensures the new password does not match the previous password, hashes the new password, clears OTP data, and triggers `revokeAllUserTokens` to immediately terminate any active sessions.
+- **Users**: Open self-registration with email verification. Users can browse, publish health articles, listen to podcasts, interact with the community, or register as health professionals.
+- **Admins & Moderators**: Cannot self-register. Admin accounts are explicitly created by a **Super Admin** or **UltimateHealth Admin**. To activate their account (`isVerified: true`), newly created admins must review and digitally sign the agreement from the website (`/admin-agreement`). Password recovery is managed via a secure multi-step verification token flow.
 
 ---
 
