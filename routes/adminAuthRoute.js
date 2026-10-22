@@ -11,7 +11,6 @@ const {
   sendAdminOTPForForgotPassword,
   verifyAdminOtp,
   resetAdminPassword,
-  verifyAdminOtpForForgotPassword,
 } = require('../controllers/admin/adminAuthController');
 const {
   verifyEmail,
@@ -25,7 +24,6 @@ const {
   forgotPasswordSchema,
   adminVerifyOtpSchema,
   adminResetPasswordSchema,
-  verifyOtpSchema,
 } = require("../validators/auth.schema");
 const {
   forgotPasswordLimiter,
@@ -125,15 +123,6 @@ router.post(
   otpLimiter,
   validateBody(adminResetPasswordSchema),
   resetAdminPassword
-);
-
-// Single-step verification + reset (matches existing /user/verifypassword)
-router.post(
-  "/admin/verifypassword",
-  enforceMinDuration(700),
-  otpLimiter,
-  validateBody(verifyOtpSchema),
-  verifyAdminOtpForForgotPassword
 );
 
 router.post('/admin/update-password', updateAdminPassword);
