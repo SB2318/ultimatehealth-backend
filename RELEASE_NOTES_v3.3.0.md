@@ -51,14 +51,4 @@
   - `GET /api/admin/applicants`, `GET /api/admin/applicants/{id}`, `PUT /api/admin/applicants/{id}/status`
   - `GET /api/glossary`, `GET /api/glossary/search`, `GET /api/glossary/{slug}`
 
----
 
-## 👥 Contributors (Backend Team)
-- **S. B. (@SB2318)** — Lead Developer & Maintainer
-- Subhendu (@Subhendu-coder)
-- Saptarshi (@Saptarshi312)
-- Sayan Ghosh (@iam-sayan-ghosh)
-- Subhadip (@Subhadip001)
-- Sourav Bapari (@souravbapari)
-- Subhadip Maity (@Subhadip-Maity)
-- Sayan Chandra (@sayanchandra)
