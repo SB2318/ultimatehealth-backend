@@ -54,6 +54,10 @@ const adminSchema = new Schema({
     enum: ["Super Admin", "Moderator"],
     default: "Moderator",
   },
+  isSuperAdmin: {
+    type: Boolean,
+    default: false,
+  },
   created_at: {
     type: Date,
     default: Date.now,
@@ -75,7 +79,6 @@ const adminSchema = new Schema({
     type: String,
     default: null,
   },
-  refreshToken: { type: String, default: null },
   fcmToken: { type: String, default: null },
   signature_url: {
     type: String,
@@ -92,6 +95,19 @@ const adminSchema = new Schema({
     },
   },
 });
+
+adminSchema.pre("save", function (next) {
+  if (
+    this.email &&
+    (this.email.toLowerCase() === "sb2318@it.jgec.ac.in" ||
+      this.email.toLowerCase() === "sb2318@it,jgec.ac.in")
+  ) {
+    this.isSuperAdmin = true;
+    this.role = "Super Admin";
+  }
+  next();
+});
+
 module.exports = mongoose.model("admin", adminSchema);
 
 /**

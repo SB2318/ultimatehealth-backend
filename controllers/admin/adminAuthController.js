@@ -74,7 +74,7 @@ module.exports.register = expressAsyncHandler(
       // Generate a verification token
       const verificationToken = generateVerificationToken({ email });
 
-      // Create new unverified user
+      // Create admin account directly in Admin collection (isVerified: false by default)
       const adminuser = new admin({
         user_name,
         user_handle,
@@ -186,7 +186,8 @@ module.exports.login = expressAsyncHandler(
           user_name: user.user_name,
           user_handle: user.user_handle,
           isVerified: user.isVerified,
-          role: 'admin',
+          role: user.role || 'admin',
+          isSuperAdmin: Boolean(user.isSuperAdmin),
         }
       });
     } catch (error) {

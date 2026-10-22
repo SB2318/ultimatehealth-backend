@@ -1,0 +1,39 @@
+info:
+  name: Submit Admin & Reviewer Application
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/admin/apply"
+  body:
+    type: multipartForm
+    data:
+      - name: fullName
+        value: Dr. John Doe
+        type: text
+      - name: email
+        value: applicant@example.com
+        type: text
+      - name: phone
+        value: "+91 9876543210"
+        type: text
+      - name: role
+        value: Moderator
+        type: text
+      - name: experience
+        value: 5 years clinical practice and medical content reviewing
+        type: text
+      - name: message
+        value: I would love to contribute to UltimateHealth as a verified content moderator.
+        type: text
+      - name: resume
+        value: "@file(sample_resume.pdf)"
+        type: file
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

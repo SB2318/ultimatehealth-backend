@@ -3081,6 +3081,151 @@ const sendContactUsMail = async ({ name, email, subject, message }) => {
   }
 };
 
+const sendAdminApplicationEmail = async ({
+  applicant,
+  resumeUrl,
+  originalFileName,
+  emailAttachments = [],
+}) => {
+  const recipientEmail =
+    process.env.ADMIN_APPLICATION_EMAIL ||
+    process.env.ADMIN_EMAIL ||
+    process.env.EMAIL_USER ||
+    "ultimate.health25@gmail.com";
+
+  const adminNotificationHtml = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 650px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+      <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; padding: 28px 24px; text-align: center;">
+        <h2 style="margin: 0 0 6px 0; font-size: 24px; font-weight: 700;">New Admin / Reviewer Application</h2>
+        <p style="margin: 0; opacity: 0.95; font-size: 14px;">UltimateHealth Platform Recruitment</p>
+      </div>
+
+      <div style="padding: 28px 24px; color: #2d3748;">
+        <p style="font-size: 15px; line-height: 1.6; margin-top: 0;">
+          A new application has been submitted through the UltimateHealth portal. Below are the applicant's details:
+        </p>
+
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px;">
+          <tr style="border-bottom: 1px solid #edf2f7;">
+            <td style="padding: 10px 0; font-weight: 600; color: #4a5568; width: 35%;">Applicant Name:</td>
+            <td style="padding: 10px 0; color: #1a202c; font-weight: 700;">${applicant.fullName}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #edf2f7;">
+            <td style="padding: 10px 0; font-weight: 600; color: #4a5568;">Email Address:</td>
+            <td style="padding: 10px 0;"><a href="mailto:${applicant.email}" style="color: #667eea; text-decoration: none;">${applicant.email}</a></td>
+          </tr>
+          <tr style="border-bottom: 1px solid #edf2f7;">
+            <td style="padding: 10px 0; font-weight: 600; color: #4a5568;">Phone Number:</td>
+            <td style="padding: 10px 0; color: #1a202c;">${applicant.phone || "Not provided"}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #edf2f7;">
+            <td style="padding: 10px 0; font-weight: 600; color: #4a5568;">Role Applied:</td>
+            <td style="padding: 10px 0;"><span style="display: inline-block; padding: 4px 10px; background: #e0e7ff; color: #3730a3; border-radius: 9999px; font-weight: 600; font-size: 12px;">${applicant.role || "Moderator"}</span></td>
+          </tr>
+          <tr style="border-bottom: 1px solid #edf2f7;">
+            <td style="padding: 10px 0; font-weight: 600; color: #4a5568;">Experience:</td>
+            <td style="padding: 10px 0; color: #1a202c;">${applicant.experience || "Not provided"}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #edf2f7;">
+            <td style="padding: 10px 0; font-weight: 600; color: #4a5568;">Submitted At:</td>
+            <td style="padding: 10px 0; color: #718096;">${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST</td>
+          </tr>
+        </table>
+
+        ${
+          applicant.message
+            ? `
+          <div style="margin: 20px 0; padding: 16px; background: #f8fafc; border-left: 4px solid #667eea; border-radius: 4px;">
+            <strong style="color: #4a5568; font-size: 13px; display: block; margin-bottom: 6px;">Cover Message / Statement of Interest:</strong>
+            <p style="margin: 0; color: #2d3748; font-size: 14px; line-height: 1.6; white-space: pre-wrap;">${applicant.message}</p>
+          </div>
+        `
+            : ""
+        }
+
+        ${
+          resumeUrl
+            ? `
+          <div style="margin: 25px 0 15px 0; text-align: center;">
+            <a href="${resumeUrl}" target="_blank" style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #667eea, #764ba2); color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; box-shadow: 0 4px 10px rgba(102, 126, 234, 0.3);">
+              📄 View / Download Resume in Cloud Storage
+            </a>
+          </div>
+        `
+            : ""
+        }
+
+        ${
+          emailAttachments.length > 0
+            ? `<p style="font-size: 13px; color: #718096; text-align: center; margin-top: 10px;">📎 The original file (<code>${originalFileName}</code>) is also attached directly to this email.</p>`
+            : ""
+        }
+
+        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 25px 0 15px 0;" />
+        <p style="font-size: 12px; color: #a0aec0; margin: 0; text-align: center;">
+          💡 You can reply directly to this email to contact <strong>${applicant.fullName}</strong> (${applicant.email}).
+        </p>
+      </div>
+    </div>
+  `;
+
+  const mailOptions = {
+    from: `"UltimateHealth Portal" <${process.env.EMAIL_USER}>`,
+    to: recipientEmail,
+    replyTo: `${applicant.fullName} <${applicant.email}>`,
+    subject: `[New Application] ${applicant.fullName} - ${applicant.role || "Review Team Candidate"}`,
+    html: adminNotificationHtml,
+    attachments: emailAttachments,
+  };
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log("Admin application notification email sent:", info.response);
+    return true;
+  } catch (error) {
+    console.error("Error sending admin application email:", error);
+    return false;
+  }
+};
+
+const sendApplicantConfirmationEmail = async ({ applicant }) => {
+  const confirmationHtml = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+      <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; padding: 24px; text-align: center;">
+        <h2 style="margin: 0; font-size: 22px;">Application Received</h2>
+        <p style="margin: 6px 0 0 0; opacity: 0.9; font-size: 14px;">UltimateHealth Review & Moderation Team</p>
+      </div>
+      <div style="padding: 24px; color: #2d3748; line-height: 1.6; font-size: 14px;">
+        <p>Dear <strong>${applicant.fullName}</strong>,</p>
+        <p>Thank you for your interest in joining the UltimateHealth community as a <strong>${applicant.role || "Moderator"}</strong>.</p>
+        <p>We have received your application and resume. Our team is currently reviewing your submission to evaluate alignment with our content review and moderation standards.</p>
+        <div style="margin: 20px 0; padding: 14px; background: #f0fdf4; border-left: 4px solid #22c55e; border-radius: 4px; color: #166534;">
+          <strong>Application ID:</strong> <code>${applicant._id}</code><br/>
+          <strong>Status:</strong> Under Review
+        </div>
+        <p>If your background matches our requirements, a Super Admin will reach out with the next onboarding steps and agreement details.</p>
+        <p style="margin-bottom: 0;">Warm regards,<br/><strong>UltimateHealth Team</strong></p>
+      </div>
+    </div>
+  `;
+
+  const mailOptions = {
+    from: `"UltimateHealth" <${process.env.EMAIL_USER}>`,
+    to: applicant.email,
+    subject: "Application Received - UltimateHealth Review Team",
+    html: confirmationHtml,
+  };
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log("Applicant confirmation email sent:", info.response);
+    return true;
+  } catch (error) {
+    console.error("Error sending applicant confirmation email:", error);
+    return false;
+  }
+};
+
 module.exports = {
   sendNewArticleEmail,
   sendContactUsMail,
@@ -3116,6 +3261,8 @@ module.exports = {
   sendPodcastDiscardEmail,
   sendOtpMail,
   sendContributorVerificationEmail,
+  sendAdminApplicationEmail,
+  sendApplicantConfirmationEmail,
 };
 
 

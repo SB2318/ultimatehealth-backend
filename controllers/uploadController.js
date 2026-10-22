@@ -1,4 +1,5 @@
 //const AWS = require('aws-sdk');
+const multer = require('multer');
 const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const fs = require('fs');
 const axios = require('axios');
@@ -82,6 +83,56 @@ const allowedAudioTypes = [
     'audio/x-sd2',
     'audio/x-vorbis+ogg'
 ];
+
+const ALLOWED_RESUME_TYPES = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'image/jpeg',
+    'image/png',
+];
+
+const applicantResumeUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 10 * 1024 * 1024, // 10 MB limit
+    },
+    fileFilter: (req, file, cb) => {
+        if (ALLOWED_RESUME_TYPES.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(
+                new Error(
+                    'Unsupported file type. Only PDF, DOC, DOCX, JPG, and PNG files are accepted.'
+                ),
+                false
+            );
+        }
+    },
+}).fields([
+    { name: 'resume', maxCount: 1 },
+    { name: 'file', maxCount: 1 },
+]);
+
+const uploadApplicantResumeToS3 = async (buffer, originalName, mimeType) => {
+    const sanitizedName = originalName.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const uniqueKey = `applicant-resumes/${Date.now()}-${crypto.randomUUID()}-${sanitizedName}`;
+
+    const params = {
+        Bucket: process.env.BUCKET_NAME,
+        Key: uniqueKey,
+        Body: buffer,
+        ContentType: mimeType,
+    };
+
+    const command = new PutObjectCommand(params);
+    await s3Client.send(command);
+
+    const baseUrl = process.env.PROD_URL || 'https://ultimatehealth.blog';
+    const resumeUrl = `${baseUrl}/api/getFile/${encodeURIComponent(uniqueKey)}`;
+
+    return { uniqueKey, resumeUrl };
+};
 
 // Max file size in bytes (~150 MB)
 const MAX_FILE_SIZE = 150 * 1024 * 1024;
@@ -920,5 +971,7 @@ module.exports = {
     publishImprovementFileFromPocketbase,
     deleteImprovementRecordFromPocketbase,
     deletePocketbaseRecord,
-    deleteFileFn
+    deleteFileFn,
+    uploadApplicantResumeToS3,
+    applicantResumeUpload
 };
