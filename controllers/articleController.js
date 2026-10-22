@@ -510,26 +510,26 @@ const sanitizePopulatedArticle = (article) => {
   return article;
 };
 
+// Common handler to fetch and return an article with identical functionality
+const fetchAndSendArticle = async (res, filter) => {
+  const article = await populateArticleQuery(Article.findOne(filter)).exec();
+
+  if (!article || article.is_removed) {
+    return res.status(404).json({ message: "Article not found" });
+  }
+
+  sanitizePopulatedArticle(article);
+
+  return res.status(200).json({ article });
+};
+
 // Get an article by ID (supports numeric _id and string pb_recordId)
 module.exports.getArticleById = expressAsyncHandler(
   async (req, res) => {
     try {
       const idParam = req.params.id;
-      let article = null;
-
-      if (!isNaN(Number(idParam))) {
-        article = await populateArticleQuery(Article.findById(Number(idParam))).exec();
-      } else {
-        article = await populateArticleQuery(Article.findOne({ pb_recordId: idParam })).exec();
-      }
-
-      if (!article || article.is_removed) {
-        return res.status(404).json({ message: "Article not found" });
-      }
-
-      sanitizePopulatedArticle(article);
-
-      res.status(200).json({ article });
+      const filter = !isNaN(Number(idParam)) ? { _id: Number(idParam) } : { pb_recordId: idParam };
+      await fetchAndSendArticle(res, filter);
     } catch (error) {
       res
         .status(500)
@@ -548,19 +548,11 @@ module.exports.getArticleByPbRecordId = expressAsyncHandler(
         return res.status(400).json({ message: "pb_recordId parameter is required" });
       }
 
-      const article = await populateArticleQuery(Article.findOne({ pb_recordId })).exec();
-
-      if (!article || article.is_removed) {
-        return res.status(404).json({ message: "Article not found" });
-      }
-
-      sanitizePopulatedArticle(article);
-
-      res.status(200).json({ article });
+      await fetchAndSendArticle(res, { pb_recordId });
     } catch (error) {
       res
         .status(500)
-        .json({ error: "Error fetching article by PocketBase record ID", details: error.message });
+        .json({ error: "Error fetching article", details: error.message });
     }
   }
 );
