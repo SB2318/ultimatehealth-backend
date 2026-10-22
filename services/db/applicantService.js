@@ -12,11 +12,41 @@ const findAdminApplicantById = async (id) => {
 };
 
 const findAdminApplicants = async (filter = {}, options = {}) => {
-  return await AdminApplicant.find(filter).sort(options.sort || { createdAt: -1 });
+  const page = Math.max(1, parseInt(options.page, 10) || 1);
+  const limit = Math.max(1, parseInt(options.limit, 10) || 10);
+  const skip = (page - 1) * limit;
+
+  const [applicants, total] = await Promise.all([
+    AdminApplicant.find(filter)
+      .sort(options.sort || { createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    AdminApplicant.countDocuments(filter),
+  ]);
+
+  return {
+    applicants,
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
+};
+
+const updateAdminApplicantStatus = async (id, status, reviewNotes = "") => {
+  return await AdminApplicant.findByIdAndUpdate(
+    id,
+    { status, reviewNotes, updatedAt: new Date() },
+    { new: true }
+  );
 };
 
 module.exports = {
   createAdminApplicant,
   findAdminApplicantById,
   findAdminApplicants,
+  updateAdminApplicantStatus,
 };

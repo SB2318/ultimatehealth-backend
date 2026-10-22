@@ -563,6 +563,85 @@ router.get('/articles', articleController.getAllArticles); // auth removed for g
  *         description: Internal server error
  */
 router.get('/articles/:id/translations', articleController.getArticleTranslations);
+/**
+ * @openapi
+ * /articles/{id}/related:
+ *   get:
+ *     summary: Retrieve related articles based on category, tags, and content similarity
+ *     description: >
+ *       Fetches articles matching the target article using tag overlap count,
+ *       full-text keyword matching, and logarithmic engagement boosting.
+ *     tags:
+ *       - Articles
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: The unique ID of the source article.
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 5
+ *           minimum: 1
+ *           maximum: 20
+ *         description: Number of related articles to return.
+ *       - in: query
+ *         name: excludeIds
+ *         schema:
+ *           type: string
+ *         description: Comma-separated list of article IDs to exclude.
+ *     responses:
+ *       '200':
+ *         description: Successfully retrieved related articles
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 count:
+ *                   type: integer
+ *                   example: 4
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       _id:
+ *                         type: integer
+ *                       title:
+ *                         type: string
+ *                       summary:
+ *                         type: string
+ *                       description:
+ *                         type: string
+ *                       imageUtils:
+ *                         type: object
+ *                       viewCount:
+ *                         type: integer
+ *                       likeCount:
+ *                         type: integer
+ *                       publishedDate:
+ *                         type: string
+ *                         format: date-time
+ *                       language:
+ *                         type: string
+ *                       author:
+ *                         type: object
+ *                       tags:
+ *                         type: array
+ *                       relevanceScore:
+ *                         type: number
+ *       '404':
+ *         description: Source article not found
+ *       '500':
+ *         description: Internal server error
+ */
 router.get(
   '/articles/:id/related',
   validateParams(getRelatedArticlesParamsSchema),
