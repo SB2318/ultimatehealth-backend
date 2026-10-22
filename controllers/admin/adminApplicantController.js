@@ -1,6 +1,12 @@
 const expressAsyncHandler = require("express-async-handler");
+const crypto = require("crypto");
+const bcrypt = require("bcryptjs");
 const { adminApplicantSchema } = require("../../validators/applicant.schema");
 const { uploadApplicantResumeToS3 } = require("../uploadController");
+const Admin = require("../../models/admin/adminModel");
+const Article = require("../../models/Articles");
+const Glossary = require("../../models/Glossary");
+const { statusEnum } = require("../../utils/StatusEnum");
 const {
   createAdminApplicant,
   findAdminApplicantById,
@@ -10,7 +16,9 @@ const {
 const {
   sendAdminApplicationEmail,
   sendApplicantConfirmationEmail,
+  sendVerificationEmail,
 } = require("../emailservice");
+const { generateVerificationToken } = require("../../services/security/tokenService");
 const { throwError } = require("../../utils/throwError");
 const { sendSuccess } = require("../../utils/response");
 const { HTTP_STATUS, ERROR_CODES } = require("../../constants/errorConstants");
@@ -187,9 +195,129 @@ const updateApplicantStatus = expressAsyncHandler(async (req, res) => {
   );
 });
 
+/**
+ * Superadmin-Specific: Create Admin profile directly from an Approved Applicant
+ * Access: SuperAdmin only
+ */
+const createAdminFromApplicant = expressAsyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { role = "Moderator", customPassword } = req.body;
+
+  const applicant = await findAdminApplicantById(id);
+  if (!applicant) {
+    throwError(HTTP_STATUS.NOT_FOUND, ERROR_CODES.RESOURCE_NOT_FOUND, "Applicant not found");
+  }
+
+  // Check if admin already exists with this email
+  const existingAdmin = await Admin.findOne({ email: applicant.email.toLowerCase() });
+  if (existingAdmin) {
+    throwError(
+      HTTP_STATUS.CONFLICT,
+      ERROR_CODES.ALREADY_EXISTS,
+      "An admin account with this email already exists"
+    );
+  }
+
+  // Generate unique handle from full name
+  const baseHandle = applicant.fullName
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "_")
+    .replace(/_+/g, "_")
+    .slice(0, 20);
+  const randomSuffix = crypto.randomBytes(2).toString("hex");
+  const user_handle = `${baseHandle}_${randomSuffix}`;
+
+  // Generate password (or use provided)
+  const plainPassword = customPassword || crypto.randomBytes(8).toString("hex") + "!Aa1";
+  const salt = await bcrypt.genSalt(10);
+  const hashedPassword = await bcrypt.hash(plainPassword, salt);
+
+  // Generate verification token for agreement signing
+  const verificationToken = generateVerificationToken({ email: applicant.email });
+
+  const newAdmin = new Admin({
+    user_name: applicant.fullName,
+    user_handle,
+    email: applicant.email.toLowerCase(),
+    password: hashedPassword,
+    role: role || (applicant.role === "Admin" ? "Super Admin" : "Moderator"),
+    verificationToken,
+    isVerified: false,
+    Profile_avtar: "",
+  });
+
+  await newAdmin.save();
+
+  // Mark applicant status as Approved
+  applicant.status = "Approved";
+  applicant.reviewNotes = `Admin profile created with handle @${user_handle}`;
+  await applicant.save();
+
+  // Dispatch onboarding / verification email
+  try {
+    sendVerificationEmail(applicant.email, verificationToken, true);
+  } catch (emailErr) {
+    console.error("⚠️ Failed to dispatch admin agreement verification email:", emailErr);
+  }
+
+  return sendSuccess(
+    res,
+    HTTP_STATUS.CREATED,
+    "Admin profile created successfully from applicant data",
+    {
+      adminId: newAdmin._id,
+      user_name: newAdmin.user_name,
+      user_handle: newAdmin.user_handle,
+      email: newAdmin.email,
+      role: newAdmin.role,
+      isVerified: newAdmin.isVerified,
+      temporaryPassword: customPassword ? undefined : plainPassword,
+    }
+  );
+});
+
+/**
+ * Get My Admin Profile: Sanitized profile of currently authenticated Admin/SuperAdmin
+ * Access: Authenticated Admin
+ */
+const getMyAdminProfile = expressAsyncHandler(async (req, res) => {
+  const adminId = req.userId;
+  if (!adminId) {
+    throwError(HTTP_STATUS.UNAUTHORIZED, ERROR_CODES.UNAUTHORIZED, "Admin authentication required");
+  }
+
+  const adminUser = await Admin.findById(adminId).select("-password -refreshToken -otp -verificationToken").lean();
+  if (!adminUser) {
+    throwError(HTTP_STATUS.NOT_FOUND, ERROR_CODES.RESOURCE_NOT_FOUND, "Admin not found");
+  }
+
+  // Aggregate review stats
+  const [articlesReviewed, glossaryReviewed] = await Promise.all([
+    Article.countDocuments({
+      reviewer_id: adminId,
+      status: { $in: [statusEnum.PUBLISHED, statusEnum.DISCARDED] },
+    }),
+    Glossary.countDocuments({
+      reviewerId: adminId,
+      status: { $in: [statusEnum.PUBLISHED, statusEnum.DISCARDED] },
+    }),
+  ]);
+
+  return sendSuccess(res, HTTP_STATUS.OK, "Admin profile retrieved successfully", {
+    ...adminUser,
+    stats: {
+      articlesReviewed,
+      glossaryReviewed,
+      totalContributions: articlesReviewed + glossaryReviewed,
+    },
+  });
+});
+
 module.exports = {
   submitApplicant,
   getAllApplicants,
   getApplicantById,
   updateApplicantStatus,
+  createAdminFromApplicant,
+  getMyAdminProfile,
 };

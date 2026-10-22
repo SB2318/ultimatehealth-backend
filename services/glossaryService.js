@@ -32,10 +32,15 @@ class GlossaryService {
     return await Glossary.findByIdAndUpdate(id, { is_removed: true, status: statusEnum.DELETED }, { new: true });
   }
 
-  async listTerms({ page = 1, limit = 20, letter, category, status, language = 'en-IN' }) {
+  /**
+   * List terms: formatted for frontend card grids e.g. /medical-glossary
+   * Formats category and relatedTerms gracefully for UI display
+   */
+  async listTerms({ page = 1, limit = 20, letter, category, status, language }) {
     const query = { is_removed: false };
 
-    if (language) {
+    // Multi-language filter: if specified, filter by it; otherwise return all published languages
+    if (language && language !== 'all') {
       query.language = language;
     }
 
@@ -45,27 +50,42 @@ class GlossaryService {
       query.status = statusEnum.PUBLISHED; // Default public view
     }
 
-    if (letter) {
+    if (letter && letter !== 'all') {
       query.term = { $regex: new RegExp(`^${letter}`, 'i') };
     }
 
-    if (category) {
+    if (category && category !== 'all') {
       query.categories = category;
     }
 
     const skip = (page - 1) * limit;
 
     const terms = await Glossary.find(query)
-      .select('term slug language shortDescription categories status createdAt')
+      .select('term slug language definition shortDescription synonyms categories relatedTerms status createdAt')
       .populate('categories', 'name slug')
+      .populate('relatedTerms', 'term slug')
       .sort({ term: 1 })
       .skip(skip)
-      .limit(Number(limit));
+      .limit(Number(limit))
+      .lean();
 
     const total = await Glossary.countDocuments(query);
 
+    // Format terms for UI compatibility with https://ultimatehealth.blog/web/en/medical-glossary
+    const formattedTerms = terms.map((t) => {
+      const primaryCategory = t.categories?.[0]?.name || (typeof t.categories?.[0] === 'string' ? t.categories[0] : 'General');
+      const relatedTermsList = (t.relatedTerms || []).map((rt) => (typeof rt === 'object' ? rt.term : rt));
+
+      return {
+        ...t,
+        category: primaryCategory, // Direct category name string for badge styling
+        relatedTerms: relatedTermsList, // Array of term strings for pill clicks
+        languageName: t.language === 'en-IN' || t.language === 'en' ? 'English' : t.language,
+      };
+    });
+
     return {
-      data: terms,
+      data: formattedTerms,
       meta: {
         total,
         page: Number(page),
@@ -75,24 +95,34 @@ class GlossaryService {
     };
   }
 
-  async searchTerms(searchQuery, limit = 10, language = 'en-IN') {
+  async searchTerms(searchQuery, limit = 10, language) {
     const filter = {
       $text: { $search: searchQuery },
       status: statusEnum.PUBLISHED,
       is_removed: false,
     };
 
-    if (language) {
+    if (language && language !== 'all') {
       filter.language = language;
     }
 
-    return await Glossary.find(
+    const terms = await Glossary.find(
       filter,
       { score: { $meta: 'textScore' } }
     )
       .sort({ score: { $meta: 'textScore' } })
       .limit(Number(limit))
-      .select('term slug language shortDescription categories');
+      .select('term slug language definition shortDescription categories relatedTerms')
+      .populate('categories', 'name slug')
+      .populate('relatedTerms', 'term slug')
+      .lean();
+
+    return terms.map((t) => ({
+      ...t,
+      category: t.categories?.[0]?.name || 'General',
+      relatedTerms: (t.relatedTerms || []).map((rt) => (typeof rt === 'object' ? rt.term : rt)),
+      languageName: t.language === 'en-IN' || t.language === 'en' ? 'English' : t.language,
+    }));
   }
 
   // ==========================================
@@ -107,7 +137,7 @@ class GlossaryService {
       status: statusEnum.UNASSIGNED,
       is_removed: false,
     };
-    if (language) query.language = language;
+    if (language && language !== 'all') query.language = language;
 
     const skip = (page - 1) * limit;
     const [terms, total] = await Promise.all([

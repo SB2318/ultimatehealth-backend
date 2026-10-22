@@ -5,6 +5,8 @@ const {
   getAllApplicants,
   getApplicantById,
   updateApplicantStatus,
+  createAdminFromApplicant,
+  getMyAdminProfile,
 } = require("../controllers/admin/adminApplicantController");
 const {
   applicantResumeUpload,
@@ -108,6 +110,39 @@ router.post(
   applicantResumeUpload,
   submitApplicant
 );
+
+/**
+ * @openapi
+ * /admin/getmyadminprofile:
+ *   get:
+ *     summary: Get profile and review statistics of the authenticated Admin / SuperAdmin
+ *     tags:
+ *       - Admin Profile
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       '200':
+ *         description: Authenticated admin profile details with contribution stats
+ *       '401':
+ *         description: Unauthorized
+ */
+router.get(
+  "/admin/getmyadminprofile",
+  adminAuthenticateToken,
+  getMyAdminProfile
+);
+
+// Alias convenience route
+router.get(
+  "/admin/me",
+  adminAuthenticateToken,
+  getMyAdminProfile
+);
+
+/**
+ * SuperAdmin Exclusive Endpoints:
+ * Protected by adminAuthenticateToken + requireSuperAdmin (isSuperAdmin: true)
+ */
 
 /**
  * @openapi
@@ -224,6 +259,47 @@ router.put(
   adminAuthenticateToken,
   requireSuperAdmin,
   updateApplicantStatus
+);
+
+/**
+ * @openapi
+ * /admin/applicants/{id}/create-admin:
+ *   post:
+ *     summary: Create Admin profile directly from an Approved applicant (Super Admin only)
+ *     description: Provisions an Admin / Moderator account, hashes a temporary password, and dispatches agreement onboarding email.
+ *     tags:
+ *       - Admin Applicants
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               role:
+ *                 type: string
+ *                 enum: [Moderator, "Super Admin"]
+ *                 default: Moderator
+ *               customPassword:
+ *                 type: string
+ *     responses:
+ *       '201':
+ *         description: Admin account created successfully and verification email dispatched
+ *       '409':
+ *         description: Admin with this email already exists
+ */
+router.post(
+  "/admin/applicants/:id/create-admin",
+  adminAuthenticateToken,
+  requireSuperAdmin,
+  createAdminFromApplicant
 );
 
 module.exports = router;
