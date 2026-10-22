@@ -714,6 +714,41 @@ router.get(
  *                   example: "Error fetching article"
  */
 
+/**
+ * @swagger
+ * /articles/record/{pb_recordId}:
+ *   get:
+ *     summary: Get an article by PocketBase record ID
+ *     tags:
+ *       - Articles
+ *     parameters:
+ *       - in: path
+ *         name: pb_recordId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The PocketBase record ID of the article
+ *     responses:
+ *       '200':
+ *         description: Successfully retrieved the article
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 article:
+ *                   type: object
+ *                   $ref: '#/components/schemas/Article'
+ *       '400':
+ *         description: pb_recordId parameter is required
+ *       '404':
+ *         description: Article not found or removed
+ *       '500':
+ *         description: Internal server error
+ */
+router.get('/articles/record/:pb_recordId', articleController.getArticleByPbRecordId);
+router.get('/articles/pb/:pb_recordId', articleController.getArticleByPbRecordId);
+
 router.get('/articles/:id', articleController.getArticleById); // auth removed for guest profile, purpose: user can view article in unauthenticated state
 
 /**

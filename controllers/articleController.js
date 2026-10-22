@@ -448,79 +448,86 @@ module.exports.getAllImprovementsForUser = expressAsyncHandler(
   }
 )
 
-// Get an article by ID
+// Helper to populate article relations
+const populateArticleQuery = (query) => {
+  return query
+    .populate('tags')
+    .populate({
+      path: 'likedUsers',
+      select: 'user_handle user_name Profile_image',
+      match: {
+        isBlockUser: false,
+        isBannedUser: false
+      }
+    })
+    .populate({
+      path: 'contributors',
+      select: 'user_handle user_name Profile_image',
+      match: {
+        isBannedUser: false,
+        isBlockUser: false
+      }
+    })
+    .populate({
+      path: "authorId",
+      populate: {
+        path: 'followers',
+        select: 'user_handle user_name Profile_image',
+        match: {
+          isBannedUser: false,
+          isBlockUser: false
+        }
+      }
+    })
+    .populate({
+      path: 'translationOf',
+      select: '_id title language pb_recordId'
+    })
+    .populate({
+      path: 'translatedArticles',
+      select: '_id title description language imageUtils pb_recordId status',
+      match: {
+        is_removed: false,
+        status: statusEnum.statusEnum.PUBLISHED
+      }
+    });
+};
+
+// Helper to clean up filtered populated null entries
+const sanitizePopulatedArticle = (article) => {
+  if (Array.isArray(article.likedUsers)) {
+    article.likedUsers = article.likedUsers.filter(user => user !== null);
+  }
+  if (Array.isArray(article.contributors)) {
+    article.contributors = article.contributors.filter(user => user !== null);
+  }
+  if (article.authorId && Array.isArray(article.authorId.followers)) {
+    article.authorId.followers = article.authorId.followers.filter(user => user !== null);
+  }
+  if (Array.isArray(article.translatedArticles)) {
+    article.translatedArticles = article.translatedArticles.filter(article => article !== null);
+  }
+  return article;
+};
+
+// Get an article by ID (supports numeric _id and string pb_recordId)
 module.exports.getArticleById = expressAsyncHandler(
   async (req, res) => {
     try {
+      const idParam = req.params.id;
+      let article = null;
 
-      const article = await Article.findById(req.params.id)
-        .populate('tags')
-        .populate({
-          path: 'likedUsers',
-          select: 'user_handle user_name Profile_image',
-          match: {
-            isBlockUser: false,
-            isBannedUser: false
-          }
-        })
-        .populate({
-          path: 'contributors',
-          select: 'user_handle user_name Profile_image',
-          match: {
-            isBannedUser: false,
-            isBlockUser: false
-          }
-        })
-        .populate({
-          path: "authorId",
-          populate: {
-            path: 'followers',
-            select: 'user_handle user_name Profile_image',
-            match: {
-              isBannedUser: false,
-              isBlockUser: false
-            }
-          }
-        })
-        .populate({
-          path: 'translationOf',
-          select: '_id title language pb_recordId'
-        })
-        .populate({
-          path: 'translatedArticles',
-          select: '_id title description language imageUtils pb_recordId status',
-          match: {
-            is_removed: false,
-            status: statusEnum.statusEnum.PUBLISHED
-          }
-        })
-        .exec();
+      if (!isNaN(Number(idParam))) {
+        article = await populateArticleQuery(Article.findById(Number(idParam))).exec();
+      } else {
+        article = await populateArticleQuery(Article.findOne({ pb_recordId: idParam })).exec();
+      }
 
       if (!article || article.is_removed) {
         return res.status(404).json({ message: "Article not found" });
       }
 
-
-
-      if (Array.isArray(article.likedUsers)) {
-        article.likedUsers = article.likedUsers.filter(user => user !== null);
-      }
-
-
-      if (Array.isArray(article.contributors)) {
-        article.contributors = article.contributors.filter(user => user !== null);
-      }
-
-
-      if (article.authorId && Array.isArray(article.authorId.followers)) {
-        article.authorId.followers = article.authorId.followers.filter(user => user !== null);
-      }
-
-      if (Array.isArray(article.translatedArticles)) {
-        article.translatedArticles = article.translatedArticles.filter(article => article !== null);
-      }
-
-
+      sanitizePopulatedArticle(article);
 
       res.status(200).json({ article });
     } catch (error) {
@@ -529,7 +536,34 @@ module.exports.getArticleById = expressAsyncHandler(
         .json({ error: "Error fetching article", details: error.message });
     }
   }
-)
+);
+
+// Get an article by PocketBase record ID (pb_recordId)
+module.exports.getArticleByPbRecordId = expressAsyncHandler(
+  async (req, res) => {
+    try {
+      const pbRecordId = req.params.pb_recordId || req.params.recordId || req.query.pb_recordId || req.query.recordId;
+
+      if (!pbRecordId) {
+        return res.status(400).json({ message: "pb_recordId parameter is required" });
+      }
+
+      const article = await populateArticleQuery(Article.findOne({ pb_recordId })).exec();
+
+      if (!article || article.is_removed) {
+        return res.status(404).json({ message: "Article not found" });
+      }
+
+      sanitizePopulatedArticle(article);
+
+      res.status(200).json({ article });
+    } catch (error) {
+      res
+        .status(500)
+        .json({ error: "Error fetching article by PocketBase record ID", details: error.message });
+    }
+  }
+);
 
 module.exports.getArticleTranslations = expressAsyncHandler(
   async (req, res) => {

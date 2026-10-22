@@ -221,6 +221,7 @@ articleSchema.pre('aggregate', function (next) {
   next();
 });
 
+articleSchema.index({ pb_recordId: 1 });
 articleSchema.index({
   status: 1,
   publishedDate: -1,
