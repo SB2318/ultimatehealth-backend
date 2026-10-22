@@ -1,0 +1,15 @@
+node_modules
+npm-debug.log
+.git
+.github
+.gitignore
+.env
+.env.*
+!.env_sample
+coverage
+tests
+docs
+bruno
+uploads
+*.md
+.DS_Store
