@@ -63,10 +63,6 @@ module.exports.searchTerms = expressAsyncHandler(async (req, res) => {
   res.status(200).json({ results });
 });
 
-// ==========================================
-// 📋 GLOSSARY REVIEW CONTROLLER (Admin / Moderator)
-// ==========================================
-
 module.exports.getUnassignedGlossaryQueue = expressAsyncHandler(async (req, res) => {
   const { page = 1, limit = 10, language } = req.query;
   const result = await glossaryService.getUnassignedTerms({ page, limit, language });

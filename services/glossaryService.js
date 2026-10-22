@@ -125,10 +125,6 @@ class GlossaryService {
     }));
   }
 
-  // ==========================================
-  // 🩺 REVIEW SYSTEM METHODS (Article Review Equivalent, Direct Document Text)
-  // ==========================================
-
   /**
    * Get unassigned terms queue waiting for a reviewer to pick
    */

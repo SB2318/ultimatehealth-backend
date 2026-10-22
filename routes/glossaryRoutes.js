@@ -6,10 +6,6 @@ const adminAuthenticateToken = require('../middleware/adminAuthenticateToken');
 
 const router = express.Router();
 
-// ==========================================
-// 🌐 Public Endpoints
-// ==========================================
-
 /**
  * @openapi
  * /glossary:
@@ -104,10 +100,6 @@ router.get('/search', glossaryController.searchTerms);
  */
 router.get('/:slug', glossaryController.getTerm);
 
-// ==========================================
-// 🔒 Admin / Author Write Endpoints
-// ==========================================
-
 /**
  * @openapi
  * /glossary:
@@ -156,9 +148,6 @@ router.post('/', adminAuthenticateToken, validateBody(createGlossarySchema), glo
 router.put('/:id', adminAuthenticateToken, validateBody(updateGlossarySchema), glossaryController.updateTerm);
 router.delete('/:id', adminAuthenticateToken, glossaryController.deleteTerm);
 
-// ==========================================
-// 📋 Admin / Moderator Review Queue Endpoints
-// ==========================================
 router.get('/admin/review-queue', adminAuthenticateToken, glossaryController.getUnassignedGlossaryQueue);
 router.get('/admin/my-reviews/in-progress', adminAuthenticateToken, glossaryController.getReviewerInProgressGlossary);
 router.get('/admin/my-reviews/completed', adminAuthenticateToken, glossaryController.getReviewerCompletedGlossary);

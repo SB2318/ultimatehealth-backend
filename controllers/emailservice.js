@@ -3226,9 +3226,53 @@ const sendApplicantConfirmationEmail = async ({ applicant }) => {
   }
 };
 
+const sendAdminOnboardingEmail = async ({ email, fullName, user_handle, phone, token, temporaryPassword }) => {
+  const verifyUrl = `${process.env.PROD_URL}/api/user/verifyEmail?token=${token}&isAdmin=true`;
+  const phoneSection = phone ? `<p style="margin: 4px 0;"><strong>Registered Phone:</strong> ${phone}</p>` : "";
+  const passwordSection = temporaryPassword ? `<p style="margin: 4px 0;"><strong>Temporary Password:</strong> ${temporaryPassword}</p>` : "";
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 24px; border: 1px solid #e0e0e0; border-radius: 8px;">
+      <h2 style="color: #0d9488;">Welcome to UltimateHealth Team</h2>
+      <p>Dear ${fullName},</p>
+      <p>Your application has been approved, and your administrator profile has been created.</p>
+      <div style="background: #f8fafc; padding: 16px; border-radius: 6px; margin: 16px 0; border-left: 4px solid #0d9488;">
+        <p style="margin: 4px 0;"><strong>User Handle:</strong> @${user_handle}</p>
+        <p style="margin: 4px 0;"><strong>Email:</strong> ${email}</p>
+        ${phoneSection}
+        ${passwordSection}
+      </div>
+      <p>To activate your account and complete the administrator agreement, click below:</p>
+      <p style="margin: 20px 0;">
+        <a href="${verifyUrl}" style="background: #0d9488; color: #ffffff; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+          Verify Email & Complete Agreement
+        </a>
+      </p>
+      <p style="font-size: 12px; color: #64748b;">If the button does not work, open this link: <a href="${verifyUrl}">${verifyUrl}</a></p>
+    </div>
+  `;
+
+  const mailOptions = {
+    from: `"UltimateHealth Admin" <${process.env.EMAIL_USER}>`,
+    to: email,
+    subject: "Welcome to UltimateHealth - Complete Your Admin Profile",
+    html,
+  };
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log("Admin onboarding email sent:", info.response);
+    return true;
+  } catch (error) {
+    console.error("Error sending admin onboarding email:", error);
+    return false;
+  }
+};
+
 module.exports = {
   sendNewArticleEmail,
   sendContactUsMail,
+  sendAdminOnboardingEmail,
   sendVerificationEmail,
   verifyEmail,
   Sendverifymail,

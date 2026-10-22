@@ -16,7 +16,7 @@ const {
 const {
   sendAdminApplicationEmail,
   sendApplicantConfirmationEmail,
-  sendVerificationEmail,
+  sendAdminOnboardingEmail,
 } = require("../emailservice");
 const { generateVerificationToken } = require("../../services/security/tokenService");
 const { throwError } = require("../../utils/throwError");
@@ -253,11 +253,18 @@ const createAdminFromApplicant = expressAsyncHandler(async (req, res) => {
   applicant.reviewNotes = `Admin profile created with handle @${user_handle}`;
   await applicant.save();
 
-  // Dispatch onboarding / verification email
+  // Dispatch onboarding email with account details & registered phone
   try {
-    sendVerificationEmail(applicant.email, verificationToken, true);
+    await sendAdminOnboardingEmail({
+      email: applicant.email,
+      fullName: applicant.fullName,
+      user_handle,
+      phone: applicant.phone || "",
+      token: verificationToken,
+      temporaryPassword: customPassword ? undefined : plainPassword,
+    });
   } catch (emailErr) {
-    console.error("⚠️ Failed to dispatch admin agreement verification email:", emailErr);
+    console.error("Failed to dispatch admin agreement verification email:", emailErr);
   }
 
   return sendSuccess(
