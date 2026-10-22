@@ -9,7 +9,7 @@ const statusEnum = require("../utils/StatusEnum");
 // const { sendArticleForReviewEmail } = require("./emailservice");
 const { publishContentEmailEvent, EMAIL_EVENT_TYPES } = require("../services/mqueue/producers/emailProducer");
 const { publishArticleAnalyticsEvent, ANALYTICS_EVENT_TYPES } = require("../services/mqueue/producers/analyticsProducer");
-const { getReadingHistory } = require("../services/db/articleService");
+const { getReadingHistory, getRelatedArticles } = require("../services/db/articleService");
 const { throwError } = require("../utils/throwError");
 const { HTTP_STATUS, ERROR_CODES } = require("../constants/errorConstants");
 const mongoose = require('mongoose');
@@ -872,6 +872,41 @@ module.exports.updateViewCount = expressAsyncHandler(
       res.status(500).json({ error: 'Error updating view', details: err.message });
     }
   }
+)
+
+
+
+module.exports.getRelatedArticleController = expressAsyncHandler(
+  async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const limit = parseInt(req.query.limit, 10) || 5;
+
+    let excludeIds = [];
+    if (req.query.excludeIds) {
+      excludeIds = req.query.excludeIds
+        .split(',')
+        .map((num) => parseInt(num.trim(), 10))
+        .filter((num) => !isNaN(num));
+    }
+
+    const relatedArticles = await getRelatedArticles(id, limit, excludeIds);
+
+    return res.status(200).json({
+      success: true,
+      count: relatedArticles.length,
+      data: relatedArticles,
+    });
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+      });
+    }
+    next(error);
+  }
+}
 )
 
 

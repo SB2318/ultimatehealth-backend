@@ -3041,7 +3041,7 @@ const sendNewArticleEmail = (email, title, authorName, articleLink) => {
 };
 const sendContactUsMail = async ({ name, email, subject, message }) => {
   const mailOptions = {
-    from: `"UltimateHealth Contact" <${process.env.EMAIL_USER}>`,
+    from: `"${name || "Contact User"}" <${process.env.EMAIL_USER}>`,
     to: "ultimate.health25@gmail.com",
     replyTo: email,
     subject: `[Contact Us] ${subject}`,

@@ -4,6 +4,11 @@ const articleController = require('../controllers/articleController');
 const authenticateToken = require('../middleware/authentcatetoken');
 const publisherMiddleware = require('../middleware/publisherMiddleware');
 const adminAuthenticateToken = require('../middleware/adminAuthenticateToken');
+const { validateParams, validateQuery } = require('../middleware/validator');
+const {
+  getRelatedArticlesParamsSchema,
+  getRelatedArticlesQuerySchema,
+} = require('../validators/article.schema');
 
 /**** For Article Tags */
 /**
@@ -558,6 +563,12 @@ router.get('/articles', articleController.getAllArticles); // auth removed for g
  *         description: Internal server error
  */
 router.get('/articles/:id/translations', articleController.getArticleTranslations);
+router.get(
+  '/articles/:id/related',
+  validateParams(getRelatedArticlesParamsSchema),
+  validateQuery(getRelatedArticlesQuerySchema),
+  articleController.getRelatedArticleController
+);
 
 /**
  * @openapi

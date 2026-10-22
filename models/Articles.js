@@ -221,6 +221,27 @@ articleSchema.pre('aggregate', function (next) {
   next();
 });
 
+articleSchema.index({
+  status: 1,
+  publishedDate: -1,
+  lastUpdated: -1,
+  is_removed: 1,
+  language:1,
+  tags: 1,
+});
+
+articleSchema.index(
+  { title: 'text', description: 'text', content: 'text' },
+  {
+    weights: { 
+      title: 5,  // priority 1
+      description: 3, // priority 2
+      content: 1 // priority 3
+    },
+    name: 'ArticleSimilarityTextIndex'
+  }
+);
+
 // Apply the autoIncrement plugin to the schema
 articleSchema.plugin(AutoIncrement, { id: 'article_id_counter', inc_field: '_id' });
 
