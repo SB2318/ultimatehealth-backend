@@ -6,7 +6,8 @@
   "scripts": {
     "test": "jest --detectOpenHandles --forceExit",
     "start": "dotenvx run -- node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "clean": "node -e \"const fs = require('fs'); ['node_modules', 'package-lock.json'].forEach(p => fs.rmSync(p, { recursive: true, force: true })); console.log('Cleaned node_modules and package-lock.json');\""
   },
   "repository": {
     "type": "git",

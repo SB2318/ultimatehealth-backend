@@ -3,15 +3,12 @@ FROM alpine:latest
 # Set the PocketBase version you want to use
 ARG PB_VERSION=0.25.0
 
-# Install required tools
-RUN apk add --no-cache \
-    unzip \
-    ca-certificates
-
-# Download and unzip PocketBase
-ADD https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_amd64.zip /tmp/pb.zip
-RUN unzip /tmp/pb.zip -d /pb/ \
-    && rm /tmp/pb.zip
+# Install required tools, download and extract PocketBase in a single layer to avoid layer bloat
+RUN apk add --no-cache unzip ca-certificates wget \
+    && wget -q https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_amd64.zip -O /tmp/pb.zip \
+    && unzip -q /tmp/pb.zip -d /pb/ \
+    && rm -f /tmp/pb.zip \
+    && apk del wget
 
 # Copy schema migrations for automatic schema creation on startup
 COPY ./pb_migrations /pb/pb_migrations
