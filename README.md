@@ -246,9 +246,22 @@ We welcome contributions! This backend is open for **students, developers, and o
 
  <table>
   <tr>
-    <td align="center"><a href="https://github.com/SB2318"><img src="https://avatars.githubusercontent.com/u/87614560?v=4" width="120px;" alt=""/><br/><sub><b>Susmita Bhattacharya</b></sub></a></td>
-    <td align="center"><a href="https://github.com/rushiii3"><img src="https://avatars.githubusercontent.com/u/105168088?v=4" width="120px;" alt=""/><br/><sub><b>HRUSHIKESH SHINDE</b></sub></a></td>
-    <td align="center"><a href="https://github.com/ionfwsrijan"><img src="https://avatars.githubusercontent.com/u/201338831?v=4" width="120px;" alt=""/><br/><sub><b>SrijanCodes</b></sub></a></td>
- </tr>
+    <td align="center"><a href="https://github.com/SB2318"><img src="https://avatars.githubusercontent.com/u/87614560?v=4" width="100px;" alt=""/><br/><sub><b>Susmita Bhattacharya</b></sub></a></td>
+    <td align="center"><a href="https://github.com/rushiii3"><img src="https://avatars.githubusercontent.com/u/105168088?v=4" width="100px;" alt=""/><br/><sub><b>HRUSHIKESH SHINDE</b></sub></a></td>
+    <td align="center"><a href="https://github.com/ionfwsrijan"><img src="https://avatars.githubusercontent.com/u/201338831?v=4" width="100px;" alt=""/><br/><sub><b>Srijan Jaiswal</b></sub></a></td>
+    <td align="center"><a href="https://github.com/AdityaChaube"><img src="https://avatars.githubusercontent.com/u/233758866?v=4" width="100px;" alt=""/><br/><sub><b>Aditya Chaube</b></sub></a></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="https://github.com/vedant7007"><img src="https://avatars.githubusercontent.com/u/170861579?v=4" width="100px;" alt=""/><br/><sub><b>Vedant Idlgave</b></sub></a></td>
+    <td align="center"><a href="https://github.com/reddypnipun"><img src="https://avatars.githubusercontent.com/u/230384897?v=4" width="100px;" alt=""/><br/><sub><b>Nipun Kumar Reddy</b></sub></a></td>
+    <td align="center"><a href="https://github.com/anshul23102"><img src="https://avatars.githubusercontent.com/u/167362756?v=4" width="100px;" alt=""/><br/><sub><b>Anshul Jain</b></sub></a></td>
+    <td align="center"><a href="https://github.com/aeriellaaa"><img src="https://avatars.githubusercontent.com/u/202282989?v=4" width="100px;" alt=""/><br/><sub><b>Akshata Srivastava</b></sub></a></td>
+  </tr>
  </table>
+
+ <br/>
+
+ <a href="https://github.com/SB2318/ultimatehealth-backend/graphs/contributors">
+   <img src="https://contrib.rocks/image?repo=SB2318/ultimatehealth-backend" alt="All Contributors" />
+ </a>
 </div>
