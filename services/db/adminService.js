@@ -1,5 +1,4 @@
 const Admin = require("../../models/admin/adminModel");
-const AdminApplicant = require("../../models/admin/adminApplicantModel");
 const { generateHashPassword } = require("../security/encryptService");
 
 const checkExistingAdmin = async ({ email }) => {
@@ -70,18 +69,6 @@ const logoutAdmin = async (adminId) => {
   );
 };
 
-const createAdminApplicant = async (applicantData) => {
-  return await AdminApplicant.create(applicantData);
-};
-
-const findAdminApplicantById = async (id) => {
-  return await AdminApplicant.findById(id);
-};
-
-const findAdminApplicants = async (filter = {}, options = {}) => {
-  return await AdminApplicant.find(filter).sort(options.sort || { createdAt: -1 });
-};
-
 module.exports = {
   checkExistingAdmin,
   findAdminByEmail,
@@ -91,7 +78,4 @@ module.exports = {
   clearOtpAdmin,
   updateAdminPasswordAndClearOtp,
   logoutAdmin,
-  createAdminApplicant,
-  findAdminApplicantById,
-  findAdminApplicants,
 };

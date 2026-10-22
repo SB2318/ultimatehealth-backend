@@ -1,7 +1,7 @@
 const expressAsyncHandler = require("express-async-handler");
 const { adminApplicantSchema } = require("../../validators/applicant.schema");
 const { uploadApplicantResumeToS3 } = require("../uploadController");
-const { createAdminApplicant } = require("../../services/db/adminService");
+const { createAdminApplicant } = require("../../services/db/applicantService");
 const {
   sendAdminApplicationEmail,
   sendApplicantConfirmationEmail,

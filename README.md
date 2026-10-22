@@ -115,22 +115,21 @@ Regular users (`user` and `doctor` roles) manage their account lifecycle through
 
 Admins possess privileged access to review, moderate, and publish health articles and podcasts. To ensure compliance and strict access governance:
 
-#### 🚫 No Self-Registration & Complete Separation from `UnverifiedUser`
+#### 🚫 No Self-Registration
 - **Admins cannot register themselves on the open platform.**
-- **Zero Relation with `UnverifiedUser` Table:** The `UnverifiedUser` model is exclusively a temporary staging collection for public user self-registration before email activation. Admin accounts **never** touch or enter the `UnverifiedUser` table.
-- **Direct Provisioning in Admin Table:** All admin accounts are created directly in the `Admin` (`adminModel`) collection by a **Super Admin** or **UltimateHealth Admin**.
-- **Native Verification Flag (`isVerified`):** The `Admin` schema maintains its own independent `isVerified` boolean field (default: `false`) and `isSuperAdmin` field directly on the document.
-- Initialized admin accounts remain non-functional (`isVerified: false`, `signature_url: ""` or null) until the onboarding agreement is formally signed from the website.
+- All admin accounts must be created directly by a **Super Admin** or **UltimateHealth Admin**.
+- Newly created admin accounts start with `isVerified: false` directly on the admin model and remain inactive until the onboarding agreement is signed.
 
 #### 📩 Candidate Application Pipeline (`POST /api/admin/apply`)
-Prospective moderators, physicians, and reviewers apply to join the review team via the web portal or agreement page:
+Prospective moderators, physicians, and reviewers submit an application to the administration:
 - **Endpoint**: `POST /api/admin/apply` (alias: `POST /api/admin-agreement/apply`)
 - **Payload (`multipart/form-data`)**: `fullName`, `email`, `phone`, `role`, `experience`, `message`, and `resume` (PDF/DOC/DOCX up to 10MB).
-- **Hybrid S3 + Email Architecture**:
-  1. **Cloud Storage**: The resume file is permanently uploaded to S3 / Object Storage under `applicant-resumes/` to generate a secure, durable URL.
-  2. **Database Record**: Application data is saved to MongoDB (`AdminApplicant`) with status `Pending`.
-  3. **Admin Notification**: An email is dispatched to UltimateHealth administration (`ultimate.health25@gmail.com`) with `replyTo: applicant.email`, formatted candidate details, S3 download button, and the resume attached directly for immediate preview in email clients.
-  4. **Applicant Confirmation**: An automatic acknowledgment receipt is emailed to the candidate.
+- **Separate Staging & Review Architecture**:
+  1. **Separate Applicant Storage**: Applications are saved in a separate `AdminApplicant` table (completely independent of the `Admin` table).
+  2. **Cloud Storage**: The resume file is uploaded to S3 / Object Storage under `applicant-resumes/` to generate a durable URL.
+  3. **Direct Email to Administration**: An email is dispatched directly to UltimateHealth administration (`ultimate.health25@gmail.com`) with `replyTo: applicant.email`, candidate details, S3 download button, and the resume attached directly for immediate preview.
+  4. **Accept/Reject**: Administration reviews the application via email. If rejected, no admin account is ever created. If approved, a Super Admin will manually provision an admin user for them.
+  5. **Applicant Confirmation**: An automatic acknowledgment receipt is emailed to the candidate.
 
 #### ✍️ Mandatory Agreement Signing
 - Before an admin can log in or access any moderation tools, they must review and digitally sign the administrator agreement through the website (`/admin/agreement`).
