@@ -76,8 +76,13 @@ router.post(
  * @openapi
  * /admin-agreement/apply:
  *   post:
- *     summary: Submit application directly from Admin Agreement landing page
- *     description: Alias for /admin/apply designed for applicant agreement onboarding flow.
+ *     summary: Submit digitally signed Admin Agreement and application
+ *     description: >
+ *       Public endpoint for applicant agreement onboarding flow.
+ *       Accepts multipart/form-data containing applicant details, designation,
+ *       audit message trail, and the digitally signed agreement PDF generated on canvas.
+ *       Saves record to AdminApplicant collection, uploads PDF to S3, and emails
+ *       official copies with attachment to both the applicant and administration team.
  *     tags:
  *       - Admin Applicants
  *     requestBody:
@@ -92,17 +97,76 @@ router.post(
  *             properties:
  *               fullName:
  *                 type: string
- *                 example: John Doe
+ *                 description: Verified legal name of the applicant
+ *                 example: Dr. Jane Doe
  *               email:
  *                 type: string
  *                 format: email
- *                 example: john@example.com
+ *                 description: Official contact email address
+ *                 example: jane.doe@hospital.org
+ *               phone:
+ *                 type: string
+ *                 description: Contact phone number with country code
+ *                 example: "+919876543210"
+ *               role:
+ *                 type: string
+ *                 description: Target role (e.g. Doctor/Medical Reviewer, Moderator, Admin)
+ *                 example: Doctor/Medical Reviewer
+ *               designation:
+ *                 type: string
+ *                 description: Professional designation or specialty
+ *                 example: Consultant Neurologist
+ *               experience:
+ *                 type: string
+ *                 description: Professional summary or years of clinical practice
+ *                 example: 8+ years clinical review and cardiology research
+ *               message:
+ *                 type: string
+ *                 description: Formatted agreement verification audit trail (timestamp, terms accepted, clinical boundaries)
+ *                 example: "Agreement signed digitally on 2026-10-23T15:30:00Z. Accepted Code of Conduct & Clinical Review Guidelines."
  *               resume:
  *                 type: string
  *                 format: binary
+ *                 description: Digitally signed agreement PDF (${fullName}_Signed_Admin_Agreement.pdf) or CV
+ *               agreement:
+ *                 type: string
+ *                 format: binary
+ *                 description: Alternative field name for digitally signed agreement PDF
  *     responses:
  *       '201':
- *         description: Application submitted successfully
+ *         description: Application and agreement successfully submitted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Application submitted successfully. We have received your application and resume."
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     applicationId:
+ *                       type: string
+ *                       example: "67204f12ab34cd56ef789012"
+ *                     agreementUrl:
+ *                       type: string
+ *                       example: "https://ultimatehealth.blog/api/getFile/applicant-resumes/1729699200-Jane_Doe_Signed_Admin_Agreement.pdf"
+ *                     resumeUrl:
+ *                       type: string
+ *                       example: "https://ultimatehealth.blog/api/getFile/applicant-resumes/1729699200-Jane_Doe_Signed_Admin_Agreement.pdf"
+ *                     hasAttachment:
+ *                       type: boolean
+ *                       example: true
+ *       '400':
+ *         description: Validation error or unsupported file type
+ *       '429':
+ *         description: Rate limit exceeded (too many requests)
+ *       '500':
+ *         description: Internal server error
  */
 router.post(
   "/admin-agreement/apply",

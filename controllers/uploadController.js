@@ -112,6 +112,9 @@ const applicantResumeUpload = multer({
 }).fields([
     { name: 'resume', maxCount: 1 },
     { name: 'file', maxCount: 1 },
+    { name: 'agreement', maxCount: 1 },
+    { name: 'admin_agreement', maxCount: 1 },
+    { name: 'document', maxCount: 1 },
 ]);
 
 const uploadApplicantResumeToS3 = async (buffer, originalName, mimeType) => {

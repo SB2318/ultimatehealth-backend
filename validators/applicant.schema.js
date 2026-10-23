@@ -22,9 +22,17 @@ const adminApplicantSchema = z.object({
     .optional()
     .or(z.literal("")),
   role: z
-    .enum(["Moderator", "Content Reviewer", "Admin", "Doctor/Medical Reviewer", "Other"])
+    .string()
+    .trim()
+    .max(100, "Role cannot exceed 100 characters")
     .default("Moderator")
     .optional(),
+  designation: z
+    .string()
+    .trim()
+    .max(100, "Designation cannot exceed 100 characters")
+    .optional()
+    .or(z.literal("")),
   experience: z
     .string()
     .trim()

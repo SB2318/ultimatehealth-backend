@@ -29,7 +29,11 @@ const adminApplicantSchema = new Schema(
       type: String,
       trim: true,
       default: "Moderator",
-      enum: ["Moderator", "Content Reviewer", "Admin", "Doctor/Medical Reviewer", "Other"],
+    },
+    designation: {
+      type: String,
+      trim: true,
+      default: "",
     },
     experience: {
       type: String,
@@ -43,6 +47,11 @@ const adminApplicantSchema = new Schema(
       maxlength: [3000, "Message cannot exceed 3000 characters"],
     },
     resumeUrl: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    agreementUrl: {
       type: String,
       trim: true,
       default: "",

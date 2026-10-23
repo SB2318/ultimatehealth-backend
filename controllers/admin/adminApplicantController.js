@@ -45,11 +45,13 @@ const submitApplicant = expressAsyncHandler(async (req, res) => {
     email,
     phone,
     role,
+    designation,
     experience,
     message,
     resumeUrl: bodyResumeUrl,
   } = validationResult.data;
 
+  const finalRole = designation || role || "Moderator";
   let resumeUrl = bodyResumeUrl || "";
   let s3Key = "";
   let originalFileName = "";
@@ -57,7 +59,12 @@ const submitApplicant = expressAsyncHandler(async (req, res) => {
 
   const uploadedFile =
     req.file ||
-    (req.files && (req.files.resume?.[0] || req.files.file?.[0]));
+    (req.files &&
+      (req.files.resume?.[0] ||
+        req.files.file?.[0] ||
+        req.files.agreement?.[0] ||
+        req.files.admin_agreement?.[0] ||
+        req.files.document?.[0]));
 
   if (uploadedFile) {
     originalFileName = uploadedFile.originalname;
@@ -90,10 +97,12 @@ const submitApplicant = expressAsyncHandler(async (req, res) => {
     fullName,
     email,
     phone: phone || "",
-    role: role || "Moderator",
+    role: finalRole,
+    designation: designation || finalRole,
     experience: experience || "",
     message: message || "",
     resumeUrl,
+    agreementUrl: resumeUrl,
     s3Key,
     originalFileName,
     status: "Pending",
@@ -110,6 +119,10 @@ const submitApplicant = expressAsyncHandler(async (req, res) => {
 
   sendApplicantConfirmationEmail({
     applicant: newApplicant,
+    resumeUrl,
+    agreementUrl: resumeUrl,
+    originalFileName,
+    emailAttachments,
   }).catch((err) => {
     console.error("❌ Failed to send applicant confirmation email:", err);
   });
@@ -121,6 +134,7 @@ const submitApplicant = expressAsyncHandler(async (req, res) => {
     {
       applicationId: newApplicant._id,
       resumeUrl: resumeUrl || undefined,
+      agreementUrl: resumeUrl || undefined,
       hasAttachment: emailAttachments.length > 0,
     }
   );

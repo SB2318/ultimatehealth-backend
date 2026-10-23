@@ -31,7 +31,23 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+const getAdminAgreementHTML = async () => {
+  try {
+    const filePath = path.join(
+      __dirname,
+      "..",
+      "public",
+      "admin-agreement.html",
+    );
 
+    const html = await fs.promises.readFile(filePath, "utf-8");
+
+    return html;
+  } catch (error) {
+    console.error("Error reading HTML file:", error);
+    throw new Error("Failed to load agreement HTML");
+  }
+};
 
 const sendVerificationEmail = (email, token, isAdmin=false) => {
   const cooldownKey = `verification-email:${email}`;
@@ -250,19 +266,19 @@ const verifyEmail = expressAsyncHandler(async (req, res) => {
   const decoded = verifyVerificationToken(token);
   const { role, email, jti } = decoded;
 
-  // if (role === ROLES.ADMIN) {
-  //   const adminUser = await Admin.findOne({ email });
+  if (role === ROLES.ADMIN) {
+    const adminUser = await Admin.findOne({ email });
 
-  //   if (!adminUser) {
-  //     throwError(
-  //       HTTP_STATUS.UNAUTHORIZED,
-  //       ERROR_CODES.TOKEN_INVALID,
-  //       "Admin user not found",
-  //     );
-  //   }
+    if (!adminUser) {
+      throwError(
+        HTTP_STATUS.UNAUTHORIZED,
+        ERROR_CODES.TOKEN_INVALID,
+        "Admin user not found",
+      );
+    }
 
-  //   return res.redirect(`/admin-agreement.html#token=${token}`);
-  // }
+    return res.redirect(`/admin-agreement.html#token=${token}`);
+  }
 
   const hashedJti = hashToken(jti);
 
@@ -3172,22 +3188,48 @@ const sendAdminApplicationEmail = async ({
   }
 };
 
-const sendApplicantConfirmationEmail = async ({ applicant }) => {
+const sendApplicantConfirmationEmail = async ({
+  applicant,
+  resumeUrl,
+  agreementUrl,
+  originalFileName,
+  emailAttachments = [],
+}) => {
+  const documentUrl = agreementUrl || resumeUrl || applicant.agreementUrl || applicant.resumeUrl;
+  const fileName = originalFileName || applicant.originalFileName || "Signed_Admin_Agreement.pdf";
+
   const confirmationHtml = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
-      <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; padding: 24px; text-align: center;">
-        <h2 style="margin: 0; font-size: 22px;">Application Received</h2>
+      <div style="background: linear-gradient(135deg, #0d9488 0%, #115e59 100%); color: #ffffff; padding: 24px; text-align: center;">
+        <h2 style="margin: 0; font-size: 22px;">Application & Agreement Received</h2>
         <p style="margin: 6px 0 0 0; opacity: 0.9; font-size: 14px;">UltimateHealth Review & Moderation Team</p>
       </div>
       <div style="padding: 24px; color: #2d3748; line-height: 1.6; font-size: 14px;">
         <p>Dear <strong>${applicant.fullName}</strong>,</p>
-        <p>Thank you for your interest in joining the UltimateHealth community as a <strong>${applicant.role || "Moderator"}</strong>.</p>
-        <p>We have received your application and resume. Our team is currently reviewing your submission to evaluate alignment with our content review and moderation standards.</p>
-        <div style="margin: 20px 0; padding: 14px; background: #f0fdf4; border-left: 4px solid #22c55e; border-radius: 4px; color: #166534;">
-          <strong>Application ID:</strong> <code>${applicant._id}</code><br/>
+        <p>Thank you for submitting your application and signed agreement to join the UltimateHealth community as a <strong>${applicant.designation || applicant.role || "Moderator"}</strong>.</p>
+        <p>We have successfully received your details and attached agreement document. Our compliance and verification team is reviewing your credentials.</p>
+        <div style="margin: 20px 0; padding: 14px; background: #f0fdf4; border-left: 4px solid #10b981; border-radius: 4px; color: #166534;">
+          <strong>Application Reference ID:</strong> <code>${applicant._id}</code><br/>
+          <strong>Role / Designation:</strong> ${applicant.designation || applicant.role || "Moderator"}<br/>
           <strong>Status:</strong> Under Review
         </div>
-        <p>If your background matches our requirements, a Super Admin will reach out with the next onboarding steps and agreement details.</p>
+        ${
+          documentUrl
+            ? `
+          <div style="margin: 20px 0; text-align: center;">
+            <a href="${documentUrl}" target="_blank" style="display: inline-block; padding: 10px 20px; background: #0d9488; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px;">
+              📄 View / Download Your Submitted Agreement
+            </a>
+          </div>
+        `
+            : ""
+        }
+        ${
+          emailAttachments.length > 0
+            ? `<p style="font-size: 13px; color: #4b5563; background: #f3f4f6; padding: 10px 14px; border-radius: 6px;">📎 A copy of your submitted agreement (<code>${fileName}</code>) is attached directly to this email for your official records.</p>`
+            : ""
+        }
+        <p>Once your verification is complete, you will receive your admin portal onboarding credentials and verification instructions.</p>
         <p style="margin-bottom: 0;">Warm regards,<br/><strong>UltimateHealth Team</strong></p>
       </div>
     </div>
@@ -3196,13 +3238,14 @@ const sendApplicantConfirmationEmail = async ({ applicant }) => {
   const mailOptions = {
     from: `"UltimateHealth" <${process.env.EMAIL_USER}>`,
     to: applicant.email,
-    subject: "Application Received - UltimateHealth Review Team",
+    subject: `Application & Agreement Received [Ref: ${applicant._id}] - UltimateHealth`,
     html: confirmationHtml,
+    attachments: emailAttachments,
   };
 
   try {
     const info = await transporter.sendMail(mailOptions);
-    console.log("Applicant confirmation email sent:", info.response);
+    console.log("Applicant confirmation email sent with attachment:", info.response);
     return true;
   } catch (error) {
     console.error("Error sending applicant confirmation email:", error);
