@@ -788,8 +788,9 @@ const options = {
           properties: {
             user: {
               type: "object",
-              example: { _id: "", user_name: "Admin User" }
+              example: { _id: "64ea2f9c4a3f9c6b8b1d2345", user_name: "Admin User", isSuperAdmin: true }
             },
+            isSuperAdmin: { type: "boolean", example: true },
             accessToken: { type: "string", example: "eyJhbGciOiJIUzI1Ni..." },
             refreshToken: { type: "string", example: "eyJhbGciOiJIUzI1Ni..." },
             message: { type: "string", example: "Login Successful" }

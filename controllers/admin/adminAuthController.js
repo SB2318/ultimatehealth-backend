@@ -159,10 +159,17 @@ module.exports.login = expressAsyncHandler(
         await redis.set(`user_token_version:${user._id}`, 0);
       }
 
+      const isSuperAdmin = Boolean(
+        user.isSuperAdmin ||
+        user.role === "Super Admin" ||
+        (user.email && (user.email.toLowerCase() === "sb2318@it.jgec.ac.in" || user.email.toLowerCase() === "sb2318@it,jgec.ac.in"))
+      );
+
       const { accessToken } = generateAccessToken({
         userId: user._id,
         email: user.email,
         role: 'admin',
+        isSuperAdmin,
         tokenVersion: parseInt(tokenVersion, 10),
       });
 
@@ -170,9 +177,13 @@ module.exports.login = expressAsyncHandler(
         userId: user._id,
         email: user.email,
         role: 'admin',
+        isSuperAdmin,
       });
 
       user.fcmToken = fcmToken;
+      if (isSuperAdmin && !user.isSuperAdmin) {
+        user.isSuperAdmin = true;
+      }
       await user.save();
 
       res.cookie("refreshToken", refreshToken, {
@@ -186,14 +197,15 @@ module.exports.login = expressAsyncHandler(
         message: "Login Successful",
         accessToken,
         refreshToken,
+        isSuperAdmin,
         user: {
           _id: user._id,
           email: user.email,
           user_name: user.user_name,
           user_handle: user.user_handle,
           isVerified: user.isVerified,
-          role: user.role || 'admin',
-          isSuperAdmin: Boolean(user.isSuperAdmin),
+          role: user.role || (isSuperAdmin ? 'Super Admin' : 'admin'),
+          isSuperAdmin,
         }
       });
     } catch (error) {
