@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const authenticateToken = require('../middleware/authentcatetoken');
+const { checkPodcastEpisodeOwnership } = require('../middleware/contentOwnershipMiddleware');
 const {
     createPodcastEpisode,
     getMyPodcastEpisodes,
@@ -142,7 +143,7 @@ router.get('/podcast-episodes/:episodeId', authenticateToken, getPodcastEpisodeB
  *       '500':
  *         description: Internal server error
  */
-router.patch('/podcast-episodes/:episodeId', authenticateToken, updatePodcastEpisode);
+router.patch('/podcast-episodes/:episodeId', authenticateToken, checkPodcastEpisodeOwnership, updatePodcastEpisode);
 
 /**
  * @swagger
@@ -175,6 +176,6 @@ router.patch('/podcast-episodes/:episodeId', authenticateToken, updatePodcastEpi
  *       '500':
  *         description: Internal server error
  */
-router.delete('/podcast-episodes/:episodeId', authenticateToken, deletePodcastEpisode);
+router.delete('/podcast-episodes/:episodeId', authenticateToken, checkPodcastEpisodeOwnership, deletePodcastEpisode);
 
 module.exports = router;

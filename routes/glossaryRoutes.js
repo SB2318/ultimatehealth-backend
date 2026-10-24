@@ -3,6 +3,7 @@ const glossaryController = require('../controllers/glossaryController');
 const { validateBody } = require('../middleware/validator');
 const { createGlossarySchema, updateGlossarySchema } = require('../validators/glossary.schema');
 const adminAuthenticateToken = require('../middleware/adminAuthenticateToken');
+const { checkGlossaryOwnership } = require('../middleware/contentOwnershipMiddleware');
 
 const router = express.Router();
 
@@ -145,8 +146,8 @@ router.get('/:slug', glossaryController.getTerm);
  *         description: Glossary term created successfully
  */
 router.post('/', adminAuthenticateToken, validateBody(createGlossarySchema), glossaryController.createTerm);
-router.put('/:id', adminAuthenticateToken, validateBody(updateGlossarySchema), glossaryController.updateTerm);
-router.delete('/:id', adminAuthenticateToken, glossaryController.deleteTerm);
+router.put('/:id', adminAuthenticateToken, checkGlossaryOwnership, validateBody(updateGlossarySchema), glossaryController.updateTerm);
+router.delete('/:id', adminAuthenticateToken, checkGlossaryOwnership, glossaryController.deleteTerm);
 
 router.get('/admin/review-queue', adminAuthenticateToken, glossaryController.getUnassignedGlossaryQueue);
 router.get('/admin/my-reviews/in-progress', adminAuthenticateToken, glossaryController.getReviewerInProgressGlossary);

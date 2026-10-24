@@ -3,6 +3,7 @@ const router = express.Router();
 //const { getPodcastsByEpisode } = require('../controllers/podcastController');
 
 const authenticateToken = require('../middleware/authentcatetoken');
+const { checkPodcastOwnership, checkPlaylistOwnership } = require('../middleware/contentOwnershipMiddleware');
 const {
     getFollowingsPodcasts,
     getMyPlayLists,
@@ -1332,19 +1333,19 @@ router.post('/podcast/update-playlist', authenticateToken, updatePlaylistwithPod
  * 
  * @deprecated
  */
-router.put('/podcast/update', authenticateToken, updatePodcast);
+router.put('/podcast/update', authenticateToken, checkPodcastOwnership, updatePodcast);
 
 /**
  * 
  * @deprecated
  */
-router.put('/podcast/update-playlist', authenticateToken, updatePlaylist);
+router.put('/podcast/update-playlist', authenticateToken, checkPlaylistOwnership, updatePlaylist);
 
 /**
  * 
  * @deprecated
  */
-router.delete('/podcast/delete', authenticateToken, deletePodcast);
+router.delete('/podcast/delete', authenticateToken, checkPodcastOwnership, deletePodcast);
 
 /**
  * @swagger
@@ -1420,7 +1421,7 @@ router.delete('/podcast/delete', authenticateToken, deletePodcast);
  *                   type: string
  *                   example: "An error occurred while deleting playlist"
  */
-router.delete('/podcast/delete-playlist', authenticateToken, deletePlaylist);
+router.delete('/podcast/delete-playlist', authenticateToken, checkPlaylistOwnership, deletePlaylist);
 
 // workspace
 /**

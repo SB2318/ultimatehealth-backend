@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const articleController = require('../controllers/articleController');
 const authenticateToken = require('../middleware/authentcatetoken');
+const { checkArticleOwnership } = require('../middleware/contentOwnershipMiddleware');
 const publisherMiddleware = require('../middleware/publisherMiddleware');
 const adminAuthenticateToken = require('../middleware/adminAuthenticateToken');
 const { validateParams, validateQuery } = require('../middleware/validator');
@@ -754,12 +755,12 @@ router.get('/articles/:id', articleController.getArticleById); // auth removed f
 /**
  * @deprecated
  */
-router.put('/articles/:id', authenticateToken, articleController.updateArticle);
+router.put('/articles/:id', authenticateToken, checkArticleOwnership, articleController.updateArticle);
 
 /**
  * @deprecated
  */
-router.delete('/articles/:id', authenticateToken, articleController.deleteArticle);
+router.delete('/articles/:id', authenticateToken, checkArticleOwnership, articleController.deleteArticle);
 
 
 /**

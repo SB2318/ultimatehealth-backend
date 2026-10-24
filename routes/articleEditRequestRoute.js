@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const authenticateToken = require('../middleware/authentcatetoken');
 const adminAuthenticateToken = require("../middleware/adminAuthenticateToken");
+const { checkImprovementContributorOwnership, checkImprovementReviewerOwnership } = require("../middleware/contentOwnershipMiddleware");
 
 const{
     submitEditRequest,
@@ -29,17 +30,17 @@ router.get('/admin/publish-improvements', adminAuthenticateToken, getAllComplete
 router.post('/admin/approve-improvement-request', adminAuthenticateToken, pickImprovementRequest);
 
 
-router.post('/admin/submit-review-on-improvement', adminAuthenticateToken, submitReviewOnImprovement);
+router.post('/admin/submit-review-on-improvement', adminAuthenticateToken, checkImprovementReviewerOwnership, submitReviewOnImprovement);
 
 
-router.post('/article/submit-improvement', authenticateToken, submitImprovement);
+router.post('/article/submit-improvement', authenticateToken, checkImprovementContributorOwnership, submitImprovement);
 
 
 router.get('/article/detect-content-loss', adminAuthenticateToken, detectContentLoss);
 
-router.post('/admin/discard-improvement', adminAuthenticateToken, discardImprovement);
+router.post('/admin/discard-improvement', adminAuthenticateToken, checkImprovementReviewerOwnership, discardImprovement);
 
-router.post('/admin/publish-improvement', adminAuthenticateToken, publishImprovement);
+router.post('/admin/publish-improvement', adminAuthenticateToken, checkImprovementReviewerOwnership, publishImprovement);
 
 router.post('/admin/improvement/unassign-moderator', adminAuthenticateToken, unassignModerator);
 
