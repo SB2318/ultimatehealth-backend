@@ -1,12 +1,19 @@
 const Redis = require("ioredis");
 
+const redisHost = process.env.REDIS_HOST || (process.env.NODE_ENV === "production" ? "redis" : "127.0.0.1");
+
 const redis = new Redis({
-  host: process.env.REDIS_HOST || "127.0.0.1",
-  port: process.env.REDIS_PORT || 6379,
+  host: redisHost,
+  port: Number(process.env.REDIS_PORT) || 6379,
   password: process.env.REDIS_PASSWORD || undefined,
   lazyConnect: true,
+  maxRetriesPerRequest: 3,
   retryStrategy(times) {
-    const delay = Math.min(times * 50, 2000);
+    if (times > 20) {
+      console.warn("⚠️ Redis max reconnection attempts reached. Continuing with in-memory fallback.");
+      return null;
+    }
+    const delay = Math.min(times * 100, 3000);
     return delay;
   },
 });

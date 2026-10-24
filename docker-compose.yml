@@ -29,12 +29,17 @@ services:
       - DATASOURCE_URL=${DATASOURCE_URL:-http://pocketbase:8090}
       - DATASOURCE_USERNAME=${DATASOURCE_USERNAME}
       - DATASOURCE_PASSWORD=${DATASOURCE_PASSWORD}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
     depends_on:
       mongodb:
         condition: service_healthy
       kafka1:
         condition: service_healthy
       kafka2:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     volumes:
       - ./firebase-admin-sdk.json:/usr/src/app/firebase-admin-sdk.json:ro
