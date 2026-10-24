@@ -14,8 +14,33 @@ const { getHTMLFileContent, authenticateAdmin, getPocketbaseClient } = require('
 const crypto = require('crypto');
 const puppeteer = require("puppeteer");
 const adminModel = require("../models/admin/adminModel");
+const AdminApplicant = require("../models/admin/adminApplicantModel");
 const jwt = require('jsonwebtoken');
 const { verifyAccessToken } = require('../services/security/tokenService');
+
+const getAuthAdminFromReq = async (req) => {
+    try {
+        const rawAuth = req.headers['authorization'] || req.headers['Authorization'];
+        let token = req.cookies?.accessToken;
+        if (!token && rawAuth) {
+            token = rawAuth.startsWith('Bearer ') ? rawAuth.split(' ')[1] : rawAuth;
+        }
+        if (!token && req.query?.token) {
+            token = req.query.token;
+        }
+        if (!token) return null;
+
+        const decoded = await verifyAccessToken(token);
+        if (!decoded || !decoded.userId) return null;
+
+        const admin = await adminModel.findById(decoded.userId);
+        if (!admin || !admin.isVerified) return null;
+
+        return admin;
+    } catch (err) {
+        return null;
+    }
+};
 
 require('dotenv').config();
 
@@ -529,39 +554,140 @@ const uploadAgreementPDF = expressAsyncHandler(
 
 // get file
 const getFile = async (req, res) => {
-    const params = {
-        Bucket: process.env.BUCKET_NAME,
-        Key: req.params.key,
-    };
-
-    const command = new GetObjectCommand(params);
-
     try {
+        const rawKey = req.params[0] || req.params.key;
+        if (!rawKey) {
+            return res.status(400).json({ message: "File key is required" });
+        }
+        const key = decodeURIComponent(rawKey);
+
+        const isAgreement = key.startsWith("agreements-") || 
+                            key.includes("/agreements-") || 
+                            key.toLowerCase().startsWith("agreements/") ||
+                            (key.toLowerCase().endsWith(".pdf") && key.toLowerCase().includes("agreement"));
+
+        const isApplicantDocument = key.startsWith("applicant-resumes/") || key.includes("applicant-resumes");
+
+        if (isAgreement) {
+            // Internal admin agreements are strictly private at all times
+           // const authAdmin = await getAuthAdminFromReq(req);
+            if (!authAdmin) {
+                return res.status(401).json({ error: "Authentication required to access agreement documents" });
+            }
+
+            const adminIdStr = authAdmin._id.toString();
+            const isOwner = authAdmin.isSuperAdmin === true ||
+                            key.includes(adminIdStr) ||
+                            (authAdmin.signature_url && authAdmin.signature_url.includes(key)) ||
+                            (authAdmin.signature_url && key.includes(authAdmin.signature_url));
+
+            if (!isOwner) {
+                return res.status(403).json({ error: "Access denied: You are not authorized to view this agreement" });
+            }
+        } else if (isApplicantDocument) {
+            // Applicant resume / verification docs: public during application, restricted once onboarded
+            const applicant = await AdminApplicant.findOne({
+                $or: [
+                    { s3Key: key },
+                    { s3Key: rawKey },
+                    { resumeUrl: { $regex: key.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'), $options: "i" } },
+                    { agreementUrl: { $regex: key.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'), $options: "i" } }
+                ]
+            });
+
+            let isOnboarded = false;
+            let applicantEmail = applicant?.email?.toLowerCase();
+
+            if (applicant) {
+                if (applicant.status === "Approved" || applicant.status === "Accepted") {
+                    isOnboarded = true;
+                }
+            }
+
+            // Also check if an Admin account exists with this applicant's email
+            if (applicantEmail) {
+                const existingAdmin = await adminModel.findOne({ email: applicantEmail });
+                if (existingAdmin) {
+                    isOnboarded = true;
+                }
+            }
+
+            // Fallback: check if an admin has this s3Key as their signature/document
+            if (!applicant && !isOnboarded) {
+                const adminWithFile = await adminModel.findOne({ signature_url: key });
+                if (adminWithFile) {
+                    isOnboarded = true;
+                    applicantEmail = adminWithFile.email?.toLowerCase();
+                }
+            }
+
+            if (isOnboarded) {
+                const authAdmin = await getAuthAdminFromReq(req);
+                if (!authAdmin) {
+                    return res.status(401).json({ error: "Authentication required: Onboarded applicant documents are private" });
+                }
+
+                const isSuperAdmin = authAdmin.isSuperAdmin === true;
+                const isSelf = applicantEmail && authAdmin.email && authAdmin.email.toLowerCase() === applicantEmail;
+
+                if (!isSuperAdmin && !isSelf) {
+                    return res.status(403).json({ error: "Access denied: Only Super Admin or the account owner can access this document" });
+                }
+            }
+        }
+
+        const params = {
+            Bucket: process.env.BUCKET_NAME,
+            Key: key,
+        };
+
+        const command = new GetObjectCommand(params);
         const data = await s3Client.send(command);
-        res.setHeader('Content-Type', data.ContentType);
+
+        if (data.ContentType) {
+            res.setHeader('Content-Type', data.ContentType);
+        }
+        if (data.ContentLength) {
+            res.setHeader('Content-Length', data.ContentLength);
+        }
+        if (data.ContentRange) {
+            res.setHeader('Content-Range', data.ContentRange);
+        }
+        if (data.AcceptRanges) {
+            res.setHeader('Accept-Ranges', data.AcceptRanges);
+        }
+
         data.Body.pipe(res);
     } catch (err) {
+        if (err.name === 'NoSuchKey' || err.$metadata?.httpStatusCode === 404) {
+            return res.status(404).json({ message: "File not found" });
+        }
         console.log("Error fetching file:", err);
-        return res.status(404).send(err);
+        return res.status(500).json({ message: "Failed to fetch file", error: err.message });
     }
-}
+};
 
 // Delete File
-// We will  not usually remove anything from bucket, we only remove it from our dataase
+// We will not usually remove anything from bucket, we only remove it from our database
 const deleteFile = async (req, res) => {
-    const params = {
-        Bucket: process.env.BUCKET_NAME,
-        Key: req.params.key,
-    };
-
-    const command = new DeleteObjectCommand(params);
-
     try {
+        const rawKey = req.params[0] || req.params.key;
+        if (!rawKey) {
+            return res.status(400).json({ message: "File key is required" });
+        }
+        const key = decodeURIComponent(rawKey);
+
+        const params = {
+            Bucket: process.env.BUCKET_NAME,
+            Key: key,
+        };
+
+        const command = new DeleteObjectCommand(params);
         await s3Client.send(command);
-        res.status(200).send({ message: 'File deleted successfully' });
+        res.status(200).send({ message: 'File deleted successfully', key });
     } catch (err) {
         console.log("Error deleting file:", err);
-        return res.status(404).send(err);
+        return res.status(500).send(err);
     }
 };
 
@@ -849,8 +975,8 @@ const publishImprovementFileFromPocketbase = expressAsyncHandler(
 
             const record = await pb.collection('content').update(article_id, formData);
 
-            await pb.collection('edit_requests').delete(record_id);
-
+            // EditRequest upon publication must NOT be deleted from database; preserve it and its assigned IDs
+            // await pb.collection('edit_requests').delete(record_id);
 
             fs.unlinkSync(tempFilePath);
 

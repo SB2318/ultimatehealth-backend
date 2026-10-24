@@ -1,6 +1,6 @@
 {
   "name": "ultimate_health",
-  "version": "1.6.3",
+  "version": "1.7.0",
   "description": "ultimate health backend",
   "main": "index.js",
   "scripts": {

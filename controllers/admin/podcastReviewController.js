@@ -173,6 +173,7 @@ const approvePodcast = expressAsyncHandler(
             }
 
             podcast.status = statusEnum.statusEnum.PUBLISHED;
+            podcast.admin_id = podcast.admin_id || adminUser._id;
             podcast.updated_at = new Date();
 
             await podcast.save();

@@ -7,6 +7,8 @@ const {
     updateLanguage,
     deleteLanguage
 } = require("../controllers/languageController");
+const adminAuthenticateToken = require("../middleware/adminAuthenticateToken");
+const requireSuperAdmin = require("../middleware/superAdminMiddleware");
 
 /**
  * @swagger
@@ -43,7 +45,7 @@ const {
  *       500:
  *         description: Server error
  */
-router.post("/", addLanguage);
+router.post("/", adminAuthenticateToken, requireSuperAdmin, addLanguage);
 
 /**
  * @swagger
@@ -133,7 +135,7 @@ router.get("/:id", getLanguageById);
  *       500:
  *         description: Server error
  */
-router.put("/:id", updateLanguage);
+router.put("/:id", adminAuthenticateToken, requireSuperAdmin, updateLanguage);
 
 /**
  * @swagger
@@ -165,6 +167,6 @@ router.put("/:id", updateLanguage);
  *       500:
  *         description: Server error
  */
-router.delete("/:id", deleteLanguage);
+router.delete("/:id", adminAuthenticateToken, requireSuperAdmin, deleteLanguage);
 
 module.exports = router;

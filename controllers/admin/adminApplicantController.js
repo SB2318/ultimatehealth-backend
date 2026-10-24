@@ -334,6 +334,120 @@ const getMyAdminProfile = expressAsyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Superadmin-Specific: Toggle block/unblock status of an Admin
+ * Access: SuperAdmin only
+ */
+const toggleBlockAdmin = expressAsyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { isBlocked } = req.body;
+
+  const targetAdmin = await Admin.findById(id);
+  if (!targetAdmin) {
+    throwError(HTTP_STATUS.NOT_FOUND, ERROR_CODES.RESOURCE_NOT_FOUND, "Admin not found");
+  }
+
+  // Prevent Super Admin from blocking another Super Admin or themselves
+  if (targetAdmin.isSuperAdmin) {
+    throwError(HTTP_STATUS.FORBIDDEN, ERROR_CODES.FORBIDDEN, "Super Admin accounts cannot be blocked");
+  }
+
+  if (targetAdmin._id.toString() === req.userId.toString()) {
+    throwError(HTTP_STATUS.BAD_REQUEST, ERROR_CODES.INVALID_INPUT, "You cannot block your own account");
+  }
+
+  targetAdmin.isBlocked = typeof isBlocked === "boolean" ? isBlocked : !targetAdmin.isBlocked;
+  targetAdmin.updated_at = new Date();
+  await targetAdmin.save();
+
+  return sendSuccess(
+    res,
+    HTTP_STATUS.OK,
+    `Admin account has been ${targetAdmin.isBlocked ? "blocked" : "unblocked"} successfully`,
+    {
+      adminId: targetAdmin._id,
+      user_name: targetAdmin.user_name,
+      user_handle: targetAdmin.user_handle,
+      email: targetAdmin.email,
+      isBlocked: targetAdmin.isBlocked,
+    }
+  );
+});
+
+/**
+ * Superadmin-Specific: Delete an Admin account permanently
+ * Access: SuperAdmin only
+ */
+const deleteAdminBySuperAdmin = expressAsyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const targetAdmin = await Admin.findById(id);
+  if (!targetAdmin) {
+    throwError(HTTP_STATUS.NOT_FOUND, ERROR_CODES.RESOURCE_NOT_FOUND, "Admin not found");
+  }
+
+  // Prevent Super Admin from deleting another Super Admin or themselves
+  if (targetAdmin.isSuperAdmin) {
+    throwError(HTTP_STATUS.FORBIDDEN, ERROR_CODES.FORBIDDEN, "Super Admin accounts cannot be deleted");
+  }
+
+  if (targetAdmin._id.toString() === req.userId.toString()) {
+    throwError(HTTP_STATUS.BAD_REQUEST, ERROR_CODES.INVALID_INPUT, "You cannot delete your own account from this endpoint");
+  }
+
+  await Admin.findByIdAndDelete(id);
+
+  return sendSuccess(
+    res,
+    HTTP_STATUS.OK,
+    "Admin account deleted permanently by Super Admin",
+    {
+      deletedAdminId: id,
+      user_handle: targetAdmin.user_handle,
+    }
+  );
+});
+
+/**
+ * Superadmin-Specific: Get list of all Admins/Moderators
+ * Access: SuperAdmin only
+ */
+const getAllAdmins = expressAsyncHandler(async (req, res) => {
+  const { search, role, isBlocked, page = 1, limit = 20 } = req.query;
+
+  const filter = {};
+  if (role) filter.role = role;
+  if (typeof isBlocked !== "undefined") filter.isBlocked = isBlocked === "true";
+  if (search) {
+    filter.$or = [
+      { user_name: { $regex: search, $options: "i" } },
+      { user_handle: { $regex: search, $options: "i" } },
+      { email: { $regex: search, $options: "i" } },
+    ];
+  }
+
+  const skip = (Number(page) - 1) * Number(limit);
+  const [admins, total] = await Promise.all([
+    Admin.find(filter)
+      .select("-password -refreshToken -otp -verificationToken")
+      .sort({ created_at: -1 })
+      .skip(skip)
+      .limit(Number(limit))
+      .lean(),
+    Admin.countDocuments(filter),
+  ]);
+
+  return sendSuccess(res, HTTP_STATUS.OK, "Admins retrieved successfully", {
+    admins,
+    pagination: {
+      total,
+      page: Number(page),
+      limit: Number(limit),
+      totalPages: Math.ceil(total / Number(limit)),
+    },
+  });
+});
+
 module.exports = {
   submitApplicant,
   getAllApplicants,
@@ -341,4 +455,7 @@ module.exports = {
   updateApplicantStatus,
   createAdminFromApplicant,
   getMyAdminProfile,
+  toggleBlockAdmin,
+  deleteAdminBySuperAdmin,
+  getAllAdmins,
 };

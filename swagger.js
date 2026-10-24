@@ -9,7 +9,7 @@ const options = {
     openapi: '3.0.0',
     info: {
       title: 'API Documentation- UltimateHealth',
-      version: '3.3.0',
+      version: '3.4.0',
     },
 
     servers: [{ url: `${url}/api` }],
@@ -38,6 +38,8 @@ const options = {
             otpExpires: { type: "string", format: "date-time", example: "2025-08-28T10:00:00Z", nullable: true },
             password: { type: "string", example: "StrongPass@123" },
             role: { type: "string", enum: ["Super Admin", "Moderator"], example: "Moderator" },
+            isSuperAdmin: { type: "boolean", example: false },
+            isBlocked: { type: "boolean", example: false },
             created_at: { type: "string", format: "date-time", example: "2025-08-28T10:00:00Z" },
             updated_at: { type: "string", format: "date-time", example: "2025-08-28T10:00:00Z" },
             Profile_avtar: { type: "string", example: "https://cdn.example.com/avatar.png" },

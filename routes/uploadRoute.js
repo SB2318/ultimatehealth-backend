@@ -5,15 +5,18 @@ const upload = multer({ dest: 'uploads/' });
 const authenticateToken = require('../middleware/authentcatetoken');
 const publisherMiddleware = require('../middleware/publisherMiddleware');
 const adminAuthenticateToken = require("../middleware/adminAuthenticateToken");
+const requireSuperAdmin = require("../middleware/superAdminMiddleware");
 const uploadRoute = express.Router();
 
 // For Storage Server
 
 uploadRoute.post('/upload-storage', upload.single('file'), controller.uploadFile);
 
+uploadRoute.get('/getFile/:key(*)', controller.getFile);
 uploadRoute.get('/getFile/:key', controller.getFile);
 
-uploadRoute.delete('/deleteFile/:key',authenticateToken, controller.deleteFile);
+uploadRoute.delete('/deleteFile/:key(*)', adminAuthenticateToken, requireSuperAdmin, controller.deleteFile);
+uploadRoute.delete('/deleteFile/:key', adminAuthenticateToken, requireSuperAdmin, controller.deleteFile);
 
 uploadRoute.post('/upload-pocketbase/article', publisherMiddleware, controller.uploadFileToPocketBase);
 
@@ -26,9 +29,9 @@ uploadRoute.get('/articles/get-article-content/:id', controller.getPbFile); // a
 uploadRoute.get('/article/get-improve-content', authenticateToken, controller.getIMPFile);
 
 
-uploadRoute.delete('/delete-improvement/:record_id', authenticateToken, controller.deleteImprovementRecordFromPocketbase);
+uploadRoute.delete('/delete-improvement/:record_id', adminAuthenticateToken, controller.deleteImprovementRecordFromPocketbase);
 
-uploadRoute.delete('/delete-pocketbase-record/:collectionName/:recordId', authenticateToken, controller.deletePocketbaseRecord);
+uploadRoute.delete('/delete-pocketbase-record/:collectionName/:recordId', adminAuthenticateToken, requireSuperAdmin, controller.deletePocketbaseRecord);
 
 module.exports = uploadRoute;
 

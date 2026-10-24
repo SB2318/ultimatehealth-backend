@@ -7,6 +7,9 @@ const {
   updateApplicantStatus,
   createAdminFromApplicant,
   getMyAdminProfile,
+  toggleBlockAdmin,
+  deleteAdminBySuperAdmin,
+  getAllAdmins,
 } = require("../controllers/admin/adminApplicantController");
 const {
   applicantResumeUpload,
@@ -364,6 +367,93 @@ router.post(
   adminAuthenticateToken,
   requireSuperAdmin,
   createAdminFromApplicant
+);
+
+/**
+ * @openapi
+ * /admin/admins:
+ *   get:
+ *     summary: List all Admins/Moderators (Super Admin only)
+ *     tags:
+ *       - Admin Management
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       '200':
+ *         description: List of admins
+ */
+router.get(
+  "/admin/admins",
+  adminAuthenticateToken,
+  requireSuperAdmin,
+  getAllAdmins
+);
+
+/**
+ * @openapi
+ * /admin/admins/{id}/block:
+ *   put:
+ *     summary: Block or unblock an Admin account (Super Admin only)
+ *     tags:
+ *       - Admin Management
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               isBlocked:
+ *                 type: boolean
+ *     responses:
+ *       '200':
+ *         description: Admin blocked/unblocked status updated
+ */
+router.put(
+  "/admin/admins/:id/block",
+  adminAuthenticateToken,
+  requireSuperAdmin,
+  toggleBlockAdmin
+);
+
+router.patch(
+  "/admin/admins/:id/block",
+  adminAuthenticateToken,
+  requireSuperAdmin,
+  toggleBlockAdmin
+);
+
+/**
+ * @openapi
+ * /admin/admins/{id}:
+ *   delete:
+ *     summary: Delete an Admin account permanently (Super Admin only)
+ *     tags:
+ *       - Admin Management
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       '200':
+ *         description: Admin deleted successfully
+ */
+router.delete(
+  "/admin/admins/:id",
+  adminAuthenticateToken,
+  requireSuperAdmin,
+  deleteAdminBySuperAdmin
 );
 
 module.exports = router;

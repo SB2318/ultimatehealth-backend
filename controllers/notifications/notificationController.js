@@ -178,6 +178,11 @@ module.exports.deleteNotificationById = expressAsyncHandler(
                 return;
             }
 
+            if (notification.userId.toString() !== userId.toString()) {
+                res.status(403).json({ message: "Forbidden: You can only delete your own notifications" });
+                return;
+            }
+
             await Notification.deleteOne({ _id: notification._id });
             res.status(200).json({ message: "Notification deleted" });
 

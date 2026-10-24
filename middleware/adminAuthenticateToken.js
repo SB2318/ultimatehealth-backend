@@ -20,6 +20,10 @@ const adminAuthenticateToken = async (req, res, next) => {
       return res.status(403).json({ error: 'Either Email not verified or Admin not found' });
     }
 
+    if (admin.isBlocked) {
+      return res.status(403).json({ error: 'Your admin account has been blocked by Super Admin' });
+    }
+
     req.userId = admin._id;
     req.userRole = decoded.role;
     req.tokenJti = decoded.jti;

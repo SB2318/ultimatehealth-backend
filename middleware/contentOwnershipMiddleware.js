@@ -6,7 +6,9 @@ const EditRequest = require("../models/admin/articleEditRequestModel");
 const Glossary = require("../models/Glossary");
 const Admin = require("../models/admin/adminModel");
 
-// SuperAdmin Check: Returns true if the user is a SuperAdmin, false otherwise.
+/**
+ * Helper to check whether an admin user has Super Admin privileges
+ */
 const checkIsSuperAdmin = async (userId) => {
   if (!userId) return false;
   try {
@@ -17,7 +19,10 @@ const checkIsSuperAdmin = async (userId) => {
   }
 };
 
-// Article Ownership Middleware: Only author (authorId) OR SuperAdmin can update/delete.
+/**
+ * 1. Article Ownership:
+ * Only original Author OR assigned Reviewer/Moderator OR SuperAdmin can update/delete.
+ */
 const checkArticleOwnership = async (req, res, next) => {
   const articleId = req.params.id || req.body.articleId || req.body.id;
   const userId = req.userId;
@@ -55,7 +60,10 @@ const checkArticleOwnership = async (req, res, next) => {
   }
 };
 
-// Podcast Ownership Middleware: Only creator (user_id) OR assigned Moderator (admin_id) OR SuperAdmin can update/delete.
+/**
+ * 2. Podcast Ownership:
+ * Only creator (user_id) OR assigned Moderator (admin_id) OR SuperAdmin can update/delete.
+ */
 const checkPodcastOwnership = async (req, res, next) => {
   const podcastId = req.params.podcastId || req.body.podcastId || req.query.podcastId;
   const userId = req.userId;
@@ -92,7 +100,10 @@ const checkPodcastOwnership = async (req, res, next) => {
   }
 };
 
-// Playlist Ownership Middleware: Only creator (user) OR SuperAdmin can update/delete.
+/**
+ * 3. Playlist Ownership:
+ * Only creator (user) OR SuperAdmin can update/delete.
+ */
 const checkPlaylistOwnership = async (req, res, next) => {
   const playlistId = req.params.playlistId || req.body.playlistId || req.query.playlistId;
   const userId = req.userId;
@@ -128,7 +139,10 @@ const checkPlaylistOwnership = async (req, res, next) => {
   }
 };
 
-// Podcast Episode Ownership Middleware: Only creator (user_id) OR SuperAdmin can update/delete.
+/**
+ * 4. Podcast Episode Ownership:
+ * Only creator (user_id) OR SuperAdmin can update/delete episode.
+ */
 const checkPodcastEpisodeOwnership = async (req, res, next) => {
   const episodeId = req.params.episodeId || req.body.episodeId;
   const userId = req.userId;
@@ -163,7 +177,11 @@ const checkPodcastEpisodeOwnership = async (req, res, next) => {
     return res.status(500).json({ message: "Error verifying episode ownership", error: error.message });
   }
 };
-// Article Improvement Contributor Ownership Middleware: Only the assigned contributor can submit improvements for their own request.
+
+/**
+ * 5. Article Improvement Contributor Ownership:
+ * Only currently assigned contributor (user_id) can submit improvements on their own request.
+ */
 const checkImprovementContributorOwnership = async (req, res, next) => {
   const requestId = req.body.requestId || req.params.requestId || req.params.reqid;
   const userId = req.userId;
@@ -199,7 +217,10 @@ const checkImprovementContributorOwnership = async (req, res, next) => {
   }
 };
 
-// Article Improvement Reviewer Ownership Middleware: Only the assigned reviewer or SuperAdmin can review or publish improvements.
+/**
+ * 6. Article Improvement Reviewer Ownership:
+ * Only currently assigned moderator (reviewer_id) OR SuperAdmin can review, discard, or publish.
+ */
 const checkImprovementReviewerOwnership = async (req, res, next) => {
   const requestId = req.body.requestId || req.params.requestId || req.params.reqid;
   const userId = req.userId;
@@ -236,7 +257,10 @@ const checkImprovementReviewerOwnership = async (req, res, next) => {
   }
 };
 
-// Glossary Ownership Middleware: Only the author (authorId) OR assigned reviewer (reviewerId) OR SuperAdmin can update/delete.
+/**
+ * 7. Glossary Ownership:
+ * Only author (authorId) OR assigned reviewer (reviewerId) OR SuperAdmin can update/delete.
+ */
 const checkGlossaryOwnership = async (req, res, next) => {
   const id = req.params.id || req.body.id;
   const userId = req.userId;

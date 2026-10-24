@@ -141,6 +141,12 @@ module.exports.login = expressAsyncHandler(
           .json({ error: "Email not verified. Please check your email." });
       }
 
+      if (user.isBlocked) {
+        return res
+          .status(403)
+          .json({ error: "Your admin account has been blocked by Super Admin." });
+      }
+
 
       const isPasswordValid = await bcrypt.compare(password, user.password);
       if (!isPasswordValid) {

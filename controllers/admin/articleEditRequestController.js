@@ -607,9 +607,22 @@ module.exports.publishImprovement = expressAsyncHandler(
             article.contributors.push(contributor._id);
             // update contributor improvement section
             contributor.improvements.push(article._id);
+            // Ensure reviewer_id on the article is preserved
+            if (!article.reviewer_id && reviewer_id) {
+                article.reviewer_id = reviewer_id;
+            }
 
             await article.save();
             await contributor.save();
+
+            // EditRequest upon publication: DO NOT delete; mark status as PUBLISHED and preserve reviewer_id and user_id!
+            editRequest.status = statusEnum.statusEnum.PUBLISHED;
+            editRequest.last_updated = new Date();
+            if (!editRequest.reviewer_id && reviewer_id) {
+                editRequest.reviewer_id = reviewer_id;
+            }
+            await editRequest.save();
+
             // update user contribution
             await updateWriteEvents(article._id, contributor._id);
 

@@ -244,6 +244,7 @@ class GlossaryService {
     if (updatedContent.language) term.language = updatedContent.language;
 
     term.status = statusEnum.PUBLISHED;
+    term.reviewerId = term.reviewerId || reviewerId;
     term.feedback = '';
     term.rejectionReason = '';
     await term.save();
