@@ -54,7 +54,8 @@ const {
   verifyRefreshToken,
   blacklistAccessToken,
   revokeRefreshToken,
-  revokeAllUserTokens
+  revokeAllUserTokens,
+  verifyAccessToken
 } = require("../services/security/tokenService");
 const {
   isSamePassword,
@@ -1339,6 +1340,46 @@ module.exports.updateNotificationPreferences = expressAsyncHandler(
     }
   }
 );
+
+/**
+ * Check validity of current JWT access token
+ * Route: GET & POST /api/checkTokenStatus, /api/tokenstatus
+ */
+module.exports.getTokenStatus = expressAsyncHandler(async (req, res) => {
+  const rawAuth = req.headers.authorization || req.headers.Authorization;
+  let token = req.cookies?.accessToken;
+  if (!token && rawAuth) {
+    token = rawAuth.startsWith("Bearer ") ? rawAuth.split(" ")[1] : rawAuth;
+  }
+  if (!token && req.query?.token) {
+    token = req.query.token;
+  }
+  if (!token && req.body?.token) {
+    token = req.body.token;
+  }
+
+  if (!token) {
+    return res.status(200).json({ isValid: false, message: "Token is missing" });
+  }
+
+  try {
+    const decoded = await verifyAccessToken(token);
+    return res.status(200).json({
+      isValid: true,
+      message: "Token is valid",
+      user: {
+        userId: decoded.userId,
+        role: decoded.role || "user",
+        isSuperAdmin: Boolean(decoded.isSuperAdmin),
+      },
+    });
+  } catch (err) {
+    return res.status(200).json({
+      isValid: false,
+      message: err.message || "Token is invalid or expired",
+    });
+  }
+});
 
 // get notification preferences
 module.exports.getNotificationPreferences = expressAsyncHandler(

@@ -217,6 +217,10 @@ const getPodcastById = expressAsyncHandler(
                 return res.status(400).json({ message: 'Podcast id is required' });
             }
 
+            if (!mongoose.Types.ObjectId.isValid(podcast_id)) {
+                return res.status(404).json({ message: 'Podcast not found' });
+            }
+
             const podcast = await Podcast.findById(podcast_id).
                 populate('user_id', 'user_name Profile_image followers').
                 populate('mentionedUsers', 'user_name user_handle Profile_image').
@@ -409,6 +413,11 @@ const savePodcast = expressAsyncHandler(
             if (!podcast_id) {
                 return res.status(400).json({ message: "Podcast id required" });
             }
+
+            if (!mongoose.Types.ObjectId.isValid(podcast_id)) {
+                return res.status(404).json({ error: 'Podcast not found' });
+            }
+
             const user = await User.findById(req.userId);
             const podcast = await Podcast.findById(podcast_id)
                 .populate('tags')
@@ -459,6 +468,10 @@ const likePodcast = expressAsyncHandler(
             const { podcast_id } = req.body;
             if (!podcast_id) {
                 return res.status(400).json({ message: "Podcast id required" });
+            }
+
+            if (!mongoose.Types.ObjectId.isValid(podcast_id)) {
+                return res.status(404).json({ error: 'Podcast not found' });
             }
 
             const user = await User.findById(req.userId);
@@ -514,6 +527,9 @@ const likePodcast = expressAsyncHandler(
 const updatePodcastViewCount = expressAsyncHandler(
     async (req, res) => {
         const { podcast_id } = req.body;
+        if (!podcast_id || !mongoose.Types.ObjectId.isValid(podcast_id)) {
+            return res.status(404).json({ error: 'Podcast not found' });
+        }
         try {
 
             const user = await User.findById(req.userId);

@@ -5,12 +5,13 @@ const PodcastEpisode = require("../models/PodcastEpisode");
 const EditRequest = require("../models/admin/articleEditRequestModel");
 const Glossary = require("../models/Glossary");
 const Admin = require("../models/admin/adminModel");
+const mongoose = require("mongoose");
 
 /**
  * Helper to check whether an admin user has Super Admin privileges
  */
 const checkIsSuperAdmin = async (userId) => {
-  if (!userId) return false;
+  if (!userId || !mongoose.Types.ObjectId.isValid(userId)) return false;
   try {
     const admin = await Admin.findById(userId).select("isSuperAdmin role");
     return Boolean(admin && (admin.isSuperAdmin || admin.role === "Super Admin"));
@@ -76,6 +77,10 @@ const checkPodcastOwnership = async (req, res, next) => {
     return res.status(400).json({ error: "Invalid request: podcastId is required" });
   }
 
+  if (!mongoose.Types.ObjectId.isValid(podcastId)) {
+    return res.status(404).json({ error: "Podcast not found" });
+  }
+
   try {
     const podcast = await Podcast.findById(podcastId);
 
@@ -114,6 +119,10 @@ const checkPlaylistOwnership = async (req, res, next) => {
 
   if (!playlistId) {
     return res.status(400).json({ error: "Invalid request: playlistId is required" });
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(playlistId)) {
+    return res.status(404).json({ error: "Playlist not found" });
   }
 
   try {
@@ -155,6 +164,10 @@ const checkPodcastEpisodeOwnership = async (req, res, next) => {
     return res.status(400).json({ message: "Episode ID is required" });
   }
 
+  if (!mongoose.Types.ObjectId.isValid(episodeId)) {
+    return res.status(404).json({ message: "Episode not found" });
+  }
+
   try {
     const episode = await PodcastEpisode.findById(episodeId);
 
@@ -192,6 +205,10 @@ const checkImprovementContributorOwnership = async (req, res, next) => {
 
   if (!requestId) {
     return res.status(400).json({ message: "Request ID is required" });
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(requestId)) {
+    return res.status(404).json({ message: "Edit request not found" });
   }
 
   try {
@@ -233,6 +250,10 @@ const checkImprovementReviewerOwnership = async (req, res, next) => {
     return res.status(400).json({ message: "Request ID is required" });
   }
 
+  if (!mongoose.Types.ObjectId.isValid(requestId)) {
+    return res.status(404).json({ message: "Edit request not found" });
+  }
+
   try {
     const editRequest = await EditRequest.findById(requestId);
 
@@ -271,6 +292,10 @@ const checkGlossaryOwnership = async (req, res, next) => {
 
   if (!id) {
     return res.status(400).json({ message: "Glossary term ID is required" });
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(404).json({ message: "Glossary term not found" });
   }
 
   try {

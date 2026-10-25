@@ -101,7 +101,13 @@ router.get('/hello', (req, res) => {
     res.send('Hello World')
 })
 
-// router.get("/tokenstatus", getTokenStatus);
+router.get("/checkTokenStatus", getTokenStatus);
+router.post("/checkTokenStatus", getTokenStatus);
+router.get("/tokenstatus", getTokenStatus);
+router.get("/tokenStatus", getTokenStatus);
+router.get("/check-token-status", getTokenStatus);
+router.get("/user/checkTokenStatus", getTokenStatus);
+router.post("/user/checkTokenStatus", getTokenStatus);
 
 router.post(
     '/user/register',

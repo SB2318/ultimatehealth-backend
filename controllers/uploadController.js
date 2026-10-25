@@ -44,13 +44,26 @@ const getAuthAdminFromReq = async (req) => {
 
 require('dotenv').config();
 
-const s3Client = new S3Client({
-    region: 'ap-southeast-2',
-    credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    },
-});
+const s3Region = process.env.AWS_REGION || 'ap-southeast-2';
+const s3AccessKey = process.env.AWS_ACCESS_KEY_ID || process.env.VULTR_ACCESS_KEY;
+const s3SecretKey = process.env.AWS_SECRET_ACCESS_KEY || process.env.VULTR_SECRET_KEY;
+
+const s3Config = {
+    region: s3Region,
+};
+
+if (s3AccessKey && s3SecretKey) {
+    s3Config.credentials = {
+        accessKeyId: s3AccessKey,
+        secretAccessKey: s3SecretKey,
+    };
+}
+
+if (process.env.ENDPOINT_URL) {
+    s3Config.endpoint = process.env.ENDPOINT_URL;
+}
+
+const s3Client = new S3Client(s3Config);
 
 //const pb = new Pocketbase(process.env.DATASORCE_URL);
 
@@ -636,6 +649,11 @@ const getFile = async (req, res) => {
             }
         }
 
+        if (!process.env.BUCKET_NAME || (!s3AccessKey && !process.env.AWS_PROFILE)) {
+            console.warn("⚠️ S3 storage credentials or BUCKET_NAME not configured. Cannot fetch file:", key);
+            return res.status(503).json({ message: "Storage service temporarily unavailable: credentials missing" });
+        }
+
         const params = {
             Bucket: process.env.BUCKET_NAME,
             Key: key,
@@ -662,6 +680,10 @@ const getFile = async (req, res) => {
         if (err.name === 'NoSuchKey' || err.$metadata?.httpStatusCode === 404) {
             return res.status(404).json({ message: "File not found" });
         }
+        if (err.name === 'InvalidAccessKeyId' || err.name === 'SignatureDoesNotMatch' || err.message?.includes('credential')) {
+            console.warn("⚠️ S3 Credential / Configuration error:", err.message);
+            return res.status(503).json({ message: "Storage service temporarily unavailable", error: err.message });
+        }
         console.log("Error fetching file:", err);
         return res.status(500).json({ message: "Failed to fetch file", error: err.message });
     }
@@ -676,6 +698,11 @@ const deleteFile = async (req, res) => {
             return res.status(400).json({ message: "File key is required" });
         }
         const key = decodeURIComponent(rawKey);
+
+        if (!process.env.BUCKET_NAME || (!s3AccessKey && !process.env.AWS_PROFILE)) {
+            console.warn("⚠️ S3 storage credentials or BUCKET_NAME not configured. Cannot delete file:", key);
+            return res.status(503).json({ message: "Storage service temporarily unavailable: credentials missing" });
+        }
 
         const params = {
             Bucket: process.env.BUCKET_NAME,
