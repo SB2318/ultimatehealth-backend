@@ -188,6 +188,11 @@ const verifyRefreshToken = async (token) => {
         }
 
         try {
+            const isBlacklisted = await redis.exists(`blacklist:${decoded.jti}`);
+            if (isBlacklisted) {
+                throwError(HTTP_STATUS.FORBIDDEN, ERROR_CODES.ACCESS_DENIED, "Token has been revoked");
+            }
+
             const exists = await redis.exists(`refresh_token:${decoded.userId}:${decoded.jti}`);
             if (!exists) {
                 const keys = await redis.keys(`refresh_token:${decoded.userId}:*`);
@@ -278,6 +283,41 @@ const verifyToken = (token) => {
     return jwt.verify(token, key, { algorithms: [algorithm] });
 };
 
+/**
+ * Verifies any valid JWT token (either short-lived access token or 7-day refresh/session token).
+ * @param {string} token 
+ * @returns {Promise<object>} Decoded token payload
+ */
+const verifyAnyToken = async (token) => {
+    if (!token) {
+        throwError(HTTP_STATUS.UNAUTHORIZED, ERROR_CODES.UNAUTHORIZED_ACCESS, "Token is missing");
+    }
+
+    const unverified = jwt.decode(token);
+    if (!unverified) {
+        throwError(HTTP_STATUS.UNAUTHORIZED, ERROR_CODES.UNAUTHORIZED_ACCESS, "Invalid token format");
+    }
+
+    if (unverified.type === "refresh") {
+        return await verifyRefreshToken(token);
+    }
+
+    if (unverified.type === "access") {
+        return await verifyAccessToken(token);
+    }
+
+    // Fallback if type is not specified
+    try {
+        return await verifyAccessToken(token);
+    } catch (accessErr) {
+        try {
+            return await verifyRefreshToken(token);
+        } catch (refreshErr) {
+            throw accessErr;
+        }
+    }
+};
+
 const hashToken = (token) => {
     const secret = process.env.TOKEN_SECRET || "fallback_default_secret_key_123";
     return crypto
@@ -306,6 +346,7 @@ module.exports = {
     verifyRefreshToken,
     verifyVerificationToken,
     verifyPasswordResetToken,
+    verifyAnyToken,
     revokeRefreshToken,
     blacklistAccessToken,
     revokeAllUserTokens,

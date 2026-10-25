@@ -17,6 +17,10 @@ const findAdminById = async (id) => {
   return Admin.findById(id).lean();
 };
 
+const findAdminDocumentById = async (id) => {
+  return Admin.findById(id);
+};
+
 const updateAdminOtp = async (adminId, payload) => {
   return Admin.updateOne({ _id: adminId }, { $set: payload });
 };
@@ -73,6 +77,8 @@ module.exports = {
   checkExistingAdmin,
   findAdminByEmail,
   findAdminByHandle,
+  findAdminById,
+  findAdminDocumentById,
   updateAdminOtp,
   incrementOtpAttemptsAdmin,
   clearOtpAdmin,

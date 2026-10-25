@@ -12,6 +12,7 @@ const {
   verifyAdminOtp,
   resetAdminPassword,
 } = require('../controllers/admin/adminAuthController');
+const { getTokenStatus } = require('../controllers/usersControllers');
 const {
   verifyEmail,
   Sendverifymail,
@@ -143,6 +144,10 @@ router.get("/admin/agreement", (req, res) => {
   res.sendFile(path.join(__dirname, "..", "public", "admin-agreement.html"));
 });
 
+router.get("/admin/checkTokenStatus", getTokenStatus);
+router.post("/admin/checkTokenStatus", getTokenStatus);
+router.get("/admin/tokenstatus", getTokenStatus);
+router.post("/admin/tokenstatus", getTokenStatus);
 
 module.exports = router;
 

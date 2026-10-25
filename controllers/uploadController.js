@@ -13,15 +13,15 @@ const expressAsyncHandler = require('express-async-handler');
 const { getHTMLFileContent, authenticateAdmin, getPocketbaseClient } = require('../utils/pocketbaseUtil');
 const crypto = require('crypto');
 const puppeteer = require("puppeteer");
-const adminModel = require("../models/admin/adminModel");
+const { findAdminDocumentById } = require("../services/db/adminService");
 const AdminApplicant = require("../models/admin/adminApplicantModel");
 const jwt = require('jsonwebtoken');
-const { verifyAccessToken } = require('../services/security/tokenService');
+const { verifyAccessToken, verifyAnyToken } = require('../services/security/tokenService');
 
 const getAuthAdminFromReq = async (req) => {
     try {
         const rawAuth = req.headers['authorization'] || req.headers['Authorization'];
-        let token = req.cookies?.accessToken;
+        let token = req.cookies?.accessToken || req.cookies?.refreshToken;
         if (!token && rawAuth) {
             token = rawAuth.startsWith('Bearer ') ? rawAuth.split(' ')[1] : rawAuth;
         }
@@ -30,10 +30,10 @@ const getAuthAdminFromReq = async (req) => {
         }
         if (!token) return null;
 
-        const decoded = await verifyAccessToken(token);
+        const decoded = await verifyAnyToken(token);
         if (!decoded || !decoded.userId) return null;
 
-        const admin = await adminModel.findById(decoded.userId);
+        const admin = await findAdminDocumentById(decoded.userId);
         if (!admin || !admin.isVerified) return null;
 
         return admin;
@@ -196,7 +196,7 @@ const getUserFromToken = (req) => {
     }
 
     const token = authHeader.split(" ")[1];
-    return verifyAccessToken(token);
+    return verifyAnyToken(token);
 };
 
 // upload file

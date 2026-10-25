@@ -1,6 +1,6 @@
 const { throwError } = require("../utils/throwError");
 const { HTTP_STATUS, ERROR_CODES } = require("../constants/errorConstants");
-const Admin = require("../models/admin/adminModel");
+const { findAdminDocumentById } = require("../services/db/adminService");
 
 /**
  * Ensures the authenticated admin has super admin privileges (isSuperAdmin: true).
@@ -18,7 +18,7 @@ const requireSuperAdmin = async (req, res, next) => {
       );
     }
 
-    const admin = await Admin.findById(adminId);
+    const admin = await findAdminDocumentById(adminId);
     if (!admin || !admin.isSuperAdmin) {
       throwError(
         HTTP_STATUS.FORBIDDEN,

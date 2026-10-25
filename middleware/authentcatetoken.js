@@ -71,21 +71,21 @@
 
 // module.exports = authenticateToken;
 
-const { verifyAccessToken, verifyRefreshToken } = require("../services/security/tokenService");
+const { verifyAccessToken, verifyRefreshToken, verifyAnyToken } = require("../services/security/tokenService");
 
 const authenticateToken = async (req, res, next) => {
   try {
-    const token = req.cookies?.accessToken || req.headers['authorization']?.split(' ')[1];
+    const token = req.cookies?.accessToken || req.cookies?.refreshToken || req.headers['authorization']?.split(' ')[1];
 
     if (!token) {
       return res.status(401).json({ error: 'No access token provided' });
     }
    
-    // Refresh call from mobile , access call from web
+    // Refresh call from mobile , access call from web, or automatic detection
     const isRefreshCall = req.headers['x-token-type'] === 'refresh';
     const decoded = isRefreshCall
       ? await verifyRefreshToken(token)
-      : await verifyAccessToken(token);
+      : await verifyAnyToken(token);
 
     req.userId = decoded.userId;
     req.userRole = decoded.role || 'user';

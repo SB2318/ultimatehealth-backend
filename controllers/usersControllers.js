@@ -37,6 +37,7 @@ const {
 const {
   findAdminByEmail,
   findAdminByHandle,
+  findAdminById,
   checkExistingAdmin,
 } = require("../services/db/adminService");
 const { blackListToken, addTokenToBlacklist } = require("../services/db/dbTokenService");
@@ -55,7 +56,8 @@ const {
   blacklistAccessToken,
   revokeRefreshToken,
   revokeAllUserTokens,
-  verifyAccessToken
+  verifyAccessToken,
+  verifyAnyToken
 } = require("../services/security/tokenService");
 const {
   isSamePassword,
@@ -1342,12 +1344,12 @@ module.exports.updateNotificationPreferences = expressAsyncHandler(
 );
 
 /**
- * Check validity of current JWT access token
+ * Check validity of current JWT access token or 7-day session/refresh token
  * Route: GET & POST /api/checkTokenStatus, /api/tokenstatus
  */
 module.exports.getTokenStatus = expressAsyncHandler(async (req, res) => {
   const rawAuth = req.headers.authorization || req.headers.Authorization;
-  let token = req.cookies?.accessToken;
+  let token = req.cookies?.accessToken || req.cookies?.refreshToken;
   if (!token && rawAuth) {
     token = rawAuth.startsWith("Bearer ") ? rawAuth.split(" ")[1] : rawAuth;
   }
@@ -1363,14 +1365,46 @@ module.exports.getTokenStatus = expressAsyncHandler(async (req, res) => {
   }
 
   try {
-    const decoded = await verifyAccessToken(token);
+    const decoded = await verifyAnyToken(token);
+
+    if (decoded.role === "admin" || decoded.isSuperAdmin) {
+      const admin = await findAdminById(decoded.userId).catch(() => null);
+      if (admin && admin.isBlocked) {
+        return res.status(200).json({
+          isValid: false,
+          message: "Admin account has been blocked by Super Admin",
+        });
+      }
+
+      return res.status(200).json({
+        isValid: true,
+        message: "Token is valid",
+        tokenType: decoded.type || "refresh",
+        expiresAt: decoded.exp ? new Date(decoded.exp * 1000).toISOString() : null,
+        user: {
+          userId: admin?._id || decoded.userId,
+          email: admin?.email || decoded.email,
+          user_name: admin?.user_name || decoded.user_name || "Admin",
+          user_handle: admin?.user_handle || decoded.user_handle || "admin",
+          role: admin?.role || (decoded.isSuperAdmin ? "Super Admin" : decoded.role || "admin"),
+          isSuperAdmin: Boolean(admin?.isSuperAdmin || decoded.isSuperAdmin),
+        },
+      });
+    }
+
+    const user = await findUserById(decoded.userId).catch(() => null);
     return res.status(200).json({
       isValid: true,
       message: "Token is valid",
+      tokenType: decoded.type || "access",
+      expiresAt: decoded.exp ? new Date(decoded.exp * 1000).toISOString() : null,
       user: {
-        userId: decoded.userId,
+        userId: user?._id || decoded.userId,
+        email: user?.email || decoded.email,
+        user_name: user?.user_name || decoded.user_name,
+        user_handle: user?.user_handle || decoded.user_handle,
         role: decoded.role || "user",
-        isSuperAdmin: Boolean(decoded.isSuperAdmin),
+        isSuperAdmin: false,
       },
     });
   } catch (err) {
