@@ -170,6 +170,14 @@ app.get('/', (req, res) => {
 //     res.redirect(302, 'https://ultimatehealth.blog/frontend/v2');
 // });
 
+app.get('/admin/delete-account', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'login-admin.html'));
+});
+
+app.get('/delete-account', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'login-user.html'));
+});
+
 app.get('/.well-known/assetlinks.json', (req, res) => {
   res.status(200).json(assetLinks);
 });

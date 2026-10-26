@@ -134,9 +134,14 @@ router.post('/admin/update-profile', authenticateToken, editProfile);
 
 
 router.post("/admin/delete", authenticateToken, deleteAdmin);
+router.post("/admin/delete-account", authenticateToken, deleteAdmin);
 
 router.get("/admin/delete-account", (req, res) => {
   res.sendFile(path.join(__dirname, "..", "public", "login-admin.html"));
+});
+
+router.get("/admin/delete-account-confirm", (req, res) => {
+  res.sendFile(path.join(__dirname, "..", "public", "delete-account-admin.html"));
 });
 
 

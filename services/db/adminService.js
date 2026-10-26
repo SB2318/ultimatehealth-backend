@@ -73,6 +73,10 @@ const logoutAdmin = async (adminId) => {
   );
 };
 
+const deleteAdminDocument = async (query) => {
+  return Admin.deleteOne(query);
+};
+
 module.exports = {
   checkExistingAdmin,
   findAdminByEmail,
@@ -84,4 +88,5 @@ module.exports = {
   clearOtpAdmin,
   updateAdminPasswordAndClearOtp,
   logoutAdmin,
+  deleteAdminDocument,
 };

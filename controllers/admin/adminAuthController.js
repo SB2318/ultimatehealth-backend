@@ -18,6 +18,8 @@ const {
 } = require("../../services/security/tokenService");
 const {
   findAdminByEmail,
+  findAdminDocumentById,
+  deleteAdminDocument,
   updateAdminOtp,
   incrementOtpAttemptsAdmin,
   clearOtpAdmin,
@@ -375,13 +377,20 @@ module.exports.editProfile = expressAsyncHandler(
 
 module.exports.deleteAdmin = expressAsyncHandler(
   async (req, res) => {
-
     try {
-      const { password } = req.body;
-      const user = await admin.findById(req.userId);
+      const { password, email } = req.body;
+      if (!password) {
+        return res.status(400).json({ error: "Password is required" });
+      }
+
+      const user = await findAdminDocumentById(req.userId);
 
       if (!user) {
         return res.status(404).json({ error: "User not found" });
+      }
+
+      if (email && email.toLowerCase() !== user.email.toLowerCase()) {
+        return res.status(400).json({ error: "Email provided does not match account" });
       }
 
       if (!user.isVerified) {
@@ -389,11 +398,13 @@ module.exports.deleteAdmin = expressAsyncHandler(
           .status(403)
           .json({ error: "Email not verified. Please check your email." });
       }
-      const isPasswordValid = await bcrypt.compare(password, user.password);
+
+      const isPasswordValid = await isSamePassword(password, user.password);
 
       if (!isPasswordValid) {
         return res.status(401).json({ error: "Invalid password" });
       }
+
       // delete profile image from aws
       const avatar = user?.Profile_avtar;
       if (
@@ -407,14 +418,21 @@ module.exports.deleteAdmin = expressAsyncHandler(
         await deleteFileFn(avatar);
       }
 
-      await admin.deleteOne({ email: user.email });
+      if (req.tokenJti) {
+        await blacklistAccessToken(req.tokenJti, req.tokenExp);
+      }
 
-      res.json({
+      await deleteAdminDocument({ _id: user._id });
+
+      res.clearCookie("accessToken");
+      res.clearCookie("refreshToken");
+
+      return res.status(200).json({
         status: true,
         message: "account has been removed from database",
       });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      return res.status(500).json({ error: error.message });
     }
   }
 );

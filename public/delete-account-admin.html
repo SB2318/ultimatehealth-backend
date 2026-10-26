@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Delete Account • Admin Portal</title>
+  <style>
+    body {
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      background: #f4f7fc;
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      color: #1e293b;
+    }
+
+    .container {
+      background: #ffffff;
+      width: 100%;
+      max-width: 420px;
+      padding: 40px 32px;
+      margin: 20px;
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+      text-align: center;
+      box-sizing: border-box;
+    }
+
+    .icon {
+      width: 56px;
+      height: 56px;
+      margin-bottom: 20px;
+    }
+
+    .alert-box {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #b91c1c;
+      padding: 14px 16px;
+      border-radius: 12px;
+      font-size: 13.5px;
+      line-height: 1.5;
+      margin-bottom: 24px;
+      text-align: left;
+    }
+
+    .alert-box strong {
+      display: block;
+      margin-bottom: 4px;
+      color: #991b1b;
+    }
+
+    h2 {
+      margin: 0 0 10px;
+      font-size: 22px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    p.subtitle {
+      font-size: 14px;
+      color: #64748b;
+      margin: 0 0 24px;
+      line-height: 1.5;
+    }
+
+    .input-group {
+      margin-bottom: 18px;
+      text-align: left;
+    }
+
+    .input-group label {
+      font-size: 13.5px;
+      font-weight: 600;
+      display: block;
+      margin-bottom: 6px;
+      color: #334155;
+    }
+
+    .input-group input {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      font-size: 15px;
+      outline: none;
+      transition: all 0.2s ease;
+      box-sizing: border-box;
+      background: #f8fafc;
+    }
+
+    .input-group input:focus {
+      background: #ffffff;
+      border-color: #ef4444;
+      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+    }
+
+    .delete-btn {
+      width: 100%;
+      background: #ef4444;
+      color: #ffffff;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
+    }
+
+    .delete-btn:hover:not(:disabled) {
+      background: #dc2626;
+      box-shadow: 0 6px 16px rgba(220, 38, 38, 0.35);
+    }
+
+    .delete-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .cancel-link {
+      margin-top: 20px;
+      display: inline-block;
+      font-size: 14px;
+      font-weight: 500;
+      color: #64748b;
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+
+    .cancel-link:hover {
+      color: #0f172a;
+      text-decoration: underline;
+    }
+
+    #responseMsg {
+      margin-top: 18px;
+      font-size: 14px;
+      font-weight: 500;
+      min-height: 20px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="container">
+    <img src="https://cdn-icons-png.flaticon.com/512/463/463612.png" alt="Danger icon" class="icon" />
+
+    <div class="alert-box">
+      <strong>Permanent Action Warning</strong>
+      Deleting your administrator account cannot be undone. All administrative access, associated audit records, and security keys will be revoked immediately.
+    </div>
+
+    <h2>Confirm Your Identity</h2>
+    <p class="subtitle">
+      Please re-enter your administrator credentials to permanently delete your account.
+    </p>
+
+    <form id="deleteForm">
+      <div class="input-group">
+        <label for="email">Admin Email</label>
+        <input type="email" id="email" required placeholder="admin@ultimatehealth.blog" autocomplete="email" />
+      </div>
+
+      <div class="input-group">
+        <label for="password">Confirm Password</label>
+        <input type="password" id="password" required placeholder="Enter your current password" autocomplete="current-password" />
+      </div>
+
+      <button type="submit" id="submitBtn" class="delete-btn">Permanently Delete Account</button>
+    </form>
+
+    <div id="responseMsg"></div>
+
+    <a href="/" class="cancel-link">Return to Home</a>
+  </div>
+
+  <script>
+    // If no token in localStorage, check if we need to redirect to login first
+    const token = localStorage.getItem("accessToken");
+    if (!token) {
+      console.warn("No accessToken found in localStorage. Proceeding with session cookies if available.");
+    }
+
+    document.getElementById("deleteForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
+
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+      const responseMsg = document.getElementById("responseMsg");
+      const submitBtn = document.getElementById("submitBtn");
+
+      responseMsg.style.color = "#64748b";
+      responseMsg.innerHTML = "Processing account deletion...";
+      submitBtn.disabled = true;
+
+      try {
+        const headers = {
+          "Content-Type": "application/json"
+        };
+        const activeToken = localStorage.getItem("accessToken");
+        if (activeToken) {
+          headers["Authorization"] = "Bearer " + activeToken;
+        }
+
+        const res = await fetch("/api/admin/delete", {
+          method: "POST",
+          headers: headers,
+          credentials: "include", 
+          body: JSON.stringify({ email, password })
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (res.ok) {
+          responseMsg.style.color = "#16a34a";
+          responseMsg.innerHTML = data.message || "Account successfully removed. Redirecting...";
+
+          setTimeout(() => {
+            try {
+              localStorage.removeItem("accessToken");
+              localStorage.removeItem("refreshToken");
+              localStorage.clear();
+            } catch (err) {}
+            window.location.href = "/goodbye.html";
+          }, 1500);
+        } else {
+          submitBtn.disabled = false;
+          responseMsg.style.color = "#dc2626";
+          responseMsg.innerHTML = data.error || data.message || "Deletion failed. Please verify your credentials.";
+        }
+      } catch (err) {
+        submitBtn.disabled = false;
+        responseMsg.style.color = "#dc2626";
+        responseMsg.innerHTML = "Network or server error: " + (err.message || "Unable to reach server");
+      }
+    });
+  </script>
+
+</body>
+</html>
