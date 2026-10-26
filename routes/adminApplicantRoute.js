@@ -7,9 +7,11 @@ const {
   updateApplicantStatus,
   createAdminFromApplicant,
   getMyAdminProfile,
+  getAdminProfileById,
   toggleBlockAdmin,
   deleteAdminBySuperAdmin,
   getAllAdmins,
+  getPlatformAnalyticsOverview,
 } = require("../controllers/admin/adminApplicantController");
 const {
   applicantResumeUpload,
@@ -454,6 +456,78 @@ router.delete(
   adminAuthenticateToken,
   requireSuperAdmin,
   deleteAdminBySuperAdmin
+);
+
+// Extended Block & Status Endpoints
+router.put(
+  "/admin/admins/:id/status",
+  adminAuthenticateToken,
+  requireSuperAdmin,
+  toggleBlockAdmin
+);
+router.patch(
+  "/admin/admins/:id/status",
+  adminAuthenticateToken,
+  requireSuperAdmin,
+  toggleBlockAdmin
+);
+router.put(
+  "/admin/:id/status",
+  adminAuthenticateToken,
+  requireSuperAdmin,
+  toggleBlockAdmin
+);
+router.patch(
+  "/admin/:id/status",
+  adminAuthenticateToken,
+  requireSuperAdmin,
+  toggleBlockAdmin
+);
+router.put(
+  "/admin/:id/block",
+  adminAuthenticateToken,
+  requireSuperAdmin,
+  toggleBlockAdmin
+);
+router.patch(
+  "/admin/:id/block",
+  adminAuthenticateToken,
+  requireSuperAdmin,
+  toggleBlockAdmin
+);
+
+// Super Admin Platform Analytics (Registered before wildcard :id)
+router.get(
+  "/admin/platform-analytics",
+  adminAuthenticateToken,
+  requireSuperAdmin,
+  getPlatformAnalyticsOverview
+);
+router.get(
+  "/admin/analytics/overview",
+  adminAuthenticateToken,
+  requireSuperAdmin,
+  getPlatformAnalyticsOverview
+);
+
+// Admin Profile Dossier by ID
+router.get(
+  "/admin/profile/:id",
+  adminAuthenticateToken,
+  requireSuperAdmin,
+  getAdminProfileById
+);
+router.get(
+  "/admin/admins/:id",
+  adminAuthenticateToken,
+  requireSuperAdmin,
+  getAdminProfileById
+);
+router.get(
+  "/admin/:id",
+  adminAuthenticateToken,
+  requireSuperAdmin,
+  getAdminProfileById
 );
 
 module.exports = router;

@@ -153,10 +153,16 @@ module.exports.login = expressAsyncHandler(
         return res.status(401).json({ error: "Invalid password" });
       }
 
-      let tokenVersion = await redis.get(`user_token_version:${user._id}`);
-      if (tokenVersion === null) {
-        tokenVersion = 0;
-        await redis.set(`user_token_version:${user._id}`, 0);
+      let tokenVersion = 0;
+      try {
+        const storedVersion = await redis.get(`user_token_version:${user._id}`);
+        if (storedVersion !== null) {
+          tokenVersion = parseInt(storedVersion, 10);
+        } else {
+          await redis.set(`user_token_version:${user._id}`, 0);
+        }
+      } catch (redisErr) {
+        console.warn("⚠️ Redis unavailable, falling back to default tokenVersion 0");
       }
 
       const isSuperAdmin = Boolean(

@@ -1,10 +1,16 @@
 const expressAsyncHandler = require("express-async-handler");
 const crypto = require("crypto");
 const bcrypt = require("bcrypt");
+const mongoose = require("mongoose");
 const { adminApplicantSchema } = require("../../validators/applicant.schema");
 const { uploadApplicantResumeToS3 } = require("../uploadController");
 const Admin = require("../../models/admin/adminModel");
+const AdminApplicant = require("../../models/admin/adminApplicantModel");
 const Article = require("../../models/Articles");
+const EditRequest = require("../../models/admin/articleEditRequestModel");
+const { ReportAction, reportActionEnum } = require("../../models/admin/reportActionSchema");
+const Specialization = require("../../models/SpecializationsModel");
+const Language = require("../../models/Language");
 const Glossary = require("../../models/Glossary");
 const { statusEnum } = require("../../utils/StatusEnum");
 const {
@@ -335,12 +341,25 @@ const getMyAdminProfile = expressAsyncHandler(async (req, res) => {
 });
 
 /**
- * Superadmin-Specific: Toggle block/unblock status of an Admin
+ * Superadmin-Specific: Block or unblock an Admin account
  * Access: SuperAdmin only
+ * Supports: PUT/PATCH /api/admin/admins/:id/block, PUT/PATCH /api/admin/:id/status
+ * Body: { is_blocked?: boolean, isBlocked?: boolean, status?: string }
  */
 const toggleBlockAdmin = expressAsyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { isBlocked } = req.body;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throwError(HTTP_STATUS.NOT_FOUND, ERROR_CODES.RESOURCE_NOT_FOUND, "Admin not found");
+  }
+
+  let targetBlockState;
+  if (typeof req.body.is_blocked !== "undefined") {
+    targetBlockState = Boolean(req.body.is_blocked);
+  } else if (typeof req.body.isBlocked !== "undefined") {
+    targetBlockState = Boolean(req.body.isBlocked);
+  } else if (req.body.status) {
+    targetBlockState = req.body.status.toLowerCase() === "suspended" || req.body.status.toLowerCase() === "blocked";
+  }
 
   const targetAdmin = await Admin.findById(id);
   if (!targetAdmin) {
@@ -356,7 +375,7 @@ const toggleBlockAdmin = expressAsyncHandler(async (req, res) => {
     throwError(HTTP_STATUS.BAD_REQUEST, ERROR_CODES.INVALID_INPUT, "You cannot block your own account");
   }
 
-  targetAdmin.isBlocked = typeof isBlocked === "boolean" ? isBlocked : !targetAdmin.isBlocked;
+  targetAdmin.isBlocked = typeof targetBlockState === "boolean" ? targetBlockState : !targetAdmin.isBlocked;
   targetAdmin.updated_at = new Date();
   await targetAdmin.save();
 
@@ -370,8 +389,118 @@ const toggleBlockAdmin = expressAsyncHandler(async (req, res) => {
       user_handle: targetAdmin.user_handle,
       email: targetAdmin.email,
       isBlocked: targetAdmin.isBlocked,
+      status: targetAdmin.isBlocked ? "suspended" : "active",
     }
   );
+});
+
+/**
+ * Superadmin-Specific: Get extended Admin Profile Dossier by ID
+ * Route: GET /api/admin/profile/:id, GET /api/admin/admins/:id, GET /api/admin/:id
+ */
+const getAdminProfileById = expressAsyncHandler(async (req, res) => {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throwError(HTTP_STATUS.NOT_FOUND, ERROR_CODES.RESOURCE_NOT_FOUND, "Admin not found");
+  }
+
+  const targetAdmin = await Admin.findById(id)
+    .select("-password -refreshToken -otp -verificationToken")
+    .lean();
+
+  if (!targetAdmin) {
+    throwError(HTTP_STATUS.NOT_FOUND, ERROR_CODES.RESOURCE_NOT_FOUND, "Admin not found");
+  }
+
+  const [articlesReviewed, improvementsReviewed, reportsHandled] = await Promise.all([
+    Article.countDocuments({ reviewer_id: id, is_removed: false }).catch(() => 0),
+    EditRequest.countDocuments({ reviewer_id: id }).catch(() => 0),
+    ReportAction.countDocuments({ admin_id: id }).catch(() => 0),
+  ]);
+
+  const permissions = {
+    canReviewArticles: true,
+    canInspectDiffs: true,
+    canManageReports: true,
+    canManageGlossary: true,
+    canAuditGlobal: Boolean(targetAdmin.isSuperAdmin),
+    canManageAdmins: Boolean(targetAdmin.isSuperAdmin),
+  };
+
+  return sendSuccess(res, HTTP_STATUS.OK, "Admin profile dossier retrieved successfully", {
+    admin: {
+      ...targetAdmin,
+      status: targetAdmin.isBlocked ? "suspended" : "active",
+    },
+    permissions,
+    metrics: {
+      articlesReviewed,
+      improvementsReviewed,
+      reportsHandled,
+    },
+  });
+});
+
+/**
+ * Superadmin-Specific: Platform Analytics & KPI Overview
+ * Route: GET /api/admin/platform-analytics, GET /api/admin/analytics/overview
+ */
+const getPlatformAnalyticsOverview = expressAsyncHandler(async (req, res) => {
+  const [
+    totalAdmins,
+    activeAdmins,
+    suspendedAdmins,
+    pendingApplicants,
+    totalApplicants,
+    unassignedArticles,
+    inProgressArticles,
+    publishedArticles,
+    totalArticles,
+    pendingReports,
+    resolvedReports,
+    totalSpecializations,
+    totalLanguages,
+  ] = await Promise.all([
+    Admin.countDocuments().catch(() => 0),
+    Admin.countDocuments({ isBlocked: false }).catch(() => 0),
+    Admin.countDocuments({ isBlocked: true }).catch(() => 0),
+    AdminApplicant.countDocuments({ status: "pending" }).catch(() => 0),
+    AdminApplicant.countDocuments().catch(() => 0),
+    Article.countDocuments({ status: statusEnum.UNASSIGNED, is_removed: false }).catch(() => 0),
+    Article.countDocuments({ status: statusEnum.IN_PROGRESS, is_removed: false }).catch(() => 0),
+    Article.countDocuments({ status: statusEnum.PUBLISHED, is_removed: false }).catch(() => 0),
+    Article.countDocuments({ is_removed: false }).catch(() => 0),
+    ReportAction.countDocuments({ action_taken: reportActionEnum.PENDING }).catch(() => 0),
+    ReportAction.countDocuments({ action_taken: reportActionEnum.RESOLVED }).catch(() => 0),
+    Specialization.countDocuments().catch(() => 0),
+    Language.countDocuments().catch(() => 0),
+  ]);
+
+  return sendSuccess(res, HTTP_STATUS.OK, "Platform analytics overview retrieved successfully", {
+    staffMetrics: {
+      totalAdmins,
+      activeAdmins,
+      suspendedAdmins,
+      pendingApplicants,
+      totalApplicants,
+    },
+    contentMetrics: {
+      unassignedArticles,
+      inProgressArticles,
+      publishedArticles,
+      totalArticles,
+      reviewQueueCount: unassignedArticles + inProgressArticles,
+    },
+    moderationMetrics: {
+      pendingReports,
+      resolvedReports,
+      totalReports: pendingReports + resolvedReports,
+    },
+    masterDataMetrics: {
+      totalSpecializations,
+      totalLanguages,
+    },
+  });
 });
 
 /**
@@ -455,7 +584,9 @@ module.exports = {
   updateApplicantStatus,
   createAdminFromApplicant,
   getMyAdminProfile,
+  getAdminProfileById,
   toggleBlockAdmin,
   deleteAdminBySuperAdmin,
   getAllAdmins,
+  getPlatformAnalyticsOverview,
 };

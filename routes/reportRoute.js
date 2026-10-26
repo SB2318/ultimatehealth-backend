@@ -10,6 +10,7 @@ router.put('/report/update-reason', adminAuthenticateToken, controller.updateRea
 router.delete('/report/reason/:id', adminAuthenticateToken, controller.deleteReason);
 
 router.get('/report/reasons', authenticateToken, controller.getAllReasons);
+router.get('/report/reasons/metrics', authenticateToken, controller.getReasonsWithMetrics);
 
 router.post('/report/submit', authenticateToken, controller.submitReport);
 

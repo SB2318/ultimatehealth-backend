@@ -22,3 +22,4 @@ test.js
 useSocket.txt
 keys/private.pem
 firebase-admin-sdk.json
+local_mongodb_data/

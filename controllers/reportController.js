@@ -95,9 +95,7 @@ module.exports.deleteReason = expressAsyncHandler(
 )
 // Get all Reasons
 module.exports.getAllReasons = expressAsyncHandler(
-
   async (req, res) => {
-
     try {
       const reasons = await Reason.find({ status: 'Active' }).sort({ createdAt: -1 });
       res.status(200).json(reasons);
@@ -107,6 +105,42 @@ module.exports.getAllReasons = expressAsyncHandler(
     }
   }
 )
+
+// Get all Reasons with Metrics (Content Breakdown for Admin Dashboard)
+module.exports.getReasonsWithMetrics = expressAsyncHandler(async (req, res) => {
+  try {
+    const reasons = await Reason.find().sort({ createdAt: -1 });
+
+    const metricsPromises = reasons.map(async (r) => {
+      const [pendingCount, investigationCount, resolvedCount] = await Promise.all([
+        ReportAction.countDocuments({ reasonId: r._id, action_taken: reportActionEnum.PENDING }).catch(() => 0),
+        ReportAction.countDocuments({ reasonId: r._id, action_taken: reportActionEnum.INVESTIGATION }).catch(() => 0),
+        ReportAction.countDocuments({ reasonId: r._id, action_taken: reportActionEnum.RESOLVED }).catch(() => 0),
+      ]);
+      const activeCount = pendingCount + investigationCount;
+      return {
+        _id: r._id,
+        reason: r.reason,
+        status: r.status,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+        activeReportsCount: activeCount,
+        resolvedReportsCount: resolvedCount,
+        totalReportsCount: activeCount + resolvedCount,
+      };
+    });
+
+    const enrichedReasons = await Promise.all(metricsPromises);
+    return res.status(200).json({
+      success: true,
+      message: "Abuse reasons with metrics retrieved successfully",
+      data: enrichedReasons,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
 // Submit Report
 module.exports.submitReport = expressAsyncHandler(
   async (req, res) => {
