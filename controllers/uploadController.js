@@ -128,41 +128,51 @@ const ALLOWED_RESUME_TYPES = [
     'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'image/jpeg',
+    'image/jpg',
     'image/png',
+    'image/webp',
+    'image/heic',
+    'image/heif',
+    'image/x-png',
+    'image/pjpeg',
+];
+
+const ALLOWED_RESUME_EXTENSIONS = [
+    '.pdf',
+    '.doc',
+    '.docx',
+    '.jpg',
+    '.jpeg',
+    '.png',
+    '.webp',
+    '.heic',
+    '.heif',
 ];
 
 const applicantResumeUpload = multer({
     storage: multer.memoryStorage(),
     limits: {
-        fileSize: 10 * 1024 * 1024, // 10 MB limit
+        fileSize: 15 * 1024 * 1024, // 15 MB limit
     },
     fileFilter: (req, file, cb) => {
-        if (ALLOWED_RESUME_TYPES.includes(file.mimetype)) {
+        const ext = path.extname(file.originalname || '').toLowerCase();
+        const mime = (file.mimetype || '').toLowerCase();
+        if (
+            ALLOWED_RESUME_TYPES.includes(mime) ||
+            ALLOWED_RESUME_EXTENSIONS.includes(ext) ||
+            mime.startsWith('image/')
+        ) {
             cb(null, true);
         } else {
             cb(
                 new Error(
-                    'Unsupported file type. Only PDF, DOC, DOCX, JPG, and PNG files are accepted.'
+                    'Unsupported file type. Only PDF, DOC, DOCX, JPG, PNG, and WebP files are accepted.'
                 ),
                 false
             );
         }
     },
-}).fields([
-    { name: 'resume', maxCount: 1 },
-    { name: 'cv', maxCount: 1 },
-    { name: 'agreementScreenshot', maxCount: 1 },
-    { name: 'agreement_screenshot', maxCount: 1 },
-    { name: 'screenshot', maxCount: 1 },
-    { name: 'agreement', maxCount: 1 },
-    { name: 'admin_agreement', maxCount: 1 },
-    { name: 'proof', maxCount: 1 },
-    { name: 'id_proof', maxCount: 1 },
-    { name: 'certificate', maxCount: 1 },
-    { name: 'file', maxCount: 2 },
-    { name: 'document', maxCount: 2 },
-    { name: 'files', maxCount: 2 },
-]);
+}).any();
 
 const uploadApplicantResumeToS3 = async (buffer, originalName, mimeType) => {
     const sanitizedName = originalName.replace(/[^a-zA-Z0-9.-]/g, '_');

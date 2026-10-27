@@ -33,12 +33,30 @@ const { HTTP_STATUS, ERROR_CODES } = require("../../constants/errorConstants");
  * Submit Admin / Moderator / Reviewer Application (Public)
  */
 const submitApplicant = expressAsyncHandler(async (req, res) => {
+  // Normalize incoming fields from form-data / json
+  if (req.body) {
+    if (!req.body.fullName && (req.body.name || req.body.applicantName || req.body.userName)) {
+      req.body.fullName = req.body.name || req.body.applicantName || req.body.userName;
+    }
+    if (!req.body.email && (req.body.userEmail || req.body.applicantEmail)) {
+      req.body.email = req.body.userEmail || req.body.applicantEmail;
+    }
+
+    // Clean up "undefined" or "null" string literals from FormData
+    for (const key of Object.keys(req.body)) {
+      if (req.body[key] === "undefined" || req.body[key] === "null") {
+        req.body[key] = "";
+      }
+    }
+  }
+
   const validationResult = adminApplicantSchema.safeParse(req.body);
 
   if (!validationResult.success) {
     const errorDetails = validationResult.error.errors
-      .map((e) => e.message)
+      .map((e) => `${e.path.join('.') || 'field'}: ${e.message}`)
       .join(", ");
+    console.error("❌ Admin applicant validation failed:", errorDetails, "Body:", req.body);
     throwError(
       HTTP_STATUS.BAD_REQUEST,
       ERROR_CODES.VALIDATION_ERROR,
