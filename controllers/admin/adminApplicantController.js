@@ -23,6 +23,9 @@ const {
   sendAdminApplicationEmail,
   sendApplicantConfirmationEmail,
   sendAdminOnboardingEmail,
+  sendApplicationApprovalEmail,
+  sendApplicationRejectionEmail,
+  sendApplicationStatusUpdateEmail,
 } = require("../emailservice");
 const { generateVerificationToken } = require("../../services/security/tokenService");
 const { throwError } = require("../../utils/throwError");
@@ -331,9 +334,9 @@ const getApplicantById = expressAsyncHandler(async (req, res) => {
  */
 const updateApplicantStatus = expressAsyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { status, reviewNotes } = req.body;
+  const { status, reviewNotes, meetLink, interviewDate, rejectionReason } = req.body;
 
-  const allowedStatuses = ["Pending", "Under Review", "Approved", "Rejected"];
+  const allowedStatuses = ["Pending", "Under Review", "Interview Scheduled", "Approved", "Accepted", "Rejected"];
   if (!status || !allowedStatuses.includes(status)) {
     throwError(
       HTTP_STATUS.BAD_REQUEST,
@@ -342,9 +345,37 @@ const updateApplicantStatus = expressAsyncHandler(async (req, res) => {
     );
   }
 
-  const updatedApplicant = await updateAdminApplicantStatus(id, status, reviewNotes);
+  const additionalFields = {};
+  if (meetLink !== undefined) additionalFields.meetLink = meetLink;
+  if (interviewDate !== undefined) additionalFields.interviewDate = interviewDate;
+  if (rejectionReason !== undefined) additionalFields.rejectionReason = rejectionReason;
+
+  const updatedApplicant = await updateAdminApplicantStatus(id, status, reviewNotes, additionalFields);
   if (!updatedApplicant) {
     throwError(HTTP_STATUS.NOT_FOUND, ERROR_CODES.RESOURCE_NOT_FOUND, "Applicant not found");
+  }
+
+  // Automated Email Dispatches based on stage
+  if (status === "Rejected") {
+    // Stage 3b: Application Rejection Email
+    sendApplicationRejectionEmail({
+      email: updatedApplicant.email,
+      fullName: updatedApplicant.fullName,
+      role: updatedApplicant.designation || updatedApplicant.role || "Reviewer / Moderator",
+      rejectionReason: rejectionReason || reviewNotes,
+      reviewNotes,
+    }).catch((err) => console.error("Failed to send rejection email:", err));
+  } else {
+    // Stage 1 & 2: Status update notification with Google Meet link if scheduled
+    sendApplicationStatusUpdateEmail({
+      email: updatedApplicant.email,
+      fullName: updatedApplicant.fullName,
+      status,
+      meetLink: meetLink || updatedApplicant.meetLink,
+      interviewDate: interviewDate || updatedApplicant.interviewDate,
+      reviewNotes,
+      role: updatedApplicant.designation || updatedApplicant.role || "Review Team Candidate",
+    }).catch((err) => console.error("Failed to send status update email:", err));
   }
 
   return sendSuccess(
@@ -413,18 +444,28 @@ const createAdminFromApplicant = expressAsyncHandler(async (req, res) => {
   applicant.reviewNotes = `Admin profile created with handle @${user_handle}`;
   await applicant.save();
 
-  // Dispatch onboarding email with account details & registered phone
+  // Dispatch Application Approval & Onboarding email with credentials & password change instructions
   try {
+    // 2. Application Approval Email containing email, password, and password-change guide
+    await sendApplicationApprovalEmail({
+      email: applicant.email,
+      fullName: applicant.fullName,
+      user_handle,
+      temporaryPassword: plainPassword,
+      role: newAdmin.role,
+    });
+
+    // Also dispatch agreement onboarding verification link
     await sendAdminOnboardingEmail({
       email: applicant.email,
       fullName: applicant.fullName,
       user_handle,
       phone: applicant.phone || "",
       token: verificationToken,
-      temporaryPassword: customPassword ? undefined : plainPassword,
+      temporaryPassword: plainPassword,
     });
   } catch (emailErr) {
-    console.error("Failed to dispatch admin agreement verification email:", emailErr);
+    console.error("Failed to dispatch admin approval onboarding emails:", emailErr);
   }
 
   return sendSuccess(
@@ -717,12 +758,99 @@ const getAllAdmins = expressAsyncHandler(async (req, res) => {
   });
 });
 
+
+/**
+ * Superadmin-Specific: Schedule Interview & Send Google Meet Link (Stage 2)
+ * Access: SuperAdmin only
+ */
+const scheduleApplicantInterview = expressAsyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { meetLink, interviewDate, reviewNotes } = req.body;
+
+  if (!meetLink) {
+    throwError(
+      HTTP_STATUS.BAD_REQUEST,
+      ERROR_CODES.VALIDATION_ERROR,
+      "Google Meet link (meetLink) is required to schedule an interview"
+    );
+  }
+
+  const updatedApplicant = await updateAdminApplicantStatus(
+    id,
+    "Interview Scheduled",
+    reviewNotes || "Interview invitation scheduled with Google Meet link",
+    { meetLink, interviewDate: interviewDate || "" }
+  );
+
+  if (!updatedApplicant) {
+    throwError(HTTP_STATUS.NOT_FOUND, ERROR_CODES.RESOURCE_NOT_FOUND, "Applicant not found");
+  }
+
+  // 4. Status Update: Send Google Meet link to applicant
+  sendApplicationStatusUpdateEmail({
+    email: updatedApplicant.email,
+    fullName: updatedApplicant.fullName,
+    status: "Interview Scheduled",
+    meetLink,
+    interviewDate,
+    reviewNotes,
+    role: updatedApplicant.designation || updatedApplicant.role,
+  }).catch((err) => console.error("Failed to send interview schedule email:", err));
+
+  return sendSuccess(
+    res,
+    HTTP_STATUS.OK,
+    "Interview scheduled successfully and Google Meet link dispatched to applicant",
+    updatedApplicant
+  );
+});
+
+/**
+ * Superadmin-Specific: Reject Applicant & Send Rejection Email (Stage 3b)
+ * Access: SuperAdmin only
+ */
+const rejectApplicant = expressAsyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { reason, reviewNotes } = req.body;
+
+  const rejectionReason = reason || reviewNotes || "Application does not meet current clinical requirements.";
+
+  const updatedApplicant = await updateAdminApplicantStatus(
+    id,
+    "Rejected",
+    reviewNotes || rejectionReason,
+    { rejectionReason }
+  );
+
+  if (!updatedApplicant) {
+    throwError(HTTP_STATUS.NOT_FOUND, ERROR_CODES.RESOURCE_NOT_FOUND, "Applicant not found");
+  }
+
+  // 3. Application Rejection: Send rejection email
+  sendApplicationRejectionEmail({
+    email: updatedApplicant.email,
+    fullName: updatedApplicant.fullName,
+    role: updatedApplicant.designation || updatedApplicant.role,
+    rejectionReason,
+    reviewNotes,
+  }).catch((err) => console.error("Failed to send rejection email:", err));
+
+  return sendSuccess(
+    res,
+    HTTP_STATUS.OK,
+    "Applicant rejected successfully and notification email dispatched",
+    updatedApplicant
+  );
+});
+
 module.exports = {
   submitApplicant,
   getAllApplicants,
   getApplicantById,
   updateApplicantStatus,
   createAdminFromApplicant,
+  scheduleApplicantInterview,
+  rejectApplicant,
   getMyAdminProfile,
   getAdminProfileById,
   toggleBlockAdmin,

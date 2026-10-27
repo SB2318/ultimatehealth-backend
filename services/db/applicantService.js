@@ -36,10 +36,10 @@ const findAdminApplicants = async (filter = {}, options = {}) => {
   };
 };
 
-const updateAdminApplicantStatus = async (id, status, reviewNotes = "") => {
+const updateAdminApplicantStatus = async (id, status, reviewNotes = "", additionalFields = {}) => {
   return await AdminApplicant.findByIdAndUpdate(
     id,
-    { status, reviewNotes, updatedAt: new Date() },
+    { status, reviewNotes, ...additionalFields, updatedAt: new Date() },
     { new: true }
   );
 };

@@ -6,6 +6,8 @@ const {
   getApplicantById,
   updateApplicantStatus,
   createAdminFromApplicant,
+  scheduleApplicantInterview,
+  rejectApplicant,
   getMyAdminProfile,
   getAdminProfileById,
   toggleBlockAdmin,
@@ -302,7 +304,115 @@ router.get(
  * @openapi
  * /admin/applicants/{id}/status:
  *   put:
- *     summary: Update applicant review status (Super Admin only)
+ *     summary: Update applicant review status and stage (Super Admin only)
+ *     description: |
+ *       Updates applicant status across the 3 lifecycle stages:
+ *       - **Stage 1 (Under Review)**: Initial review of candidate credentials and signed agreement.
+ *       - **Stage 2 (Interview Scheduled)**: Schedules interview and automatically dispatches Google Meet link to applicant.
+ *       - **Stage 3 (Approved / Rejected)**: Final decision; dispatches approval credentials or rejection feedback.
+ *     tags:
+ *       - Admin Applicants
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: MongoDB ObjectId of the AdminApplicant
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - status
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: ["Pending", "Under Review", "Interview Scheduled", "Approved", "Rejected"]
+ *                 example: "Interview Scheduled"
+ *               meetLink:
+ *                 type: string
+ *                 description: Google Meet link to be included in the candidate notification email
+ *                 example: "https://meet.google.com/abc-defg-hij"
+ *               interviewDate:
+ *                 type: string
+ *                 description: Date and time of the scheduled meeting / interview
+ *                 example: "2026-10-30 14:00 IST"
+ *               reviewNotes:
+ *                 type: string
+ *                 description: Internal or external reviewer notes
+ *                 example: "Candidate profile verified. Proceeding to clinical review interview."
+ *               rejectionReason:
+ *                 type: string
+ *                 description: Specific reason if rejecting the application
+ *                 example: "Requires at least 3 years active clinical practice certification."
+ *     responses:
+ *       '200':
+ *         description: Applicant status updated successfully and notification email dispatched
+ *       '400':
+ *         description: Validation error or invalid status
+ *       '404':
+ *         description: Applicant not found
+ *   patch:
+ *     summary: Partial update of applicant status, Google Meet link, or notes (Super Admin only)
+ *     tags:
+ *       - Admin Applicants
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: ["Pending", "Under Review", "Interview Scheduled", "Approved", "Rejected"]
+ *               meetLink:
+ *                 type: string
+ *               interviewDate:
+ *                 type: string
+ *               reviewNotes:
+ *                 type: string
+ *               rejectionReason:
+ *                 type: string
+ *     responses:
+ *       '200':
+ *         description: Status updated successfully
+ */
+router.put(
+  "/admin/applicants/:id/status",
+  adminAuthenticateToken,
+  requireSuperAdmin,
+  updateApplicantStatus
+);
+
+router.patch(
+  "/admin/applicants/:id/status",
+  adminAuthenticateToken,
+  requireSuperAdmin,
+  updateApplicantStatus
+);
+
+/**
+ * @openapi
+ * /admin/applicants/{id}/schedule-interview:
+ *   post:
+ *     summary: Schedule Stage 2 Interview & Send Google Meet link (Super Admin only)
+ *     description: |
+ *       Transitions applicant to Stage 2 (**Interview Scheduled**), stores the Google Meet link,
+ *       and automatically sends an interview invitation email containing the Google Meet link and guidelines.
  *     tags:
  *       - Admin Applicants
  *     security:
@@ -320,22 +430,124 @@ router.get(
  *           schema:
  *             type: object
  *             required:
- *               - status
+ *               - meetLink
  *             properties:
- *               status:
+ *               meetLink:
  *                 type: string
- *                 enum: [Pending, Under Review, Approved, Rejected]
+ *                 format: uri
+ *                 description: Google Meet URL for the interview
+ *                 example: "https://meet.google.com/uh-interview-2026"
+ *               interviewDate:
+ *                 type: string
+ *                 description: Scheduled date and time
+ *                 example: "Friday, Oct 30, 2026 at 3:00 PM IST"
  *               reviewNotes:
  *                 type: string
+ *                 description: Instructions or preparation notes for the applicant
+ *                 example: "Please bring your medical registration certificate and ID proof."
  *     responses:
  *       '200':
- *         description: Applicant status updated successfully
+ *         description: Interview scheduled and Google Meet link email sent to applicant
+ *       '400':
+ *         description: Google Meet link is required
+ *       '404':
+ *         description: Applicant not found
  */
-router.put(
-  "/admin/applicants/:id/status",
+router.post(
+  "/admin/applicants/:id/schedule-interview",
   adminAuthenticateToken,
   requireSuperAdmin,
-  updateApplicantStatus
+  scheduleApplicantInterview
+);
+
+/**
+ * @openapi
+ * /admin/applicants/{id}/approve:
+ *   post:
+ *     summary: Approve applicant, create Admin profile & send credentials with password change instructions (Super Admin only - Stage 3a)
+ *     description: |
+ *       Formally approves the applicant at Stage 3:
+ *       1. Creates a verified Admin / Moderator account in MongoDB.
+ *       2. Hashes a secure temporary password.
+ *       3. Dispatches an **Approval Email** containing username, email, temporary password, login URL, and step-by-step instructions on how to change password later.
+ *     tags:
+ *       - Admin Applicants
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               role:
+ *                 type: string
+ *                 enum: [Moderator, "Super Admin"]
+ *                 default: Moderator
+ *               customPassword:
+ *                 type: string
+ *                 description: Optional custom initial password (otherwise secure password is generated automatically)
+ *     responses:
+ *       '201':
+ *         description: Applicant approved, Admin account created, and approval credentials email dispatched
+ *       '409':
+ *         description: Admin with this email already exists
+ */
+router.post(
+  "/admin/applicants/:id/approve",
+  adminAuthenticateToken,
+  requireSuperAdmin,
+  createAdminFromApplicant
+);
+
+/**
+ * @openapi
+ * /admin/applicants/{id}/reject:
+ *   post:
+ *     summary: Reject applicant & send rejection email (Super Admin only - Stage 3b)
+ *     description: |
+ *       Transitions applicant to Stage 3b (**Rejected**), saves reviewer feedback,
+ *       and dispatches a professional Rejection Email to the candidate.
+ *     tags:
+ *       - Admin Applicants
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               reason:
+ *                 type: string
+ *                 description: Specific explanation for rejection
+ *                 example: "Does not meet minimum 3 years clinical review experience criteria."
+ *               reviewNotes:
+ *                 type: string
+ *                 description: Additional notes from committee
+ *     responses:
+ *       '200':
+ *         description: Applicant rejected and rejection notification email dispatched
+ *       '404':
+ *         description: Applicant not found
+ */
+router.post(
+  "/admin/applicants/:id/reject",
+  adminAuthenticateToken,
+  requireSuperAdmin,
+  rejectApplicant
 );
 
 /**

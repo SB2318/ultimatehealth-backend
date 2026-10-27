@@ -3328,6 +3328,308 @@ const sendAdminOnboardingEmail = async ({ email, fullName, user_handle, phone, t
   }
 };
 
+
+/**
+ * 2. Application Approval Email
+ * Dispatched to applicant when SuperAdmin approves the application.
+ * Contains: user email, temporary password, login portal link, and instructions on how to change password later.
+ */
+const sendApplicationApprovalEmail = async ({
+  email,
+  fullName,
+  user_handle,
+  temporaryPassword,
+  role = "Moderator",
+  loginUrl,
+}) => {
+  const portalUrl =
+    loginUrl ||
+    `${process.env.PROD_URL || "https://ultimatehealth.blog"}/admin/login`;
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 620px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.06);">
+      <!-- Header -->
+      <div style="background: linear-gradient(135deg, #0d9488 0%, #115e59 100%); color: #ffffff; padding: 32px 24px; text-align: center;">
+        <span style="font-size: 38px; display: block; margin-bottom: 8px;">🎉</span>
+        <h1 style="margin: 0 0 6px 0; font-size: 24px; font-weight: 700; color: #ffffff;">Application Approved!</h1>
+        <p style="margin: 0; opacity: 0.95; font-size: 15px;">Welcome to the UltimateHealth Review & Moderation Team</p>
+      </div>
+
+      <!-- Content -->
+      <div style="padding: 28px 24px; color: #2d3748; line-height: 1.6; font-size: 14px;">
+        <p style="font-size: 15px; margin-top: 0;">
+          Dear <strong>${fullName}</strong>,
+        </p>
+        <p>
+          We are pleased to inform you that following careful review of your clinical credentials, background, and signed agreement, your application for the role of <strong>${role}</strong> has been officially <strong>Approved</strong>!
+        </p>
+
+        <!-- Credentials Card -->
+        <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 20px; margin: 20px 0;">
+          <h3 style="margin: 0 0 12px 0; font-size: 16px; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
+            🔐 Your Administrator Access Credentials
+          </h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <tr>
+              <td style="padding: 6px 0; color: #64748b; width: 35%; font-weight: 600;">Login Portal:</td>
+              <td style="padding: 6px 0;"><a href="${portalUrl}" style="color: #0d9488; font-weight: 600; text-decoration: none;">${portalUrl}</a></td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #64748b; font-weight: 600;">User Handle:</td>
+              <td style="padding: 6px 0; color: #1e293b; font-weight: 700;">@${user_handle}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Email Address:</td>
+              <td style="padding: 6px 0; color: #1e293b; font-weight: 600;">${email}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Temporary Password:</td>
+              <td style="padding: 6px 0;">
+                <code style="background: #e2e8f0; color: #0f172a; padding: 3px 8px; border-radius: 4px; font-size: 14px; font-weight: 700; letter-spacing: 0.5px;">${temporaryPassword}</code>
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        <!-- Action Button -->
+        <div style="text-align: center; margin: 28px 0;">
+          <a href="${portalUrl}" style="display: inline-block; padding: 13px 32px; background: linear-gradient(135deg, #0d9488, #0f766e); color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 15px; box-shadow: 0 4px 12px rgba(13, 148, 136, 0.3);">
+            🚀 Log In to Admin Dashboard
+          </a>
+        </div>
+
+        <!-- Step-by-Step Password Change Instructions -->
+        <div style="background: #eff6ff; border-left: 4px solid #3b82f6; border-radius: 6px; padding: 18px; margin: 24px 0;">
+          <h4 style="margin: 0 0 8px 0; color: #1e40af; font-size: 14px; font-weight: 700;">
+            🛡️ Important Security Step: How to Change Your Password Later
+          </h4>
+          <ol style="margin: 0; padding-left: 20px; color: #1e3a8a; line-height: 1.6; font-size: 13px;">
+            <li>Log in to the portal using your temporary password above.</li>
+            <li>Click on your <strong>Profile Avatar / User Handle</strong> in the top-right navigation menu.</li>
+            <li>Navigate to <strong>Settings</strong> ➔ <strong>Security & Password</strong>.</li>
+            <li>Enter your temporary password under <em>Current Password</em>, then enter your new secure password (minimum 8 characters with letters, numbers, and special symbols).</li>
+            <li>Click <strong>Save Changes</strong>. Your new password will take effect immediately.</li>
+          </ol>
+        </div>
+
+        <p style="font-size: 13px; color: #64748b; line-height: 1.5;">
+          If you have any questions or require assistance onboarding, please contact the SuperAdmin team at <a href="mailto:${process.env.EMAIL_USER}" style="color: #0d9488;">${process.env.EMAIL_USER}</a>.
+        </p>
+
+        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+        <p style="margin: 0; font-size: 13px; color: #475569;">
+          Warm regards,<br />
+          <strong>The UltimateHealth Editorial & Governance Board</strong>
+        </p>
+      </div>
+    </div>
+  `;
+
+  const mailOptions = {
+    from: `"UltimateHealth Governance" <${process.env.EMAIL_USER}>`,
+    to: email,
+    subject: "🎉 Application Approved – Welcome to the UltimateHealth Admin Team!",
+    html,
+  };
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log("Application approval email sent:", info.response);
+    return true;
+  } catch (error) {
+    console.error("Error sending application approval email:", error);
+    return false;
+  }
+};
+
+/**
+ * 3. Application Rejection Email
+ * Dispatched to applicant when SuperAdmin rejects the application.
+ * Informs the candidate respectfully of the decision with optional reviewer notes.
+ */
+const sendApplicationRejectionEmail = async ({
+  email,
+  fullName,
+  role = "Reviewer / Moderator",
+  rejectionReason = "",
+  reviewNotes = "",
+}) => {
+  const reasonText = rejectionReason || reviewNotes;
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+      <!-- Header -->
+      <div style="background: linear-gradient(135deg, #475569 0%, #1e293b 100%); color: #ffffff; padding: 26px 20px; text-align: center;">
+        <h2 style="margin: 0 0 4px 0; font-size: 22px; font-weight: 700; color: #ffffff;">Application Status Update</h2>
+        <p style="margin: 0; opacity: 0.9; font-size: 14px;">UltimateHealth Review Board</p>
+      </div>
+
+      <!-- Content -->
+      <div style="padding: 26px 22px; color: #334155; line-height: 1.6; font-size: 14px;">
+        <p style="margin-top: 0; font-size: 15px;">
+          Dear <strong>${fullName}</strong>,
+        </p>
+        <p>
+          Thank you for your interest in joining the UltimateHealth team as a <strong>${role}</strong> and for taking the time to share your credentials and agreement with us.
+        </p>
+        <p>
+          After thorough consideration by our compliance and governance board, we regret to inform you that we are unable to approve your application at this time.
+        </p>
+
+        ${
+          reasonText
+            ? `
+          <div style="background: #f8fafc; border-left: 4px solid #64748b; border-radius: 4px; padding: 14px 16px; margin: 18px 0;">
+            <strong style="color: #1e293b; font-size: 13px; display: block; margin-bottom: 4px;">Review Feedback / Notes:</strong>
+            <p style="margin: 0; color: #475569; font-size: 13px; line-height: 1.6;">${reasonText}</p>
+          </div>
+        `
+            : ""
+        }
+
+        <p>
+          We genuinely appreciate your commitment to evidence-based healthcare communication. Your profile will be retained in our reviewer directory, and we encourage you to reapply in future cycles as openings expand.
+        </p>
+        <p>
+          You are also welcome to contribute as an open-access medical author on our platform.
+        </p>
+
+        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 24px 0 16px 0;" />
+        <p style="margin: 0; font-size: 13px; color: #64748b;">
+          Sincerely,<br />
+          <strong>The UltimateHealth Credentialing & Committee</strong>
+        </p>
+      </div>
+    </div>
+  `;
+
+  const mailOptions = {
+    from: `"UltimateHealth Committee" <${process.env.EMAIL_USER}>`,
+    to: email,
+    subject: "Update on Your Application – UltimateHealth",
+    html,
+  };
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log("Application rejection email sent:", info.response);
+    return true;
+  } catch (error) {
+    console.error("Error sending application rejection email:", error);
+    return false;
+  }
+};
+
+/**
+ * 4. Application Status Update with Google Meet Link Email
+ * Dispatched to applicant whenever their application status is updated (e.g. Interview Scheduled, Stage 2 Review).
+ * Features prominent Google Meet link, scheduled date & time, and meeting guidelines.
+ */
+const sendApplicationStatusUpdateEmail = async ({
+  email,
+  fullName,
+  status,
+  meetLink,
+  interviewDate = "",
+  reviewNotes = "",
+  role = "Review Team Candidate",
+}) => {
+  const safeMeetLink = meetLink ? meetLink.trim() : "";
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 620px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,0.06);">
+      <!-- Header -->
+      <div style="background: linear-gradient(135deg, #4338ca 0%, #312e81 100%); color: #ffffff; padding: 28px 24px; text-align: center;">
+        <span style="font-size: 34px; display: block; margin-bottom: 6px;">📅</span>
+        <h2 style="margin: 0 0 6px 0; font-size: 22px; font-weight: 700; color: #ffffff;">Application Status Update</h2>
+        <p style="margin: 0; opacity: 0.95; font-size: 14px;">Stage 2 Verification & Interview</p>
+      </div>
+
+      <!-- Body -->
+      <div style="padding: 28px 24px; color: #334155; line-height: 1.6; font-size: 14px;">
+        <p style="margin-top: 0; font-size: 15px;">
+          Dear <strong>${fullName}</strong>,
+        </p>
+        <p>
+          We are pleased to share an update on your application for the role of <strong>${role}</strong> on UltimateHealth.
+        </p>
+
+        <!-- Status Card -->
+        <div style="background: #f1f5f9; border-left: 4px solid #4338ca; border-radius: 4px; padding: 14px 18px; margin: 20px 0;">
+          <div style="font-size: 12px; font-weight: 700; color: #4338ca; text-transform: uppercase; letter-spacing: 0.5px;">Current Application Stage</div>
+          <div style="font-size: 17px; font-weight: 700; color: #0f172a; margin-top: 4px;">${status}</div>
+          ${interviewDate ? `<div style="font-size: 13px; color: #475569; margin-top: 4px;"><strong>Scheduled Time:</strong> ${interviewDate}</div>` : ""}
+        </div>
+
+        ${
+          safeMeetLink
+            ? `
+          <!-- Google Meet Box -->
+          <div style="background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 8px; padding: 22px; margin: 24px 0; text-align: center;">
+            <h3 style="margin: 0 0 8px 0; font-size: 16px; color: #312e81; font-weight: 700;">
+              📹 Google Meet Interview Call
+            </h3>
+            <p style="margin: 0 0 16px 0; color: #4338ca; font-size: 13px;">
+              Please join using the Google Meet link below at the scheduled time:
+            </p>
+            <a href="${safeMeetLink}" target="_blank" style="display: inline-block; padding: 12px 28px; background: #4f46e5; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 15px; box-shadow: 0 4px 10px rgba(79, 70, 229, 0.35);">
+              👉 Join Google Meet Meeting
+            </a>
+            <p style="margin: 14px 0 0 0; font-size: 12px; color: #6366f1;">
+              Direct link: <a href="${safeMeetLink}" style="color: #4338ca; word-break: break-all;">${safeMeetLink}</a>
+            </p>
+          </div>
+        `
+            : ""
+        }
+
+        ${
+          reviewNotes
+            ? `
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 14px 16px; margin: 20px 0;">
+            <strong style="color: #1e293b; font-size: 13px; display: block; margin-bottom: 4px;">Notes from SuperAdmin:</strong>
+            <p style="margin: 0; color: #475569; font-size: 13px; line-height: 1.6;">${reviewNotes}</p>
+          </div>
+        `
+            : ""
+        }
+
+        <!-- Preparation Tips -->
+        <div style="background: #f0fdf4; border-left: 4px solid #16a34a; border-radius: 4px; padding: 14px 18px; margin: 20px 0;">
+          <h4 style="margin: 0 0 6px 0; font-size: 13px; color: #166534; font-weight: 700;">📋 Meeting Guidelines</h4>
+          <ul style="margin: 0; padding-left: 18px; color: #15803d; font-size: 12px; line-height: 1.6;">
+            <li>Ensure you have a stable internet connection and functioning webcam/microphone.</li>
+            <li>Have your valid medical license or hospital identification ready for verification.</li>
+            <li>Join the Google Meet call 2-3 minutes ahead of the scheduled time.</li>
+          </ul>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 24px 0 16px 0;" />
+        <p style="margin: 0; font-size: 13px; color: #64748b;">
+          Warm regards,<br />
+          <strong>The UltimateHealth Candidate Review Team</strong>
+        </p>
+      </div>
+    </div>
+  `;
+
+  const mailOptions = {
+    from: `"UltimateHealth Review Team" <${process.env.EMAIL_USER}>`,
+    to: email,
+    subject: `Application Status: ${status} - UltimateHealth Interview Invitation`,
+    html,
+  };
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log("Application status update email sent:", info.response);
+    return true;
+  } catch (error) {
+    console.error("Error sending application status update email:", error);
+    return false;
+  }
+};
+
 module.exports = {
   sendNewArticleEmail,
   sendContactUsMail,
@@ -3366,6 +3668,9 @@ module.exports = {
   sendContributorVerificationEmail,
   sendAdminApplicationEmail,
   sendApplicantConfirmationEmail,
+  sendApplicationApprovalEmail,
+  sendApplicationRejectionEmail,
+  sendApplicationStatusUpdateEmail,
 };
 
 

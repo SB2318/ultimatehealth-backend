@@ -78,8 +78,28 @@ const adminApplicantSchema = new Schema(
     },
     status: {
       type: String,
-      enum: ["Pending", "Under Review", "Accepted", "Rejected"],
+      enum: ["Pending", "Under Review", "Interview Scheduled", "Approved", "Accepted", "Rejected"],
       default: "Pending",
+    },
+    meetLink: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    interviewDate: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    reviewNotes: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    rejectionReason: {
+      type: String,
+      trim: true,
+      default: "",
     },
   },
   {
