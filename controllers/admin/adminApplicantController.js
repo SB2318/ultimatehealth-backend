@@ -77,10 +77,12 @@ const submitApplicant = expressAsyncHandler(async (req, res) => {
   } = validationResult.data;
 
   const finalRole = designation || role || "Moderator";
-  let resumeUrl = bodyResumeUrl || "";
-  let agreementUrl = bodyAgreementUrl || "";
+  let resumeUrl = bodyResumeUrl || req.body?.resume || req.body?.resume_url || "";
+  let agreementUrl = bodyAgreementUrl || req.body?.agreement || req.body?.agreement_url || req.body?.agreementScreenshot || "";
   let s3Key = "";
+  let agreementS3Key = "";
   let originalFileName = "";
+  let agreementFileName = "";
   const emailAttachments = [];
 
   // Extract separate Resume and Agreement Screenshot files from multipart payload
@@ -88,75 +90,86 @@ const submitApplicant = expressAsyncHandler(async (req, res) => {
   let agreementFile = null;
 
   if (req.files) {
-    if (Array.isArray(req.files)) {
-      for (const f of req.files) {
-        const fn = (f.fieldname || "").toLowerCase();
-        const on = (f.originalname || "").toLowerCase();
-        if (
-          fn.includes("agreement") ||
-          fn.includes("screenshot") ||
-          fn.includes("proof") ||
-          on.includes("agreement") ||
-          on.includes("screenshot")
-        ) {
-          if (!agreementFile) agreementFile = f;
-        } else if (
-          fn.includes("resume") ||
-          fn.includes("cv") ||
-          on.includes("resume") ||
-          on.includes("cv")
-        ) {
-          if (!resumeFile) resumeFile = f;
-        } else {
-          if (!resumeFile) resumeFile = f;
-          else if (!agreementFile) agreementFile = f;
-        }
+    const allFiles = Array.isArray(req.files) ? req.files : Object.values(req.files).flat();
+    console.log("📥 Applicant files received:", allFiles.map((f) => ({ fieldname: f.fieldname, originalname: f.originalname, mimetype: f.mimetype, size: f.size })));
+
+    // Pass 1: Explicit fieldname check
+    for (const f of allFiles) {
+      const fn = (f.fieldname || "").toLowerCase();
+      if (
+        fn === "agreement" ||
+        fn === "agreementfile" ||
+        fn === "agreement_file" ||
+        fn === "agreementscreenshot" ||
+        fn === "agreement_screenshot" ||
+        fn === "screenshot" ||
+        fn === "admin_agreement" ||
+        fn === "adminagreement" ||
+        fn === "proof" ||
+        fn === "id_proof" ||
+        fn === "certificate"
+      ) {
+        if (!agreementFile) agreementFile = f;
+      } else if (
+        fn === "resume" ||
+        fn === "cv" ||
+        fn === "resumefile" ||
+        fn === "resume_file"
+      ) {
+        if (!resumeFile) resumeFile = f;
       }
-    } else {
-      resumeFile =
-        req.files.resume?.[0] ||
-        req.files.cv?.[0] ||
-        req.files.resumeFile?.[0];
+    }
 
-      agreementFile =
-        req.files.agreementScreenshot?.[0] ||
-        req.files.agreement_screenshot?.[0] ||
-        req.files.screenshot?.[0] ||
-        req.files.agreement?.[0] ||
-        req.files.admin_agreement?.[0] ||
-        req.files.proof?.[0] ||
-        req.files.id_proof?.[0];
+    // Pass 2: Substring matching on fieldname and originalname
+    for (const f of allFiles) {
+      if (f === resumeFile || f === agreementFile) continue;
+      const fn = (f.fieldname || "").toLowerCase();
+      const on = (f.originalname || "").toLowerCase();
 
-      // Fallback if generic field name like 'file' or 'document' was used
-      const genericFiles = [
-        ...(req.files.file || []),
-        ...(req.files.document || []),
-        ...(req.files.files || []),
-      ];
+      const isAgreement =
+        fn.includes("agreement") ||
+        fn.includes("screenshot") ||
+        fn.includes("proof") ||
+        fn.includes("sign") ||
+        on.includes("agreement") ||
+        on.includes("screenshot") ||
+        on.includes("proof") ||
+        on.includes("sign");
 
-      for (const f of genericFiles) {
-        const on = (f.originalname || "").toLowerCase();
-        if (
-          on.includes("agreement") ||
-          on.includes("screenshot") ||
-          on.includes("proof")
-        ) {
-          if (!agreementFile) agreementFile = f;
-        } else {
-          if (!resumeFile) resumeFile = f;
-          else if (!agreementFile) agreementFile = f;
-        }
+      const isResume =
+        fn.includes("resume") ||
+        fn.includes("cv") ||
+        on.includes("resume") ||
+        on.includes("cv");
+
+      if (isAgreement && !agreementFile) {
+        agreementFile = f;
+      } else if (isResume && !resumeFile) {
+        resumeFile = f;
+      }
+    }
+
+    // Pass 3: Any remaining unassigned files
+    for (const f of allFiles) {
+      if (f === resumeFile || f === agreementFile) continue;
+      if (!resumeFile) {
+        resumeFile = f;
+      } else if (!agreementFile) {
+        agreementFile = f;
       }
     }
   } else if (req.file) {
-    const on = (req.file.originalname || "").toLowerCase();
     const fn = (req.file.fieldname || "").toLowerCase();
+    const on = (req.file.originalname || "").toLowerCase();
     if (
       fn.includes("agreement") ||
       fn.includes("screenshot") ||
       fn.includes("proof") ||
+      fn.includes("sign") ||
       on.includes("agreement") ||
-      on.includes("screenshot")
+      on.includes("screenshot") ||
+      on.includes("proof") ||
+      on.includes("sign")
     ) {
       agreementFile = req.file;
     } else {
@@ -164,18 +177,19 @@ const submitApplicant = expressAsyncHandler(async (req, res) => {
     }
   }
 
-  // Upload Resume to S3 if provided
+  // 1. Upload Resume to S3 if provided
   if (resumeFile) {
     originalFileName = resumeFile.originalname;
     if (process.env.BUCKET_NAME && process.env.AWS_ACCESS_KEY_ID) {
       try {
         const s3Result = await uploadApplicantResumeToS3(
           resumeFile.buffer,
-          resumeFile.originalname,
+          `Resume-${fullName.replace(/\s+/g, '_')}-${resumeFile.originalname}`,
           resumeFile.mimetype
         );
         s3Key = s3Result.uniqueKey;
         resumeUrl = s3Result.resumeUrl;
+        console.log("✅ Resume uploaded to S3:", resumeUrl);
       } catch (s3Err) {
         console.error(
           "⚠️ S3 resume upload failed, continuing with email attachment:",
@@ -185,46 +199,43 @@ const submitApplicant = expressAsyncHandler(async (req, res) => {
     }
 
     emailAttachments.push({
-      filename: resumeFile.originalname,
+      filename: `Resume_${resumeFile.originalname}`,
       content: resumeFile.buffer,
       contentType: resumeFile.mimetype,
     });
   }
 
-  // Upload Agreement Screenshot to S3 if provided
+  // 2. Upload Agreement File / Screenshot to S3 if provided
   if (agreementFile) {
+    agreementFileName = agreementFile.originalname;
     if (!originalFileName) originalFileName = agreementFile.originalname;
     if (process.env.BUCKET_NAME && process.env.AWS_ACCESS_KEY_ID) {
       try {
         const s3Result = await uploadApplicantResumeToS3(
           agreementFile.buffer,
-          agreementFile.originalname,
+          `Agreement-${fullName.replace(/\s+/g, '_')}-${agreementFile.originalname}`,
           agreementFile.mimetype
         );
+        agreementS3Key = s3Result.uniqueKey;
         agreementUrl = s3Result.resumeUrl;
-        if (!s3Key) s3Key = s3Result.uniqueKey;
+        if (!s3Key) s3Key = agreementS3Key;
+        console.log("✅ Agreement uploaded to S3:", agreementUrl);
       } catch (s3Err) {
         console.error(
-          "⚠️ S3 agreement screenshot upload failed, continuing with email attachment:",
+          "⚠️ S3 agreement upload failed, continuing with email attachment:",
           s3Err
         );
       }
     }
 
     emailAttachments.push({
-      filename: agreementFile.originalname,
+      filename: `Agreement_${agreementFile.originalname}`,
       content: agreementFile.buffer,
       contentType: agreementFile.mimetype,
     });
   }
 
-  // Fallbacks if only one document was uploaded
-  if (!agreementUrl && resumeUrl) {
-    agreementUrl = resumeUrl;
-  } else if (!resumeUrl && agreementUrl) {
-    resumeUrl = agreementUrl;
-  }
-
+  // Persist with independent resumeUrl and agreementUrl
   const newApplicant = await createAdminApplicant({
     fullName,
     email,
@@ -233,10 +244,12 @@ const submitApplicant = expressAsyncHandler(async (req, res) => {
     designation: designation || finalRole,
     experience: experience || "",
     message: message || "",
-    resumeUrl,
-    agreementUrl,
-    s3Key,
-    originalFileName,
+    resumeUrl: resumeUrl || "",
+    agreementUrl: agreementUrl || "",
+    s3Key: s3Key || "",
+    agreementS3Key: agreementS3Key || "",
+    originalFileName: originalFileName || "",
+    agreementFileName: agreementFileName || "",
     status: "Pending",
   });
 

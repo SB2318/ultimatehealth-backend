@@ -61,7 +61,17 @@ const adminApplicantSchema = new Schema(
       trim: true,
       default: "",
     },
+    agreementS3Key: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     originalFileName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    agreementFileName: {
       type: String,
       trim: true,
       default: "",
