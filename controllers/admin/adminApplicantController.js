@@ -66,11 +66,17 @@ const submitApplicant = expressAsyncHandler(async (req, res) => {
   const uploadedFile =
     req.file ||
     (req.files &&
-      (req.files.resume?.[0] ||
-        req.files.file?.[0] ||
-        req.files.agreement?.[0] ||
-        req.files.admin_agreement?.[0] ||
-        req.files.document?.[0]));
+      (Array.isArray(req.files)
+        ? req.files[0]
+        : (req.files.resume?.[0] ||
+           req.files.proof?.[0] ||
+           req.files.file?.[0] ||
+           req.files.agreement?.[0] ||
+           req.files.admin_agreement?.[0] ||
+           req.files.document?.[0] ||
+           req.files.id_proof?.[0] ||
+           req.files.certificate?.[0] ||
+           Object.values(req.files).flat()[0])));
 
   if (uploadedFile) {
     originalFileName = uploadedFile.originalname;

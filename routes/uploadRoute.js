@@ -8,9 +8,29 @@ const adminAuthenticateToken = require("../middleware/adminAuthenticateToken");
 const requireSuperAdmin = require("../middleware/superAdminMiddleware");
 const uploadRoute = express.Router();
 
+const storageUpload = multer({ dest: 'uploads/' }).fields([
+    { name: 'file', maxCount: 1 },
+    { name: 'proof', maxCount: 1 },
+    { name: 'document', maxCount: 1 },
+    { name: 'resume', maxCount: 1 },
+    { name: 'image', maxCount: 1 },
+]);
+
 // For Storage Server
 
-uploadRoute.post('/upload-storage', upload.single('file'), controller.uploadFile);
+uploadRoute.post(
+    '/upload-storage',
+    (req, res, next) => {
+        storageUpload(req, res, (err) => {
+            if (err) return next(err);
+            if (!req.file && req.files) {
+                req.file = req.files.file?.[0] || req.files.proof?.[0] || Object.values(req.files).flat()[0];
+            }
+            next();
+        });
+    },
+    controller.uploadFile
+);
 
 uploadRoute.get('/getFile/:key(*)', controller.getFile);
 uploadRoute.get('/getFile/:key', controller.getFile);

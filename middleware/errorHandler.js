@@ -47,6 +47,14 @@ function errorHandler(err, req, res, _next) {
     message = `${field} already exists`;
   }
 
+  //  Multer: Upload Error
+  else if (err.name === "MulterError" || (err.code && typeof err.code === "string" && err.code.startsWith("LIMIT_"))) {
+    statusCode = 400;
+    code = err.code || "FILE_UPLOAD_ERROR";
+    message = err.message || "File upload error";
+    details = err.field ? { field: err.field } : undefined;
+  }
+
   //  Custom App Error 
   else if (isAppError(err)) {
     statusCode = err.statusCode;

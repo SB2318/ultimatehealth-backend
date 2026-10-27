@@ -14,6 +14,7 @@ const { getHTMLFileContent, authenticateAdmin, getPocketbaseClient } = require('
 const crypto = require('crypto');
 const puppeteer = require("puppeteer");
 const { findAdminDocumentById } = require("../services/db/adminService");
+const adminModel = require("../models/admin/adminModel");
 const AdminApplicant = require("../models/admin/adminApplicantModel");
 const jwt = require('jsonwebtoken');
 const { verifyAccessToken, verifyAnyToken } = require('../services/security/tokenService');
@@ -149,10 +150,13 @@ const applicantResumeUpload = multer({
     },
 }).fields([
     { name: 'resume', maxCount: 1 },
+    { name: 'proof', maxCount: 1 },
     { name: 'file', maxCount: 1 },
     { name: 'agreement', maxCount: 1 },
     { name: 'admin_agreement', maxCount: 1 },
     { name: 'document', maxCount: 1 },
+    { name: 'id_proof', maxCount: 1 },
+    { name: 'certificate', maxCount: 1 },
 ]);
 
 const uploadApplicantResumeToS3 = async (buffer, originalName, mimeType) => {
@@ -202,7 +206,7 @@ const getUserFromToken = (req) => {
 // upload file
 const uploadFile = async (req, res) => {
 
-    const file = req.file;
+    const file = req.file || (req.files && (Array.isArray(req.files) ? req.files[0] : (req.files.file?.[0] || req.files.proof?.[0] || Object.values(req.files).flat()[0])));
 
     if (!file) {
         return res.status(400).json({ message: 'No file uploaded.' });
@@ -349,33 +353,35 @@ const uploadFile = async (req, res) => {
 const uploadAgreementPDF = expressAsyncHandler(
     async (req, res) => {
         try {
-            const { html, fullName } = req.body;
+            const { html, fullName, email } = req.body;
 
             if (!html || !fullName) {
                 return res.status(400).json({ message: "HTML and full name are required" });
             }
 
-            const decoded = getUserFromToken(req);
-
-            const admin = await adminModel.findOne({ email: decoded.email });
-            // const admin = await adminModel.findById(userId);
-
-            if (!admin) {
-                return res.status(404).json({ message: "Admin not found" });
+            let admin = null;
+            let decoded = null;
+            try {
+                decoded = getUserFromToken(req);
+                if (decoded && decoded.email) {
+                    admin = await adminModel.findOne({ email: decoded.email });
+                }
+            } catch (err) {
+                // External applicant or candidate signing terms and conditions before onboarding
             }
 
+            if (admin) {
+                const normalize = (str) =>
+                    str.toLowerCase().replace(/\s+/g, " ").trim();
 
-            const normalize = (str) =>
-                str.toLowerCase().replace(/\s+/g, " ").trim();
+                const inputName = normalize(fullName);
+                const dbName = normalize(admin.user_name || "");
 
-            const inputName = normalize(fullName);
-            const dbName = normalize(admin.user_name);
-
-
-            if (!inputName.includes(dbName) || !dbName.includes(inputName)) {
-                return res.status(403).json({
-                    message: "Full name does not match your account name",
-                });
+                if (dbName && (!inputName.includes(dbName) && !dbName.includes(inputName))) {
+                    return res.status(403).json({
+                        message: "Full name does not match your account name",
+                    });
+                }
             }
             if (!html.includes("data:image")) {
                 return res.status(400).json({ message: "Signature missing" });
@@ -533,7 +539,8 @@ const uploadAgreementPDF = expressAsyncHandler(
             }
 
             // 🧾 Unique key
-            const uniqueKey = `agreements-${admin._id}-${Date.now()}-${crypto.randomUUID()}.pdf`;
+            const targetId = admin ? admin._id.toString() : `applicant-${Date.now()}`;
+            const uniqueKey = `agreements-${targetId}-${crypto.randomUUID()}.pdf`;
 
             const params = {
                 Bucket: process.env.BUCKET_NAME,
@@ -545,15 +552,27 @@ const uploadAgreementPDF = expressAsyncHandler(
             const command = new PutObjectCommand(params);
             await s3Client.send(command);
 
-            admin.isVerified = true;
-            admin.signature_url = uniqueKey;
+            const baseUrl = process.env.PROD_URL || 'https://ultimatehealth.blog';
+            const pdfUrl = `${baseUrl}/api/getFile/${encodeURIComponent(uniqueKey)}`;
 
-            await admin.save();
+            if (admin) {
+                admin.isVerified = true;
+                admin.signature_url = uniqueKey;
+                await admin.save();
+            } else {
+                const applicantEmail = (email || decoded?.email || "").toLowerCase();
+                if (applicantEmail) {
+                    await AdminApplicant.updateMany(
+                        { email: applicantEmail },
+                        { $set: { agreementUrl: pdfUrl, s3Key: uniqueKey } }
+                    );
+                }
+            }
 
             res.status(200).send({
                 message: "Agreement uploaded successfully",
                 key: uniqueKey,
-                pdfUrl: `https://ultimatehealth.blog/api/getFile/${uniqueKey}`,
+                pdfUrl,
             });
 
         } catch (err) {
@@ -574,29 +593,57 @@ const getFile = async (req, res) => {
         }
         const key = decodeURIComponent(rawKey);
 
-        const isAgreement = key.startsWith("agreements-") || 
-                            key.includes("/agreements-") || 
-                            key.toLowerCase().startsWith("agreements/") ||
-                            (key.toLowerCase().endsWith(".pdf") && key.toLowerCase().includes("agreement"));
-
         const isApplicantDocument = key.startsWith("applicant-resumes/") || key.includes("applicant-resumes");
 
+        const isAgreement = !isApplicantDocument && (
+                            key.startsWith("agreements-") || 
+                            key.includes("/agreements-") || 
+                            key.toLowerCase().startsWith("agreements/") ||
+                            (key.toLowerCase().endsWith(".pdf") && key.toLowerCase().includes("agreement")));
+
         if (isAgreement) {
-            // Internal admin agreements are strictly private at all times
-           // const authAdmin = await getAuthAdminFromReq(req);
-            if (!authAdmin) {
-                return res.status(401).json({ error: "Authentication required to access agreement documents" });
-            }
+            // Check if this agreement belongs to an active, onboarded internal admin
+            const authAdmin = await getAuthAdminFromReq(req);
+            const onboardedAdmin = await adminModel.findOne({ signature_url: key });
 
-            const adminIdStr = authAdmin._id.toString();
-            const isOwner = authAdmin.isSuperAdmin === true ||
-                            key.includes(adminIdStr) ||
-                            (authAdmin.signature_url && authAdmin.signature_url.includes(key)) ||
-                            (authAdmin.signature_url && key.includes(authAdmin.signature_url));
+            if (onboardedAdmin && onboardedAdmin.isVerified) {
+                // Internal active admin agreement: strictly enforce authentication
+                if (!authAdmin) {
+                    return res.status(401).json({ error: "Authentication required to access agreement documents" });
+                }
 
-            if (!isOwner) {
-                return res.status(403).json({ error: "Access denied: You are not authorized to view this agreement" });
+                const adminIdStr = authAdmin._id.toString();
+                const isOwner = authAdmin.isSuperAdmin === true ||
+                                key.includes(adminIdStr) ||
+                                (authAdmin.signature_url && authAdmin.signature_url.includes(key)) ||
+                                (authAdmin.signature_url && key.includes(authAdmin.signature_url));
+
+                if (!isOwner) {
+                    return res.status(403).json({ error: "Access denied: You are not authorized to view this agreement" });
+                }
+            } else if (authAdmin) {
+                // If an admin is authenticated, verify they are owner or superAdmin or reviewing applicant
+                const adminIdStr = authAdmin._id.toString();
+                const isOwner = authAdmin.isSuperAdmin === true ||
+                                key.includes(adminIdStr) ||
+                                (authAdmin.signature_url && authAdmin.signature_url.includes(key)) ||
+                                (authAdmin.signature_url && key.includes(authAdmin.signature_url));
+
+                if (!isOwner && !authAdmin.isSuperAdmin) {
+                    // Check if it's an applicant document
+                    const isApplicantDoc = await AdminApplicant.exists({
+                        $or: [
+                            { s3Key: key },
+                            { agreementUrl: { $regex: key.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'), $options: "i" } }
+                        ]
+                    });
+                    if (!isApplicantDoc) {
+                        return res.status(403).json({ error: "Access denied: You are not authorized to view this agreement" });
+                    }
+                }
             }
+            // For external applicants who accepted terms & conditions and signed during application,
+            // allow access so the applicant and reviewing team can view the agreement PDF.
         } else if (isApplicantDocument) {
             // Applicant resume / verification docs: public during application, restricted once onboarded
             const applicant = await AdminApplicant.findOne({
