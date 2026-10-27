@@ -424,7 +424,8 @@ const createAdminFromApplicant = expressAsyncHandler(async (req, res) => {
   const hashedPassword = await bcrypt.hash(plainPassword, salt);
 
   // Generate verification token for agreement signing
-  const verificationToken = generateVerificationToken({ email: applicant.email });
+  const tokenResult = generateVerificationToken({ email: applicant.email });
+  const verificationToken = typeof tokenResult === 'object' && tokenResult.verificationToken ? tokenResult.verificationToken : tokenResult;
 
   const newAdmin = new Admin({
     user_name: applicant.fullName,

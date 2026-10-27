@@ -74,7 +74,8 @@ module.exports.register = expressAsyncHandler(
       const hashedPassword = await bcrypt.hash(password, salt);
 
       // Generate a verification token
-      const verificationToken = generateVerificationToken({ email });
+      const tokenResult = generateVerificationToken({ email });
+      const verificationToken = typeof tokenResult === 'object' && tokenResult.verificationToken ? tokenResult.verificationToken : tokenResult;
 
       // Create admin account directly in Admin collection (isVerified: false by default)
       const adminuser = new admin({

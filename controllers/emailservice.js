@@ -235,10 +235,11 @@ const resendVerificationEmail = expressAsyncHandler(async (req, res) => {
     return sendSuccess(res, HTTP_STATUS.OK, successMessage);
   }
 
-  const verificationToken = generateVerificationToken({
+  const tokenResult = generateVerificationToken({
     email: account.email,
     role: admin ? "ADMIN" : account.isDoctor ? "DOCTOR" : "USER",
   });
+  const verificationToken = typeof tokenResult === 'object' && tokenResult.verificationToken ? tokenResult.verificationToken : tokenResult;
   if (process.env.NODE_ENV === "development") {
     console.log("Generated verification token:", verificationToken);
   }
