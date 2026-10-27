@@ -200,11 +200,14 @@ const articleSchema = new Schema({
 // Apply pre hook, to check whether status deleted or not
 articleSchema.pre(/^find/, function (next) {
   // this refers to current query
-  this.find({
-    status: {
-      $ne: 'deleted'
-    }
-  });
+  const currentQuery = this.getQuery();
+  if (!currentQuery || !currentQuery.status) {
+    this.find({
+      status: {
+        $ne: 'deleted'
+      }
+    });
+  }
   next();
 });
 
