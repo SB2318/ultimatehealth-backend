@@ -3084,6 +3084,7 @@ const sendContactUsMail = async ({ name, email, subject, message }) => {
 const sendAdminApplicationEmail = async ({
   applicant,
   resumeUrl,
+  agreementUrl,
   originalFileName,
   emailAttachments = [],
 }) => {
@@ -3146,9 +3147,21 @@ const sendAdminApplicationEmail = async ({
         ${
           resumeUrl
             ? `
-          <div style="margin: 25px 0 15px 0; text-align: center;">
+          <div style="margin: 20px 0 10px 0; text-align: center;">
             <a href="${resumeUrl}" target="_blank" style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #667eea, #764ba2); color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; box-shadow: 0 4px 10px rgba(102, 126, 234, 0.3);">
-              📄 View / Download Resume in Cloud Storage
+              📄 View / Download Resume
+            </a>
+          </div>
+        `
+            : ""
+        }
+
+        ${
+          agreementUrl
+            ? `
+          <div style="margin: 10px 0 15px 0; text-align: center;">
+            <a href="${agreementUrl}" target="_blank" style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #0d9488, #115e59); color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; box-shadow: 0 4px 10px rgba(13, 148, 136, 0.3);">
+              📸 View Agreement Screenshot / Proof
             </a>
           </div>
         `
@@ -3157,7 +3170,7 @@ const sendAdminApplicationEmail = async ({
 
         ${
           emailAttachments.length > 0
-            ? `<p style="font-size: 13px; color: #718096; text-align: center; margin-top: 10px;">📎 The original file (<code>${originalFileName}</code>) is also attached directly to this email.</p>`
+            ? `<p style="font-size: 13px; color: #718096; text-align: center; margin-top: 10px;">📎 All submitted document files are also attached directly to this email.</p>`
             : ""
         }
 
@@ -3214,11 +3227,30 @@ const sendApplicantConfirmationEmail = async ({
           <strong>Status:</strong> Under Review
         </div>
         ${
-          documentUrl
+          resumeUrl
             ? `
-          <div style="margin: 20px 0; text-align: center;">
-            <a href="${documentUrl}" target="_blank" style="display: inline-block; padding: 10px 20px; background: #0d9488; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px;">
-              📄 View / Download Your Submitted Agreement
+          <div style="margin: 15px 0 8px 0; text-align: center;">
+            <a href="${resumeUrl}" target="_blank" style="display: inline-block; padding: 10px 20px; background: #4f46e5; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px;">
+              📄 View Submitted Resume
+            </a>
+          </div>
+        `
+            : ""
+        }
+        ${
+          agreementUrl && agreementUrl !== resumeUrl
+            ? `
+          <div style="margin: 8px 0 15px 0; text-align: center;">
+            <a href="${agreementUrl}" target="_blank" style="display: inline-block; padding: 10px 20px; background: #0d9488; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px;">
+              📸 View Submitted Agreement Screenshot / Document
+            </a>
+          </div>
+        `
+            : (!resumeUrl && agreementUrl)
+            ? `
+          <div style="margin: 15px 0; text-align: center;">
+            <a href="${agreementUrl}" target="_blank" style="display: inline-block; padding: 10px 20px; background: #0d9488; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 13px;">
+              📄 View Submitted Document
             </a>
           </div>
         `

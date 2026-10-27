@@ -62,6 +62,10 @@ const requireSuperAdmin = require("../middleware/superAdminMiddleware");
  *                 type: string
  *                 format: binary
  *                 description: Resume or CV file (PDF, DOC, DOCX, JPG, PNG up to 10MB)
+ *               agreementScreenshot:
+ *                 type: string
+ *                 format: binary
+ *                 description: Signed agreement screenshot or proof document (JPG, PNG, PDF up to 10MB)
  *     responses:
  *       '201':
  *         description: Application submitted successfully
@@ -132,11 +136,15 @@ router.post(
  *               resume:
  *                 type: string
  *                 format: binary
- *                 description: Digitally signed agreement PDF (${fullName}_Signed_Admin_Agreement.pdf) or CV
+ *                 description: Resume or CV file (PDF, DOC, DOCX up to 10MB)
+ *               agreementScreenshot:
+ *                 type: string
+ *                 format: binary
+ *                 description: Screenshot of signed agreement or agreement document
  *               agreement:
  *                 type: string
  *                 format: binary
- *                 description: Alternative field name for digitally signed agreement PDF
+ *                 description: Alternative field name for digitally signed agreement PDF / screenshot
  *     responses:
  *       '201':
  *         description: Application and agreement successfully submitted

@@ -51,6 +51,12 @@ const adminApplicantSchema = z.object({
     .url("Invalid resume URL")
     .optional()
     .or(z.literal("")),
+  agreementUrl: z
+    .string()
+    .trim()
+    .url("Invalid agreement URL")
+    .optional()
+    .or(z.literal("")),
 });
 
 module.exports = {
