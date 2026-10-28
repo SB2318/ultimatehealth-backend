@@ -1407,3 +1407,82 @@ module.exports.getTrustedUsers = expressAsyncHandler(
     }
   }
 );
+
+// Search articles with pagination and language filter
+module.exports.searchArticles = expressAsyncHandler(
+  async (req, res) => {
+    const { q, language, page = 1, limit = 10 } = req.query;
+
+    if (!q || !q.trim()) {
+      return res.status(400).json({ message: 'Search query is required' });
+    }
+
+    try {
+      const pageNum = Math.max(1, parseInt(page, 10) || 1);
+      const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10) || 10));
+      const skip = (pageNum - 1) * limitNum;
+
+      // Escape regex special characters to prevent ReDoS
+      const escapedQuery = q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(escapedQuery, 'i');
+
+      // Also match any article tag names
+      const matchingTags = await ArticleTag.find({ name: regex }).select('_id').lean().exec();
+      const tagIds = matchingTags.map((t) => t._id);
+
+      const orConditions = [
+        { title: regex },
+        { description: regex },
+        { authorName: regex },
+        { summary: regex }
+      ];
+
+      if (tagIds.length > 0) {
+        orConditions.push({ tags: { $in: tagIds } });
+      }
+
+      const query = {
+        status: statusEnum.statusEnum.PUBLISHED,
+        is_removed: false,
+        $or: orConditions
+      };
+
+      if (language && language !== 'all') {
+        const langPrefix = language.split('-')[0];
+        query.language = new RegExp('^' + langPrefix, 'i');
+      }
+
+      let articles = await Article.find(query)
+        .populate('tags')
+        .populate({
+          path: 'authorId',
+          select: 'Profile_image user_name user_handle',
+          match: {
+            isBlockUser: false,
+            isBannedUser: false
+          }
+        })
+        .sort({ lastUpdated: -1, publishedDate: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .lean()
+        .exec();
+
+      articles = articles.filter((r) => r.authorId !== null);
+
+      const total = await Article.countDocuments(query);
+      const totalPages = Math.ceil(total / limitNum);
+
+      return res.status(200).json({
+        articles,
+        total,
+        totalPages,
+        currentPage: pageNum,
+        limit: limitNum
+      });
+    } catch (error) {
+      console.error('Error searching articles:', error);
+      return res.status(500).json({ error: 'Error searching articles', details: error.message });
+    }
+  }
+);

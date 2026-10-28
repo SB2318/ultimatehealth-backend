@@ -750,6 +750,84 @@ router.get(
 router.get('/articles/record/:pb_recordId', articleController.getArticleByPbRecordId);
 router.get('/articles/pb/:pb_recordId', articleController.getArticleByPbRecordId);
 
+/**
+ * @openapi
+ * /articles/search:
+ *   get:
+ *     summary: Search published articles by keyword
+ *     description: >
+ *       Searches published articles matching a keyword against title, description, summary, author name, or tags.
+ *       Supports pagination and optional language filtering.
+ *     tags:
+ *       - Articles
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Search query term (keyword)
+ *         example: "cardiology"
+ *       - in: query
+ *         name: language
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Optional language filter (e.g. en-IN, hi-IN, English, Hindi, all)
+ *         example: "en-IN"
+ *       - in: query
+ *         name: page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Number of articles per page (max 100)
+ *     responses:
+ *       '200':
+ *         description: Search results with pagination metadata
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 articles:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Article'
+ *                 total:
+ *                   type: integer
+ *                   example: 25
+ *                 totalPages:
+ *                   type: integer
+ *                   example: 3
+ *                 currentPage:
+ *                   type: integer
+ *                   example: 1
+ *                 limit:
+ *                   type: integer
+ *                   example: 10
+ *       '400':
+ *         description: Search query is required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Search query is required
+ *       '500':
+ *         description: Internal server error
+ */
+router.get('/articles/search', articleController.searchArticles);
+
 router.get('/articles/:id', articleController.getArticleById); // auth removed for guest profile, purpose: user can view article in unauthenticated state
 
 /**
