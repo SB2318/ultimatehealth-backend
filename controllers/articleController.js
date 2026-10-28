@@ -172,13 +172,18 @@ module.exports.createArticle = expressAsyncHandler(
 module.exports.getAllArticles = expressAsyncHandler(
   async (req, res) => {
 
-    const { page = 1, limit = 150 } = req.query;
+    const { page = 1, limit = 150, language } = req.query;
     try {
 
       const query = {
         status: statusEnum.statusEnum.PUBLISHED,
         is_removed: false
       };
+
+      if (language && language !== 'all') {
+        const langPrefix = language.split('-')[0];
+        query.language = new RegExp('^' + langPrefix, 'i');
+      }
 
 
 
@@ -231,13 +236,9 @@ module.exports.getAllArticles = expressAsyncHandler(
         }
       }
 
-      if (Number(page) === 1) {
-        const totalArticles = await Article.countDocuments(query);
-        const totalPages = Math.ceil(totalArticles / Number(limit));
-        res.status(200).json({ articles, totalPages });
-      } else {
-        res.status(200).json({ articles: articles });
-      }
+      const totalArticles = await Article.countDocuments(query);
+      const totalPages = Math.ceil(totalArticles / Number(limit));
+      res.status(200).json({ articles, totalPages, total: totalArticles, currentPage: Number(page) });
     } catch (error) {
       res
         .status(500)
