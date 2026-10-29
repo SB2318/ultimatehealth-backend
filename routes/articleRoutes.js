@@ -123,7 +123,6 @@ router.post('/articles/tags', publisherMiddleware, articleController.addNewTag);
  *                   type: string
  *                   example: "Internal server error"
  */
-
 router.get('/articles/tags', articleController.getAllTags); // auth removed for guest profile, purpose: user can see available categories in unauthenticated state
 /**
  * @openapi
@@ -447,79 +446,6 @@ router.delete('/articles/tags/:id', adminAuthenticateToken, articleController.de
  */
 router.post('/articles', publisherMiddleware, articleController.createArticle);
 
-/**
- * @openapi
- * /articles:
- *   get:
- *     summary: Get all published articles
- *     description: >
- *       This endpoint allows users to fetch all articles that are published (`PUBLISHED` status) and not removed (`is_removed: false`). The articles are paginated by `page` and `limit` parameters. 
- *       The articles will include information about their associated tags, mentioned users, liked users, and the author, excluding blocked or banned users.
- *       The results are sorted by `lastUpdated` in descending order.
- *     tags:
- *       - Articles
- *     security:
- *       - bearerAuth: []  
- *     parameters:
- *       - in: query
- *         name: page
- *         required: false
- *         schema:
- *           type: integer
- *           default: 1
- *         description: The page number to retrieve (default is 1).
- *       - in: query
- *         name: limit
- *         required: false
- *         schema:
- *           type: integer
- *           default: 50
- *         description: The number of articles to retrieve per page (default is 50).
- *     responses:
- *       '200':
- *         description: Successfully retrieved the list of articles
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 articles:
- *                   type: array
- *                   items:
- *                     type: object
- *                     $ref: '#/components/schemas/Article'
- *       '400':
- *         description: Invalid request or missing parameters
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Invalid request or parameters"
- *       '401':
- *         description: Unauthorized - User must be authenticated
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Unauthorized"
- *       '500':
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Error fetching articles"
- */
-
 router.get('/articles', articleController.getAllArticles); // auth removed for guest profile, purpose: user can view articles in unauthenticated state
 
 /**
@@ -715,38 +641,6 @@ router.get(
  *                   example: "Error fetching article"
  */
 
-/**
- * @swagger
- * /articles/record/{pb_recordId}:
- *   get:
- *     summary: Get an article by PocketBase record ID
- *     tags:
- *       - Articles
- *     parameters:
- *       - in: path
- *         name: pb_recordId
- *         required: true
- *         schema:
- *           type: string
- *         description: The PocketBase record ID of the article
- *     responses:
- *       '200':
- *         description: Successfully retrieved the article
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 article:
- *                   type: object
- *                   $ref: '#/components/schemas/Article'
- *       '400':
- *         description: pb_recordId parameter is required
- *       '404':
- *         description: Article not found or removed
- *       '500':
- *         description: Internal server error
- */
 router.get('/articles/record/:pb_recordId', articleController.getArticleByPbRecordId);
 router.get('/articles/pb/:pb_recordId', articleController.getArticleByPbRecordId);
 
@@ -1600,30 +1494,6 @@ router.get('/get-improvement/:reqid', authenticateToken, articleController.getIm
  */
 router.post('/articles/trust', authenticateToken, articleController.trustArticle);
 
-/**
- * @openapi
- * /articles/trusted-users:
- *   get:
- *     summary: Get users who trusted an article
- *     tags:
- *       - Articles
- *     parameters:
- *       - in: query
- *         name: article_id
- *         required: true
- *         schema:
- *           type: number
- *         description: ID of the article
- *     responses:
- *       '200':
- *         description: Successfully retrieved trusted users
- *       '400':
- *         description: Bad request
- *       '404':
- *         description: Article not found
- *       '500':
- *         description: Internal server error
- */
 router.get('/articles/trusted-users', articleController.getTrustedUsers); // need to protect the route
 router.get('/articles/read-history', authenticateToken, articleController.getReadingHistoriesOfUser); // need to be place in user route, later will replace
 

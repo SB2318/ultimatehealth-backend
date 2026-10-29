@@ -12,6 +12,8 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=4000
+      - PROD_URL=${PROD_URL:-https://ultimatehealth.blog}
+      - BASE_URL=${BASE_URL:-https://ultimatehealth.blog}
       - MONGODB_URL=${MONGODB_URL}
       - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}

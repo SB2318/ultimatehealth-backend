@@ -53,7 +53,8 @@ const sendVerificationEmail = (email, token, isAdmin=false) => {
   const cooldownKey = `verification-email:${email}`;
   cache.put(cooldownKey, true, cooldownTime * 1000);
 
-  const url = `${process.env.PROD_URL}/api/user/verifyEmail?token=${token}&isAdmin=${isAdmin}`;
+  const baseUrl = (process.env.PROD_URL || process.env.BASE_URL || "https://ultimatehealth.blog").replace(/\/$/, "");
+  const url = `${baseUrl}/api/user/verifyEmail?token=${token}&isAdmin=${isAdmin}`;
   console.log("URL", url);
   const mailOptions = {
     from: process.env.EMAIL_USER,
@@ -3287,7 +3288,8 @@ const sendApplicantConfirmationEmail = async ({
 };
 
 const sendAdminOnboardingEmail = async ({ email, fullName, user_handle, phone, token, temporaryPassword }) => {
-  const verifyUrl = `${process.env.PROD_URL}/api/user/verifyEmail?token=${token}&isAdmin=true`;
+  const baseUrl = (process.env.PROD_URL || process.env.BASE_URL || "https://ultimatehealth.blog").replace(/\/$/, "");
+  const verifyUrl = `${baseUrl}/api/user/verifyEmail?token=${token}&isAdmin=true`;
   const phoneSection = phone ? `<p style="margin: 4px 0;"><strong>Registered Phone:</strong> ${phone}</p>` : "";
   const passwordSection = temporaryPassword ? `<p style="margin: 4px 0;"><strong>Temporary Password:</strong> ${temporaryPassword}</p>` : "";
 

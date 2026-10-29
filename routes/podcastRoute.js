@@ -234,67 +234,6 @@ router.get('/podcast/get-my-playlists', authenticateToken, getMyPlayLists);
 
 router.get('/podcast/playlist-details', authenticateToken, getPodcastsByPlaylistId);
 
-/**
- * @swagger
- * /podcast/published-podcasts:
- *   get:
- *     tags:
- *       - Podcasts
- *     summary: Get all published podcasts
- *     description: Retrieve a paginated list of the most recently published podcasts. This route is protected and requires authentication.
- *     operationId: getAllPublishedPodcasts
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *         description: Page number for pagination
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 10
- *         description: Number of items per page
- *     responses:
- *       '200':
- *         description: List of published podcasts successfully retrieved
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 allPodcasts:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Podcast'
- *                 totalPages:
- *                   type: integer
- *                   example: 5
- *                   description: Only included on the first page
- *       '401':
- *         description: Unauthorized - Missing or invalid token
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Unauthorized
- *       '500':
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Internal server error
- */
 router.get('/podcast/published-podcasts', getAllPublishedPodcasts); // auth removed for guest profile, purpose: user can listen podcasts in unauthenticated state
 
 /**

@@ -1,7 +1,7 @@
 
 const swaggerJsdoc = require('swagger-jsdoc');
 const port = process.env.PORT | 8080;
-const url = process.env.PROD_URL;
+const url = process.env.PROD_URL || process.env.BASE_URL || 'https://ultimatehealth.blog';
 
 
 const options = {
