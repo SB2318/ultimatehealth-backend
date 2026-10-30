@@ -324,9 +324,13 @@ const verifyEmail = expressAsyncHandler(async (req, res) => {
     isVerified: true,
   });
 
-  // Sync the newly verified user to Firebase Firestore
-  const { cloneUserToFirebase } = require("../services/db/firebaseService");
-  await cloneUserToFirebase(newUser);
+  // Sync the newly verified user to Firebase Auth / Firestore safely
+  try {
+    const { cloneUserToFirebase } = require("../services/db/firebaseService");
+    await cloneUserToFirebase(newUser);
+  } catch (fbErr) {
+    console.error("[EmailService] Firebase user sync error:", fbErr.message);
+  }
 
   await UnverifiedUser.deleteOne({
     _id: unverifiedUser._id,

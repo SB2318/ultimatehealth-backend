@@ -184,6 +184,7 @@ const getAllPublishedPodcasts = expressAsyncHandler(
                 status: statusEnum.statusEnum.PUBLISHED
             }).populate('tags')
                 .populate('user_id', 'user_name user_handle Profile_image')
+                .populate('episode_id', 'name')
                 .sort({ updated_at: -1 })
                 .skip(skip)
                 .limit(Number(limit))
@@ -225,6 +226,7 @@ const getPodcastById = expressAsyncHandler(
                 populate('user_id', 'user_name Profile_image followers').
                 populate('mentionedUsers', 'user_name user_handle Profile_image').
                 populate('tags').
+                populate('episode_id', 'name description podcasts_count').
                 lean().
                 exec();
 
@@ -276,6 +278,7 @@ const searchPodcast = expressAsyncHandler(
                 .populate('tags')
                 .populate('article_id', 'title')
                 .populate('user_id', 'user_name user_handle Profile_image')
+                .populate('episode_id', 'name')
                 .sort({
                     updated_at: -1
                 })
@@ -332,6 +335,7 @@ const filterPodcast = expressAsyncHandler(
                 .populate('tags')
                 .populate('article_id', 'title')
                 .populate('user_id', 'user_name user_handle Profile_image')
+                .populate('episode_id', 'name')
                 .sort(sort)
                 .lean()
                 .exec();
@@ -1148,6 +1152,7 @@ const getPodcastsByEpisode = expressAsyncHandler(
             const podcasts = await Podcast.find({ episode_id: episodeId })
                 .populate('tags')
                 .populate('user_id', 'user_name user_handle Profile_image')
+                .populate('episode_id', 'name')
                 .sort({ episode_number: 1 }) // 1 = Ascending order
                 .exec();
 
