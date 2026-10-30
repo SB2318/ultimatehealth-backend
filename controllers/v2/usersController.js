@@ -1,5 +1,6 @@
 const expressAsyncHandler = require("express-async-handler");
 const {
+  createUser,
   createUnverifiedUser,
   findUserById,
   findUnverifiedUserByEmail,
@@ -93,8 +94,7 @@ module.exports.register = expressAsyncHandler(async (req, res) => {
     );
   }
 
-  // Generate a verification token
-  const verificationToken = await createUnverifiedUser({
+  const newUser = await createUser({
     user_name,
     user_handle,
     email,
@@ -107,19 +107,75 @@ module.exports.register = expressAsyncHandler(async (req, res) => {
     contact_detail,
   });
 
-  if (verificationToken == null) {
+  if (!newUser) {
     throwError(
-      HTTP_STATUS.BAD_REQUEST,
+      HTTP_STATUS.INTERNAL_SERVER_ERROR,
       ERROR_CODES.INTERNAL_ERROR,
-      "Error creating  user",
-    );
-  } else {
-    sendSuccess(
-      res,
-      HTTP_STATUS.CREATED,
-      "Registration successful. Please verify your email."
+      "Error creating user",
     );
   }
+
+  const { refreshToken, jti } = await generateRefreshToken(newUser._id, {
+    role: newUser.isDoctor ? "doctor" : "user",
+    email: newUser.email,
+  });
+
+  await loginUser(newUser, refreshToken, req.body.fcmToken ?? null);
+
+  let tokenVersion = await redis.get(`user_token_version:${newUser._id}`);
+  if (tokenVersion === null) {
+    tokenVersion = 0;
+    await redis.set(`user_token_version:${newUser._id}`, 0);
+  }
+
+  const { accessToken } = generateAccessToken({
+    userId: newUser._id,
+    email: newUser.email,
+    role: newUser.isDoctor ? "doctor" : "user",
+    tokenVersion: parseInt(tokenVersion, 10),
+  });
+
+  const userAgent = req.headers['user-agent']?.toLowerCase() || '';
+  const isMobile = req.headers['x-client-type']?.toLowerCase() === 'mobile' ||
+    userAgent.includes('okhttp') ||
+    userAgent.includes('dart') ||
+    userAgent.includes('alamofire') ||
+    userAgent.includes('cfnetwork');
+
+  if (!isMobile) {
+    res.cookie("accessToken", accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 15 * 60 * 1000,
+    });
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+  }
+
+  const responsePayload = {
+    user: {
+      _id: newUser._id,
+      email: newUser.email,
+      user_name: newUser.user_name,
+      isDoctor: newUser.isDoctor,
+      isVerified: true,
+      user_handle: newUser.user_handle,
+    },
+    accessToken,
+    refreshToken,
+  };
+
+  sendSuccess(
+    res,
+    HTTP_STATUS.CREATED,
+    "Registration successful",
+    responsePayload,
+  );
 });
 
 module.exports.checkUserHandle = expressAsyncHandler(async (req, res) => {

@@ -22,16 +22,24 @@ const createUser = async ({
     Years_of_experience,
     contact_detail,
 }) => {
+    let hashedPassword = password;
+    if (password && !password.startsWith("$2")) {
+        hashedPassword = await generateHashPassword(password);
+    }
+    const formattedContact = typeof contact_detail === "string"
+        ? { phone_no: contact_detail }
+        : contact_detail;
+
     const newUser = new User({
         user_name: user_name,
         user_handle: user_handle,
         email: email,
-        password: password,
+        password: hashedPassword,
         isDoctor: isDoctor,
         specialization: specialization,
         qualification: qualification,
         Years_of_experience: Years_of_experience,
-        contact_detail: contact_detail,
+        contact_detail: formattedContact,
         Profile_image: Profile_image,
         isVerified: true,
     })
@@ -39,6 +47,12 @@ const createUser = async ({
     await newUser.save()
 
     if (newUser) {
+        try {
+            const { cloneUserToFirebase } = require("./firebaseService");
+            await cloneUserToFirebase(newUser);
+        } catch (fbErr) {
+            console.error("[UserService] Firebase user sync error:", fbErr.message);
+        }
         return newUser
     }
     return null

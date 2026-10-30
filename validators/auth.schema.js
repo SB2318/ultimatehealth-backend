@@ -69,6 +69,8 @@ const baseFields = {
         .trim()
         .regex(/^[+]?[0-9]{10,15}$/, 'Contact number must be 10-15 digits')
         .optional(),
+
+    fcmToken: z.string().trim().optional(),
 }
 
 const registerSchema = z.discriminatedUnion('isDoctor', [

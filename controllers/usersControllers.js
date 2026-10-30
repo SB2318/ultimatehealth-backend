@@ -2,8 +2,10 @@
 const expressAsyncHandler = require("express-async-handler");
 const jwt = require("jsonwebtoken");
 const User = require("../models/UserModel");
+const UnverifiedUser = require("../models/UnverifiedUserModel");
 const ArticleTag = require("../models/ArticleModel");
 const {
+  createUser,
   createUnverifiedUser,
   findUserById,
   findUnverifiedUserByEmail,
@@ -73,58 +75,114 @@ const { HTTP_STATUS, ERROR_CODES } = require("../constants/errorConstants");
 const { Types } = require("mongoose");
 const { ROLES } = require("../constants/roles");
 
-async function creatingUnverifiedUser(userData) {
-  const verificationToken = await createUnverifiedUser({
-    user_name: userData.user_name,
-    user_handle: userData.user_handle,
-    email: userData.email,
-    password: userData.password,
-    isDoctor: userData.isDoctor,
-    qualification: userData.qualification,
-    specialization: userData.specialization,
-    Years_of_experience: userData.Years_of_experience,
-    Profile_image: userData.Profile_image,
-    contact_detail: userData.contact_detail,
-  });
-  console.log("verificationToken", verificationToken);
-  if (!verificationToken) {
-    throwError(
-      HTTP_STATUS.INTERNAL_SERVER_ERROR,
-      ERROR_CODES.INTERNAL_ERROR,
-      "Failed to register user",
-    );
-  }
-  // sending verification email to user
-}
-
 module.exports.register = expressAsyncHandler(async (req, res) => {
   const start = Date.now();
   const minDuration = 700;
 
   const userData = req.validateBody;
 
-  // if user exist we get true or false value from checkExistingUser and checkExistingAdmin function and if any of them is true then we throw error that user already exist
   const [existingUser, existingAdmin] = await Promise.all([
-    checkExistingUser({
-      email: userData.email,
-      user_handle: userData.user_handle,
-    }),
+    findUserByEmail(userData.email),
     checkExistingAdmin({ email: userData.email }),
   ]);
 
-  if (!existingUser && !existingAdmin) {
-    await creatingUnverifiedUser(userData);
+  if (existingUser || existingAdmin) {
+    throwError(
+      HTTP_STATUS.BAD_REQUEST,
+      ERROR_CODES.USER_ALREADY_EXISTS,
+      "Email already in use",
+    );
   }
+
+  const existingHandle = await findUserByHandle(userData.user_handle);
+  if (existingHandle) {
+    throwError(
+      HTTP_STATUS.BAD_REQUEST,
+      ERROR_CODES.USER_ALREADY_EXISTS,
+      "User handle already in use",
+    );
+  }
+
+  // Clean up any stale unverified record if exists
+  await UnverifiedUser.deleteMany({
+    $or: [{ email: userData.email }, { user_handle: userData.user_handle }],
+  });
+
+  const newUser = await createUser(userData);
+
+  if (!newUser) {
+    throwError(
+      HTTP_STATUS.INTERNAL_SERVER_ERROR,
+      ERROR_CODES.INTERNAL_ERROR,
+      "Failed to register user",
+    );
+  }
+
+  // Generate refresh token and attach to user
+  const { refreshToken, jti } = await generateRefreshToken(
+    {
+      userId: newUser._id,
+      role: newUser.isDoctor ? "doctor" : "user",
+    },
+    "7d",
+  );
+
+  await loginUser(newUser._id, refreshToken, jti, userData.fcmToken ?? null);
+
+  const userAgent = req.headers["user-agent"]?.toLowerCase() || "";
+  const isMobile =
+    req.headers["x-client-type"]?.toLowerCase() === "mobile" ||
+    userAgent.includes("okhttp") ||
+    userAgent.includes("dart") ||
+    userAgent.includes("alamofire") ||
+    userAgent.includes("cfnetwork");
+
+  if (!isMobile) {
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+  }
+
+  // Fetch token version from redis
+  let tokenVersion = await redis.get(`user_token_version:${newUser._id}`);
+  if (tokenVersion === null) {
+    tokenVersion = 0;
+    await redis.set(`user_token_version:${newUser._id}`, 0);
+  }
+
+  const accessToken = await generateAccessToken({
+    userId: newUser._id,
+    role: newUser.isDoctor ? "doctor" : "user",
+    tokenVersion: parseInt(tokenVersion, 10),
+  });
+
+  const responsePayload = {
+    user: {
+      _id: newUser._id,
+      email: newUser.email,
+      user_name: newUser.user_name,
+      isDoctor: newUser.isDoctor,
+      isVerified: true,
+      user_handle: newUser.user_handle,
+    },
+    accessToken,
+    refreshToken,
+  };
 
   // simulate delay to prevent timing attacks
   const elapsed = Date.now() - start;
   if (elapsed < minDuration) {
     await new Promise((resolve) => setTimeout(resolve, minDuration - elapsed));
   }
+
   sendSuccess(
     res,
     HTTP_STATUS.CREATED,
-    "If the account can be registered, please verify your email.",
+    "User registered successfully",
+    responsePayload,
   );
 });
 
@@ -239,8 +297,7 @@ module.exports.login = expressAsyncHandler(async (req, res) => {
 
 //Google Sign-In / Sign-Up
 // Single endpoint for both Google login and Google registration.
-// Google users are NOT auto-verified — they go through the same email
-// verification flow as regular users.
+// User is immediately verified upon registration with refreshToken attached.
 module.exports.googleAuth = expressAsyncHandler(async (req, res) => {
   const {
     email,
@@ -256,7 +313,7 @@ module.exports.googleAuth = expressAsyncHandler(async (req, res) => {
     fcmToken,
   } = req.validateBody;
 
-  // Case 1: Verified user already exists → Log them in
+  // Case 1: User already exists → Log them in
   const existingVerifiedUser = await findUserByEmail(email);
 
   if (existingVerifiedUser) {
@@ -268,9 +325,15 @@ module.exports.googleAuth = expressAsyncHandler(async (req, res) => {
       );
     }
 
-    // Attach uid if this is their first Google login (uid not yet stored)
+    const updates = {};
     if (!existingVerifiedUser.uid && uid) {
-      await User.findByIdAndUpdate(existingVerifiedUser._id, { uid });
+      updates.uid = uid;
+    }
+    if (!existingVerifiedUser.isVerified) {
+      updates.isVerified = true;
+    }
+    if (Object.keys(updates).length > 0) {
+      await User.findByIdAndUpdate(existingVerifiedUser._id, updates);
     }
 
     // Clear any existing refresh token before issuing a new one
@@ -297,7 +360,21 @@ module.exports.googleAuth = expressAsyncHandler(async (req, res) => {
       tokenVersion: parseInt(tokenVersion, 10),
     });
 
-    const isMobile = req.headers['x-client-type']?.toLowerCase() === 'mobile';
+    const userAgent = req.headers['user-agent']?.toLowerCase() || '';
+    const isMobile = req.headers['x-client-type']?.toLowerCase() === 'mobile' ||
+      userAgent.includes('okhttp') ||
+      userAgent.includes('dart') ||
+      userAgent.includes('alamofire') ||
+      userAgent.includes('cfnetwork');
+
+    if (!isMobile) {
+      res.cookie("refreshToken", refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+    }
 
     const payload = {
       user: {
@@ -309,27 +386,13 @@ module.exports.googleAuth = expressAsyncHandler(async (req, res) => {
         user_handle: existingVerifiedUser.user_handle,
       },
       accessToken,
+      refreshToken,
     };
-
-    if (isMobile) payload.refreshToken = refreshToken;
 
     return sendSuccess(res, HTTP_STATUS.OK, "Login successful", payload);
   }
 
-  // Case 2: Unverified user exists → Gate them 
-  const unverifiedUser = await findUnverifiedUserByEmail(email);
-
-  if (unverifiedUser) {
-    throwError(
-      HTTP_STATUS.FORBIDDEN,
-      ERROR_CODES.ACCESS_DENIED,
-      "This email is registered but not yet verified. Please check your inbox or request a new verification email.",
-    );
-  }
-
-  // Case 3: Fresh registration
-
-  // Auto-generate a unique user_handle if not provided
+  // Case 2: Fresh registration via Google (Auto-verified)
   let finalUserHandle = user_handle;
   if (!finalUserHandle) {
     const baseHandle = user_name.replace(/[^a-zA-Z0-9_]/g, "").toLowerCase() || "user";
@@ -337,19 +400,14 @@ module.exports.googleAuth = expressAsyncHandler(async (req, res) => {
     let attempt = 0;
     while (!isUnique) {
       finalUserHandle = attempt === 0 ? baseHandle : `${baseHandle}_${Math.floor(Math.random() * 10000)}`;
-      const handleExists = await checkExistingUser({ email: "__no_match__@x.com", user_handle: finalUserHandle });
+      const handleExists = await findUserByHandle(finalUserHandle);
       if (!handleExists) isUnique = true;
       attempt++;
     }
   }
 
-  // Check for duplicate email or handle across both tables
-  const [emailTaken, handleTaken] = await Promise.all([
-    checkExistingUser({ email, user_handle: "__no_match__" }),
-    checkExistingUser({ email: "__no_match__@x.com", user_handle: finalUserHandle }),
-  ]);
-
-  if (emailTaken) {
+  const existingAdmin = await checkExistingAdmin({ email });
+  if (existingAdmin) {
     throwError(
       HTTP_STATUS.BAD_REQUEST,
       ERROR_CODES.USER_ALREADY_EXISTS,
@@ -357,6 +415,7 @@ module.exports.googleAuth = expressAsyncHandler(async (req, res) => {
     );
   }
 
+  const handleTaken = await findUserByHandle(finalUserHandle);
   if (handleTaken && user_handle) {
     throwError(
       HTTP_STATUS.BAD_REQUEST,
@@ -365,36 +424,90 @@ module.exports.googleAuth = expressAsyncHandler(async (req, res) => {
     );
   }
 
-  const verificationToken = await createGoogleUnverifiedUser({
+  // Clean up any stale unverified record if exists
+  await UnverifiedUser.deleteMany({
+    $or: [{ email }, { user_handle: finalUserHandle }],
+  });
+
+  const formattedContact = typeof contact_detail === "string"
+    ? { phone_no: contact_detail }
+    : (contact_detail || null);
+
+  const newUser = await User.create({
     user_name,
     user_handle: finalUserHandle,
     email,
-    uid,
-    isDoctor,
-    Profile_image,
-    qualification,
-    specialization,
-    Years_of_experience,
-    contact_detail,
+    uid: uid || null,
+    password: null,
+    isDoctor: isDoctor || false,
+    Profile_image: Profile_image || "",
+    qualification: qualification || null,
+    specialization: specialization || null,
+    Years_of_experience: Years_of_experience || null,
+    contact_detail: formattedContact,
+    isVerified: true,
   });
 
-  if (!verificationToken) {
-    throwError(
-      HTTP_STATUS.INTERNAL_SERVER_ERROR,
-      ERROR_CODES.INTERNAL_ERROR,
-      "Failed to create account",
-    );
+  try {
+    const { cloneUserToFirebase } = require("../services/db/firebaseService");
+    await cloneUserToFirebase(newUser);
+  } catch (fbErr) {
+    console.error("[GoogleAuth] Firebase user sync error:", fbErr.message);
   }
 
-  // Send verification email (same as the normal registration flow)
-  if (process.env.NODE_ENV === "production") {
-    await sendVerificationEmail(email, verificationToken, false);
+  const { refreshToken, jti } = await generateRefreshToken({
+    userId: newUser._id,
+    role: newUser.isDoctor ? ROLES.DOCTOR : ROLES.USER,
+  }, "7d");
+
+  await loginUser(newUser._id, refreshToken, jti, fcmToken ?? null);
+
+  let tokenVersion = await redis.get(`user_token_version:${newUser._id}`);
+  if (tokenVersion === null) {
+    tokenVersion = 0;
+    await redis.set(`user_token_version:${newUser._id}`, 0);
   }
+
+  const accessToken = await generateAccessToken({
+    userId: newUser._id,
+    role: newUser.isDoctor ? ROLES.DOCTOR : ROLES.USER,
+    tokenVersion: parseInt(tokenVersion, 10),
+  });
+
+  const userAgent = req.headers['user-agent']?.toLowerCase() || '';
+  const isMobile = req.headers['x-client-type']?.toLowerCase() === 'mobile' ||
+    userAgent.includes('okhttp') ||
+    userAgent.includes('dart') ||
+    userAgent.includes('alamofire') ||
+    userAgent.includes('cfnetwork');
+
+  if (!isMobile) {
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+  }
+
+  const payload = {
+    user: {
+      _id: newUser._id,
+      email: newUser.email,
+      user_name: newUser.user_name,
+      isDoctor: newUser.isDoctor,
+      isVerified: true,
+      user_handle: newUser.user_handle,
+    },
+    accessToken,
+    refreshToken,
+  };
 
   return sendSuccess(
     res,
     HTTP_STATUS.CREATED,
-    "Account created successfully. Please verify your email to continue.",
+    "Account created successfully",
+    payload,
   );
 });
 

@@ -89,7 +89,7 @@ Provides secure, high-throughput REST & WebSocket APIs for:
 
 ## 🔐 Authentication & Roles
 
-- **Users**: Open self-registration with email verification. Users can browse, publish health articles, listen to podcasts, interact with the community, or register as health professionals.
+- **Users**: Instant self-registration with automatic verification (`isVerified: true`) and refresh token attachment. Users receive access and refresh tokens directly upon registration without needing a second email verification step, enabling immediate access to browse, publish health articles, listen to podcasts, interact with the community, or register as health professionals.
 - **Admins & Moderators**: Cannot self-register. Admin accounts are explicitly created by a **Super Admin** or **UltimateHealth Admin**. To activate their account (`isVerified: true`), newly created admins must review and digitally sign the agreement from the website (`/admin-agreement`). Password recovery is managed via a secure multi-step verification token flow.
 
 ---
