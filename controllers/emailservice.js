@@ -9,7 +9,7 @@ const User = require("../models/UserModel");
 const Admin = require("../models/admin/adminModel");
 const cache = require("memory-cache");
 const statusEnum = require("../utils/StatusEnum");
-const cooldownTime = 3600;
+const cooldownTime = Number(process.env.EMAIL_RESEND_COOLDOWN_SECONDS) || 60;
 const path = require("path");
 const {
   generateVerificationToken,
