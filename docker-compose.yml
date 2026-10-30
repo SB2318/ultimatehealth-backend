@@ -1,8 +1,8 @@
 version: "3.8"
 services:
-  # ─────────────────────────────────────────────
-  #  UltimateHealth Node.js API
-  # ─────────────────────────────────────────────
+  # ═════════════════════════════════════════════════════════════════════════════
+  # 🚀 UltimateHealth Node.js API
+  # ═════════════════════════════════════════════════════════════════════════════
   api:
     build: .
     container_name: ultimatehealth-backend
@@ -30,7 +30,7 @@ services:
       - BUCKET_NAME=${BUCKET_NAME}
       - ENDPOINT_URL=${ENDPOINT_URL}
       - GEMINI_API_KEY_1=${GEMINI_API_KEY_1}
-      - KAFKA_BROKERS=${KAFKA_BROKERS:-kafka1:9092,kafka2:9092}
+      - KAFKA_BROKERS=${KAFKA_BROKERS:-kafka1:9092}
       - DATASOURCE_URL=${DATASOURCE_URL:-http://pocketbase:8090}
       - DATASOURCE_USERNAME=${DATASOURCE_USERNAME}
       - DATASOURCE_PASSWORD=${DATASOURCE_PASSWORD}
@@ -42,8 +42,8 @@ services:
         condition: service_healthy
       kafka1:
         condition: service_healthy
-      kafka2:
-        condition: service_healthy
+      # kafka2:
+      #   condition: service_healthy
       redis:
         condition: service_healthy
     volumes:
@@ -96,56 +96,57 @@ services:
       KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka1:9092
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka1:9093,2@kafka2:9093
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka1:9093
       KAFKA_NUM_PARTITIONS: 12
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 2
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_MAX_CONNECTIONS: 5000
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_HEAP_OPTS: "-Xmx256m -Xms256m"
 
-  kafka2:
-    image: apache/kafka:latest
-    container_name: kafka2-ultimatehealth
-    restart: unless-stopped
-    ports:
-      - "9093:9092"
-    volumes:
-      - kafka2-data:/var/lib/kafka/data
-    ulimits:
-      nofile:
-        soft: 65535
-        hard: 65535
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1",
-        ]
-      interval: 15s
-      timeout: 10s
-      retries: 10
-      start_period: 60s
-    environment:
-      KAFKA_CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
-      KAFKA_NODE_ID: 2
-      KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka2:9092
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka1:9093,2@kafka2:9093
-      KAFKA_NUM_PARTITIONS: 12
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 2
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_MAX_CONNECTIONS: 5000
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+  # kafka2:
+  #   image: apache/kafka:latest
+  #   container_name: kafka2-ultimatehealth
+  #   restart: unless-stopped
+  #   ports:
+  #     - "9093:9092"
+  #   volumes:
+  #     - kafka2-data:/var/lib/kafka/data
+  #   ulimits:
+  #     nofile:
+  #       soft: 65535
+  #       hard: 65535
+  #   healthcheck:
+  #     test:
+  #       [
+  #         "CMD-SHELL",
+  #         "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1",
+  #       ]
+  #     interval: 15s
+  #     timeout: 10s
+  #     retries: 10
+  #     start_period: 60s
+  #   environment:
+  #     KAFKA_CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+  #     KAFKA_NODE_ID: 2
+  #     KAFKA_PROCESS_ROLES: broker,controller
+  #     KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+  #     KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+  #     KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+  #     KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+  #     KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka2:9092
+  #     KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka1:9093,2@kafka2:9093
+  #     KAFKA_NUM_PARTITIONS: 12
+  #     KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
+  #     KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 2
+  #     KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+  #     KAFKA_MAX_CONNECTIONS: 5000
+  #     KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
 
-  # ─────────────────────────────────────────────
+  # ═════════════════════════════════════════════════════════════════════════════
   # 📦 PocketBase
-  # ─────────────────────────────────────────────
+  # ═════════════════════════════════════════════════════════════════════════════
   pocketbase:
     build:
       context: .
@@ -174,7 +175,7 @@ services:
 
 volumes:
   kafka1-data:
-  kafka2-data:
+  # kafka2-data:
   mongodb_data:
   pb_data:
   redis_data:
