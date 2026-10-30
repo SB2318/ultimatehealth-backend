@@ -148,7 +148,10 @@ const getRelatedArticles = async (articleId, limit = 10, excludeIds = []) => {
     orConditions.push({ tags: { $in: targetTags } });
   }
   if (searchKeywords) {
-    orConditions.push({ $text: { $search: searchKeywords } });
+    const cleanKeywords = searchKeywords ? searchKeywords.split(/\s+/).filter(w => w.length > 2).slice(0, 5) : [];
+  if (cleanKeywords.length > 0) {
+    orConditions.push({ title: { $regex: cleanKeywords.join('|'), $options: 'i' } });
+  }
   }
 
   const matchFilter = orConditions.length > 0
@@ -162,7 +165,7 @@ const getRelatedArticles = async (articleId, limit = 10, excludeIds = []) => {
         tagOverlapCount: targetTags.length > 0
           ? { $size: { $setIntersection: ["$tags", targetTags] } }
           : 0,
-        textScore: searchKeywords ? { $meta: "textScore" } : 0,
+        // textScore removed
         engagementBoost: {
           $ln: {
             $add: [
@@ -179,7 +182,7 @@ const getRelatedArticles = async (articleId, limit = 10, excludeIds = []) => {
         relevanceScore: {
           $add: [
             { $multiply: ["$tagOverlapCount", 5.0] }, // Tags: 50% weight
-            { $multiply: ["$textScore", 2.0] },       // Text: 35% weight
+            // textScore removed
             { $multiply: ["$engagementBoost", 0.5] }  // Popularity: 15% weight
           ]
         }
