@@ -172,7 +172,7 @@ module.exports.login = expressAsyncHandler(async (req, res) => {
     await logoutUser(user._id);
   }
 
-  const { refreshToken, jti } = generateRefreshToken(
+  const { refreshToken, jti } = await generateRefreshToken(
     {
       userId: user._id,
       role: user.isDoctor ? "doctor" : "user",
@@ -212,7 +212,7 @@ module.exports.login = expressAsyncHandler(async (req, res) => {
     await redis.set(`user_token_version:${user._id}`, 0);
   }
 
-  const accessToken = generateAccessToken({
+  const accessToken = await generateAccessToken({
     userId: user._id,
     role: user.isDoctor ? "doctor" : "user",
     tokenVersion: parseInt(tokenVersion, 10),
@@ -278,7 +278,7 @@ module.exports.googleAuth = expressAsyncHandler(async (req, res) => {
       await logoutUser(existingVerifiedUser._id);
     }
 
-    const { refreshToken, jti } = generateRefreshToken({
+    const { refreshToken, jti } = await generateRefreshToken({
       userId: existingVerifiedUser._id,
       role: existingVerifiedUser.isDoctor ? ROLES.DOCTOR : ROLES.USER,
     }, "7d");
@@ -291,7 +291,7 @@ module.exports.googleAuth = expressAsyncHandler(async (req, res) => {
       await redis.set(`user_token_version:${existingVerifiedUser._id}`, 0);
     }
 
-    const accessToken = generateAccessToken({
+    const accessToken = await generateAccessToken({
       userId: existingVerifiedUser._id,
       role: existingVerifiedUser.isDoctor ? ROLES.DOCTOR : ROLES.USER,
       tokenVersion: parseInt(tokenVersion, 10),
@@ -653,7 +653,7 @@ module.exports.refreshToken = expressAsyncHandler(async (req, res) => {
 
 
   //  Issue NEW Access Token
-  const { accessToken: newAccessToken } = generateAccessToken({
+  const { accessToken: newAccessToken } = await generateAccessToken({
     userId: decoded.userId,
     role: decoded.role,
     tokenVersion: parseInt(tokenVersion, 10),
