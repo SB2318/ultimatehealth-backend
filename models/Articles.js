@@ -197,14 +197,27 @@ const articleSchema = new Schema({
 });
 
 
+// Apply pre hook, to check whether status deleted or not
+articleSchema.pre(/^find/, function (next) {
+  // this refers to current query
+  const currentQuery = this.getQuery();
+  if (!currentQuery || !currentQuery.status) {
+    this.find({
+      status: {
+        $ne: 'deleted'
+      }
+    });
+  }
+  next();
+});
 
 // Apply to aggregation pipelines so soft-deleted articles don't show up in charts
 articleSchema.pre('aggregate', function (next) {
   // this -> current query
   this.pipeline().unshift({
     $match: {
-      is_removed: {
-        $ne: true
+      status: {
+        $ne: 'deleted'
       }
     }
   });

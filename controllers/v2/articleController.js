@@ -483,6 +483,7 @@ module.exports.deleteArticle = expressAsyncHandler(async (req, res) => {
   const article = await Article.findOneAndUpdate(
     { _id: id },
     { 
+      status: statusEnum.statusEnum.DELETED,
       is_removed: true 
     },
     { new: true }

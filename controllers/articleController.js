@@ -688,6 +688,7 @@ module.exports.deleteArticle = expressAsyncHandler(
         );
         await EditRequest.deleteMany({ articleId: id });
       } else {
+        article.status = statusEnum.statusEnum.DELETED;
         article.is_removed = true;
         await article.save();
       }

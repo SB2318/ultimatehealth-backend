@@ -67,23 +67,9 @@ const generateAccessToken = (payload, expiresIn) => {
     return { accessToken, jti };
 };
 
-const generateRefreshToken = async (userIdOrPayload, payloadOrExpiry = {}, expiresIn) => {
-    let userId;
-    let payload = {};
-    let expiry;
-
-    if (typeof userIdOrPayload === "object" && userIdOrPayload !== null) {
-        payload = { ...userIdOrPayload };
-        userId = payload.userId;
-        expiry = typeof payloadOrExpiry === "string" ? payloadOrExpiry : expiresIn;
-    } else {
-        userId = userIdOrPayload;
-        payload = typeof payloadOrExpiry === "object" ? payloadOrExpiry : {};
-        expiry = expiresIn || (typeof payloadOrExpiry === "string" ? payloadOrExpiry : null);
-    }
-
+const generateRefreshToken = async (userId, payload = {}, expiresIn) => {
     const { key, algorithm } = getSignSecret("refresh");
-    const resolvedExpiry = expiry || process.env.JWT_REFRESH_EXPIRY || "7d";
+    const expiry = expiresIn || process.env.JWT_REFRESH_EXPIRY || "7d";
     const jti = generateJti();
 
     const refreshTokenPayload = {
@@ -96,7 +82,7 @@ const generateRefreshToken = async (userIdOrPayload, payloadOrExpiry = {}, expir
     const refreshToken = jwt.sign(
         refreshTokenPayload,
         key,
-        { algorithm, issuer: ISSUER, audience: AUDIENCE, expiresIn: resolvedExpiry }
+        { algorithm, issuer: ISSUER, audience: AUDIENCE, expiresIn: expiry }
     );
 
     const ttlSeconds = 7 * 24 * 60 * 60;
