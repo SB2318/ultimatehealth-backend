@@ -77,8 +77,8 @@ flowchart TD
         "isVerified": true,
         "user_handle": "janedoe"
       },
-      "accessToken": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
-      "refreshToken": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+      "accessToken": "<sample_jwt_access_token>",
+      "refreshToken": "<sample_jwt_refresh_token>"
     }
   }
   ```
