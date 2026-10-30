@@ -1,17 +1,18 @@
 const expressAsyncHandler = require("express-async-handler");
 const { throwError } = require("../utils/throwError");
 const { HTTP_STATUS, ERROR_CODES } = require("../constants/errorConstants");
-const { verifyRefreshToken, hashToken } = require("../services/security/tokenService");
+const { verifyAnyToken, hashToken } = require("../services/security/tokenService");
 const { findUserById } = require("../services/db/userService");
 const { findAdminById } = require("../services/db/adminService");
 const { ROLES } = require("../constants/roles");
 
 const authenticate = expressAsyncHandler(async (req, _res, next) => {
   const token =
-    req.cookies?.refreshToken ||
     (req.headers.authorization?.startsWith("Bearer ")
       ? req.headers.authorization.split(" ")[1]
-      : null);
+      : null) ||
+    req.cookies?.accessToken ||
+    req.cookies?.refreshToken;
 
   if (!token) {
     throwError(
@@ -21,9 +22,9 @@ const authenticate = expressAsyncHandler(async (req, _res, next) => {
     );
   }
 
-  const decoded = verifyRefreshToken(token);
+  const decoded = await verifyAnyToken(token);
 
-  if (!decoded?.userId || !decoded?.jti || !decoded?.role) {
+  if (!decoded?.userId || !decoded?.role) {
     throwError(
       HTTP_STATUS.UNAUTHORIZED,
       ERROR_CODES.UNAUTHORIZED_ACCESS,
@@ -58,29 +59,32 @@ const authenticate = expressAsyncHandler(async (req, _res, next) => {
     );
   }
 
-  if (
-    !account.refreshToken?.hashedRefreshToken ||
-    !account.refreshToken?.jti
-  ) {
-    throwError(
-      HTTP_STATUS.UNAUTHORIZED,
-      ERROR_CODES.UNAUTHORIZED_ACCESS,
-      "Session expired"
-    );
-  }
+  // If a refresh token is used as session credential, check refresh token validity against stored hash
+  if (decoded.type === "refresh") {
+    if (
+      !account.refreshToken?.hashedRefreshToken ||
+      !account.refreshToken?.jti
+    ) {
+      throwError(
+        HTTP_STATUS.UNAUTHORIZED,
+        ERROR_CODES.UNAUTHORIZED_ACCESS,
+        "Session expired"
+      );
+    }
 
-  const hashedToken = await hashToken(token);
+    const hashedToken = await hashToken(token);
 
-  const isValidSession =
-    account.refreshToken.jti === decoded.jti &&
-    account.refreshToken.hashedRefreshToken === hashedToken;
+    const isValidSession =
+      account.refreshToken.jti === decoded.jti &&
+      account.refreshToken.hashedRefreshToken === hashedToken;
 
-  if (!isValidSession) {
-    throwError(
-      HTTP_STATUS.UNAUTHORIZED,
-      ERROR_CODES.UNAUTHORIZED_ACCESS,
-      "Invalid session"
-    );
+    if (!isValidSession) {
+      throwError(
+        HTTP_STATUS.UNAUTHORIZED,
+        ERROR_CODES.UNAUTHORIZED_ACCESS,
+        "Invalid session"
+      );
+    }
   }
 
   req.user = {
@@ -88,6 +92,7 @@ const authenticate = expressAsyncHandler(async (req, _res, next) => {
     email: account.email,
     role: decoded.role,
   };
+  req.userId = account._id;
 
   next();
 });
