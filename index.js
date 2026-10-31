@@ -199,14 +199,14 @@ let io = require('socket.io')(server, {
 });
 
 // Optional Authentication Middleware
-io.use((socket, next) => {
+io.use(async (socket, next) => {
     const token = socket.handshake.auth.token;
 
     if (token) {
         try {
             // Verify JWT token
 
-            const decoded = verifyRefreshToken(token);
+            const decoded = await verifyRefreshToken(token);
             socket.userId = decoded.userId || decoded.id;
             socket.isAuthenticated = true;
             console.log(` Authenticated user connected: ${socket.userId} (Socket: ${socket.id})`);

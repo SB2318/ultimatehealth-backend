@@ -207,7 +207,7 @@ const getBrowser = async () => {
     return browser;
 };
 
-const getUserFromToken = (req) => {
+const getUserFromToken = async (req) => {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -215,7 +215,7 @@ const getUserFromToken = (req) => {
     }
 
     const token = authHeader.split(" ")[1];
-    return verifyAnyToken(token);
+    return await verifyAnyToken(token);
 };
 
 // upload file
@@ -377,7 +377,7 @@ const uploadAgreementPDF = expressAsyncHandler(
             let admin = null;
             let decoded = null;
             try {
-                decoded = getUserFromToken(req);
+                decoded = await getUserFromToken(req);
                 if (decoded && decoded.email) {
                     admin = await adminModel.findOne({ email: decoded.email });
                 }

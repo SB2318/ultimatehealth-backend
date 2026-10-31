@@ -48,7 +48,7 @@ module.exports.add = async (req, res) => {
       doctor_ids,
       contributed_by,
     });
-    const saveSpecialization = newSpecialization.save();
+    const saveSpecialization = await newSpecialization.save();
     if (!saveSpecialization) {
       return res.status(400).json({ error: "Failed to save Specialization" });
     }

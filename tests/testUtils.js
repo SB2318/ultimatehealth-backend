@@ -32,19 +32,23 @@ const createTestAdmin = async (overrides = {}) => {
   return admin;
 };
 
-const getAuthTokensForUser = (user) => {
-  const payload = { userId: user._id, role: 'user' };
+const getAuthTokensForUser = async (user) => {
+  const payload = { userId: user._id, role: user.isDoctor ? 'doctor' : 'user' };
+  const { accessToken } = generateAccessToken(payload, '15m');
+  const { refreshToken } = await generateRefreshToken(user._id, { role: payload.role }, '7d');
   return {
-    accessToken: generateAccessToken(payload, '15m'),
-    refreshToken: generateRefreshToken(payload, '7d')
+    accessToken,
+    refreshToken,
   };
 };
 
-const getAuthTokensForAdmin = (admin) => {
+const getAuthTokensForAdmin = async (admin) => {
   const payload = { userId: admin._id, role: 'admin' };
+  const { accessToken } = generateAccessToken(payload, '15m');
+  const { refreshToken } = await generateRefreshToken(admin._id, { role: 'admin' }, '7d');
   return {
-    accessToken: generateAccessToken(payload, '15m'),
-    refreshToken: generateRefreshToken(payload, '7d')
+    accessToken,
+    refreshToken,
   };
 };
 

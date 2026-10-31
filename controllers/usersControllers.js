@@ -1060,7 +1060,7 @@ module.exports.getSocials = expressAsyncHandler(async (req, res) => {
       );
     }
 
-    sendSuccess(
+    return sendSuccess(
       res,
       HTTP_STATUS.OK,
       "Article contributors fetched successfully",
@@ -1069,7 +1069,7 @@ module.exports.getSocials = expressAsyncHandler(async (req, res) => {
   }
   let id = social_user_id ? social_user_id : req.userId;
 
-  const author = getUserSocialData(id);
+  const author = await getUserSocialData(id);
   if (!author) {
     throwError(
       HTTP_STATUS.NOT_FOUND,
