@@ -458,13 +458,13 @@ module.exports.login = expressAsyncHandler(async (req, res) => {
   const { accessToken } = generateAccessToken({
     userId: user._id,
     email: user.email,
-    role: "user",
+    role: user.isDoctor ? "doctor" : "user",
     tokenVersion: parseInt(tokenVersion, 10),
   });
 
   //  Generate Refresh Token (RS256 with Redis JTI storage)
   const { refreshToken } = await generateRefreshToken(user._id, {
-    role: "user",
+    role: user.isDoctor ? "doctor" : "user",
     email: user.email,
   });
 

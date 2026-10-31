@@ -120,9 +120,9 @@ module.exports.register = expressAsyncHandler(async (req, res) => {
 
   // Generate refresh token and attach to user
   const { refreshToken, jti } = await generateRefreshToken(
+    newUser._id,
     {
-      userId: newUser._id,
-      role: newUser.isDoctor ? "doctor" : "user",
+      role: newUser.isDoctor ? ROLES.DOCTOR : ROLES.USER,
     },
     "7d",
   );
@@ -231,9 +231,9 @@ module.exports.login = expressAsyncHandler(async (req, res) => {
   }
 
   const { refreshToken, jti } = await generateRefreshToken(
+    user._id,
     {
-      userId: user._id,
-      role: user.isDoctor ? "doctor" : "user",
+      role: user.isDoctor ? ROLES.DOCTOR : ROLES.USER,
     },
     "7d",
   );
@@ -341,10 +341,13 @@ module.exports.googleAuth = expressAsyncHandler(async (req, res) => {
       await logoutUser(existingVerifiedUser._id);
     }
 
-    const { refreshToken, jti } = await generateRefreshToken({
-      userId: existingVerifiedUser._id,
-      role: existingVerifiedUser.isDoctor ? ROLES.DOCTOR : ROLES.USER,
-    }, "7d");
+    const { refreshToken, jti } = await generateRefreshToken(
+      existingVerifiedUser._id,
+      {
+        role: existingVerifiedUser.isDoctor ? ROLES.DOCTOR : ROLES.USER,
+      },
+      "7d",
+    );
 
     await loginUser(existingVerifiedUser._id, refreshToken, jti, fcmToken ?? null);
 
@@ -455,10 +458,13 @@ module.exports.googleAuth = expressAsyncHandler(async (req, res) => {
     console.error("[GoogleAuth] Firebase user sync error:", fbErr.message);
   }
 
-  const { refreshToken, jti } = await generateRefreshToken({
-    userId: newUser._id,
-    role: newUser.isDoctor ? ROLES.DOCTOR : ROLES.USER,
-  }, "7d");
+  const { refreshToken, jti } = await generateRefreshToken(
+    newUser._id,
+    {
+      role: newUser.isDoctor ? ROLES.DOCTOR : ROLES.USER,
+    },
+    "7d",
+  );
 
   await loginUser(newUser._id, refreshToken, jti, fcmToken ?? null);
 
@@ -1480,9 +1486,22 @@ module.exports.getTokenStatus = expressAsyncHandler(async (req, res) => {
   try {
     const decoded = await verifyAnyToken(token);
 
+    if (!decoded?.userId || !decoded?.role) {
+      return res.status(200).json({
+        isValid: false,
+        message: "Invalid token: missing userId or role",
+      });
+    }
+
     if (decoded.role === "admin" || decoded.isSuperAdmin) {
       const admin = await findAdminById(decoded.userId).catch(() => null);
-      if (admin && admin.isBlocked) {
+      if (!admin) {
+        return res.status(200).json({
+          isValid: false,
+          message: "Admin account not found",
+        });
+      }
+      if (admin.isBlocked) {
         return res.status(200).json({
           isValid: false,
           message: "Admin account has been blocked by Super Admin",
@@ -1495,28 +1514,35 @@ module.exports.getTokenStatus = expressAsyncHandler(async (req, res) => {
         tokenType: decoded.type || "refresh",
         expiresAt: decoded.exp ? new Date(decoded.exp * 1000).toISOString() : null,
         user: {
-          userId: admin?._id || decoded.userId,
-          email: admin?.email || decoded.email,
-          user_name: admin?.user_name || decoded.user_name || "Admin",
-          user_handle: admin?.user_handle || decoded.user_handle || "admin",
-          role: admin?.role || (decoded.isSuperAdmin ? "Super Admin" : decoded.role || "admin"),
-          isSuperAdmin: Boolean(admin?.isSuperAdmin || decoded.isSuperAdmin),
+          userId: admin._id,
+          email: admin.email,
+          user_name: admin.user_name || "Admin",
+          user_handle: admin.user_handle || "admin",
+          role: admin.role || (decoded.isSuperAdmin ? "Super Admin" : decoded.role),
+          isSuperAdmin: Boolean(admin.isSuperAdmin || decoded.isSuperAdmin),
         },
       });
     }
 
     const user = await findUserById(decoded.userId).catch(() => null);
+    if (!user || user.isBlockUser || user.isBannedUser) {
+      return res.status(200).json({
+        isValid: false,
+        message: !user ? "User account not found" : "User account is restricted",
+      });
+    }
+
     return res.status(200).json({
       isValid: true,
       message: "Token is valid",
-      tokenType: decoded.type || "access",
+      tokenType: decoded.type || "refresh",
       expiresAt: decoded.exp ? new Date(decoded.exp * 1000).toISOString() : null,
       user: {
-        userId: user?._id || decoded.userId,
-        email: user?.email || decoded.email,
-        user_name: user?.user_name || decoded.user_name,
-        user_handle: user?.user_handle || decoded.user_handle,
-        role: decoded.role || "user",
+        userId: user._id,
+        email: user.email,
+        user_name: user.user_name,
+        user_handle: user.user_handle,
+        role: decoded.role,
         isSuperAdmin: false,
       },
     });

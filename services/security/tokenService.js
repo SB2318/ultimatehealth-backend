@@ -67,14 +67,39 @@ const generateAccessToken = (payload, expiresIn) => {
     return { accessToken, jti };
 };
 
-const generateRefreshToken = async (userId, payload = {}, expiresIn) => {
+const generateRefreshToken = async (userIdOrPayload, payloadOrExpiresIn = {}, maybeExpiresIn) => {
     const { key, algorithm } = getSignSecret("refresh");
-    const expiry = expiresIn || process.env.JWT_REFRESH_EXPIRY || "7d";
+    let resolvedUserId;
+    let resolvedPayload = {};
+    let resolvedExpiry;
+
+    if (
+        userIdOrPayload &&
+        typeof userIdOrPayload === "object" &&
+        !userIdOrPayload._bsontype &&
+        typeof userIdOrPayload.toHexString !== "function" &&
+        ("userId" in userIdOrPayload || "role" in userIdOrPayload)
+    ) {
+        resolvedPayload = userIdOrPayload;
+        resolvedUserId = userIdOrPayload.userId;
+        resolvedExpiry = typeof payloadOrExpiresIn === "string" ? payloadOrExpiresIn : maybeExpiresIn;
+    } else {
+        resolvedUserId = userIdOrPayload;
+        if (typeof payloadOrExpiresIn === "string") {
+            resolvedExpiry = payloadOrExpiresIn;
+        } else if (payloadOrExpiresIn && typeof payloadOrExpiresIn === "object") {
+            resolvedPayload = payloadOrExpiresIn;
+            resolvedExpiry = maybeExpiresIn;
+        }
+    }
+
+    const expiry = resolvedExpiry || process.env.JWT_REFRESH_EXPIRY || "7d";
     const jti = generateJti();
+    const finalUserId = String(resolvedUserId || resolvedPayload.userId || "");
 
     const refreshTokenPayload = {
-        ...payload,
-        userId: userId || payload.userId,
+        ...resolvedPayload,
+        userId: finalUserId,
         type: "refresh",
         jti,
     };
@@ -87,7 +112,7 @@ const generateRefreshToken = async (userId, payload = {}, expiresIn) => {
 
     const ttlSeconds = 7 * 24 * 60 * 60;
     try {
-        await redis.setex(`refresh_token:${userId || payload.userId}:${jti}`, ttlSeconds, "active");
+        await redis.setex(`refresh_token:${finalUserId}:${jti}`, ttlSeconds, "active");
     } catch (e) {
         console.warn("⚠️ Redis unavailable, skipping refresh token storage");
     }
@@ -185,6 +210,16 @@ const verifyRefreshToken = async (token) => {
 
         if (!decoded || decoded.type !== "refresh") {
             throwError(HTTP_STATUS.UNAUTHORIZED, ERROR_CODES.UNAUTHORIZED_ACCESS, 'Invalid token type');
+        }
+
+        // Normalize payload if generated with nested { userId: { userId, role } }
+        if (decoded.userId && typeof decoded.userId === "object") {
+            if (!decoded.role && decoded.userId.role) {
+                decoded.role = decoded.userId.role;
+            }
+            if (decoded.userId.userId) {
+                decoded.userId = String(decoded.userId.userId);
+            }
         }
 
         try {
