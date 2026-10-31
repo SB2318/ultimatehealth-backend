@@ -148,7 +148,9 @@ const getRelatedArticles = async (articleId, limit = 10, excludeIds = []) => {
     orConditions.push({ tags: { $in: targetTags } });
   }
   if (searchKeywords) {
-    orConditions.push({ $text: { $search: searchKeywords } });
+    const keywords = (searchKeywords || "").split(/\s+/).filter(w => w.length > 2).slice(0, 5);
+    const escapedKeywords = keywords.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+    orConditions.push({ title: { $regex: escapedKeywords || searchKeywords, $options: 'i' } });
   }
 
   const matchFilter = orConditions.length > 0
@@ -162,7 +164,7 @@ const getRelatedArticles = async (articleId, limit = 10, excludeIds = []) => {
         tagOverlapCount: targetTags.length > 0
           ? { $size: { $setIntersection: ["$tags", targetTags] } }
           : 0,
-        textScore: searchKeywords ? { $meta: "textScore" } : 0,
+        textScore: searchKeywords ? 1.0 : 0,
         engagementBoost: {
           $ln: {
             $add: [

@@ -1427,9 +1427,17 @@ module.exports.searchArticles = expressAsyncHandler(
       const escapedQuery = q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const regex = new RegExp(escapedQuery, 'i');
 
-      // Also match any article tag names
-      const matchingTags = await ArticleTag.find({ name: regex }).select('_id').lean().exec();
+      // Also match any article tag names or author usernames/handles
+      const [matchingTags, matchingAuthors] = await Promise.all([
+        ArticleTag.find({ name: regex }).select('_id').lean().exec(),
+        User.find({
+          isBlockUser: false,
+          isBannedUser: false,
+          $or: [{ user_name: regex }, { user_handle: regex }]
+        }).select('_id').lean().exec()
+      ]);
       const tagIds = matchingTags.map((t) => t._id);
+      const authorIds = matchingAuthors.map((u) => u._id);
 
       const orConditions = [
         { title: regex },
@@ -1440,6 +1448,9 @@ module.exports.searchArticles = expressAsyncHandler(
 
       if (tagIds.length > 0) {
         orConditions.push({ tags: { $in: tagIds } });
+      }
+      if (authorIds.length > 0) {
+        orConditions.push({ authorId: { $in: authorIds } });
       }
 
       const query = {
@@ -1456,6 +1467,22 @@ module.exports.searchArticles = expressAsyncHandler(
       let articles = await Article.find(query)
         .populate('tags')
         .populate({
+          path: 'mentionedUsers',
+          select: 'user_handle user_name Profile_image',
+          match: {
+            isBlockUser: false,
+            isBannedUser: false
+          }
+        })
+        .populate({
+          path: 'likedUsers',
+          select: 'Profile_image user_name user_handle',
+          match: {
+            isBlockUser: false,
+            isBannedUser: false
+          }
+        })
+        .populate({
           path: 'authorId',
           select: 'Profile_image user_name user_handle',
           match: {
@@ -1470,6 +1497,15 @@ module.exports.searchArticles = expressAsyncHandler(
         .exec();
 
       articles = articles.filter((r) => r.authorId !== null);
+
+      for (const article of articles) {
+        if (Array.isArray(article.mentionedUsers)) {
+          article.mentionedUsers = article.mentionedUsers.filter((u) => u !== null);
+        }
+        if (Array.isArray(article.likedUsers)) {
+          article.likedUsers = article.likedUsers.filter((u) => u !== null).reverse();
+        }
+      }
 
       const total = await Article.countDocuments(query);
       const totalPages = Math.ceil(total / limitNum);

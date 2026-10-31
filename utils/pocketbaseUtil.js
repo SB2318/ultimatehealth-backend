@@ -12,7 +12,7 @@ const getHTMLFileContent = async (collectionName, recordId) => {
             const fileName = collectionName === 'content' ? record.html_file : record.edited_html_file;
 
             // In PocketBase JS SDK v0.23+, getUrl is preferred over getURL
-            const htmlFileUrl = pb.files.getUrl ? pb.files.getUrl(record, fileName) : pb.files.getURL(record, fileName);
+            const htmlFileUrl = pb.files.getURL ? pb.files.getURL(record, fileName) : pb.files.getUrl(record, fileName);
             const response = await fetch(htmlFileUrl);
             const htmlContent = await response.text();
 

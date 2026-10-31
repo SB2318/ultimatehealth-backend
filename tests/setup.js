@@ -48,7 +48,7 @@ beforeAll(async () => {
   process.env.NODE_ENV = 'test';
 
   await mongoose.connect(mongoUri);
-});
+}, 30000); // increased timeout for MongoMemoryServer startup
 
 afterAll(async () => {
   if (mongoose.connection) {
@@ -58,7 +58,7 @@ afterAll(async () => {
   if (mongoServer) {
     await mongoServer.stop();
   }
-});
+}, 30000); // increased timeout for MongoMemoryServer teardown
 
 afterEach(async () => {
   const collections = mongoose.connection.collections;
@@ -66,4 +66,4 @@ afterEach(async () => {
     const collection = collections[key];
     await collection.deleteMany();
   }
-});
+}, 15000); // increased timeout for collection cleanup

@@ -1047,7 +1047,7 @@ const publishImprovementFileFromPocketbase = expressAsyncHandler(
             }
 
 
-            const fileUrl = pb.files.getUrl(improvementRecord, improvementRecord.edited_html_file, { download: true });
+            const fileUrl = pb.files.getURL(improvementRecord, improvementRecord.edited_html_file, { download: true });
             const response = await axios.get(fileUrl, { responseType: 'stream' });
 
             const writer = fs.createWriteStream(tempFilePath);

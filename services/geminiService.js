@@ -15,7 +15,7 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { geminiBreaker } = require("../utils/circuitBreaker");
 
 async function generateWithKeyRotation({
-    model = "gemini-2.5-flash",
+    model = process.env.GEMINI_MODEL || "gemini-1.5-flash",
     systemInstruction,
     history = [],
     message,
