@@ -133,8 +133,25 @@ module.exports.createArticle = expressAsyncHandler(
       });
 
       newArticle.mentionedUsers.push(user._id); // Initially all can mention the author.
-      // Save the new article to the database
-      await newArticle.save();
+      // Save the new article to the database (with auto-resync for sequence counter)
+      try {
+        await newArticle.save();
+      } catch (saveError) {
+        if (saveError && saveError.code === 11000 && saveError.keyPattern && saveError.keyPattern._id) {
+          console.warn('Auto-increment sequence out-of-sync detected. Resyncing article_id_counter...');
+          const maxArticle = await Article.findOne({}, { _id: 1 }).sort({ _id: -1 });
+          const maxId = maxArticle && typeof maxArticle._id === 'number' ? maxArticle._id : 0;
+          await mongoose.connection.db.collection('counters').updateOne(
+            { id: 'article_id_counter' },
+            { $set: { seq: maxId } }
+          );
+          newArticle._id = undefined;
+          newArticle.isNew = true;
+          await newArticle.save();
+        } else {
+          throw saveError;
+        }
+      }
 
       // Update the user's articles field
       user.articles.push(newArticle._id);
