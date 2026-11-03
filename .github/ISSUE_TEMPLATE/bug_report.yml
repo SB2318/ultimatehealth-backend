@@ -3,6 +3,20 @@ description: File a bug report
 title: "🐞[Bug]: "
 labels: 'bug'
 body:
+  - type: dropdown
+    id: related-area
+    attributes:
+      label: Related Area
+      description: Select the area related to this issue
+      options:
+        - Frontend
+        - Backend
+        - Mobile
+        - Testing
+        - CI/CD
+        - Other
+    validations:
+      required: true
   - type: checkboxes
     id: existing-issue
     attributes:
@@ -48,6 +62,9 @@ body:
       options:
         - label: "I have read the Contributing Guidelines"
           required: true
-          
+        - label: "I am an open-source community contributor"
+          required: false
+        - label: "I'm an IEEE IGDTUW contributor"
+          required: false
         - label: "I want to work on this issue"
           required: false

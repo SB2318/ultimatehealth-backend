@@ -1,0 +1,146 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# 🧑‍🏫 Mentors & Reviewers Automation Bot
+# ──────────────────────────────────────────────────────────────────────────────
+#
+# DESCRIPTION:
+#   Manages reviewer and maintainer involvement across issues and PRs.
+#   It has two jobs: one that tags issues created by mentors/leads, and another
+#   that automatically assigns the right reviewer to PRs linked to those issues.
+#
+# HOW IT WORKS:
+#
+#   JOB 1 — issue-automation (fires on: issues opened):
+#     1. Checks if the issue creator is in the MENTORS / LEADS list (SB2318).
+#     2. If yes, adds label: "mentor:<username>" to the issue.
+#     3. This marks the issue for downstream review assignment by Job 2.
+#
+#   JOB 2 — pr-automation (fires on: pull_request_target to main or web):
+#     1. Scans the PR body for issue-closing keywords (fixes/closes/resolves #N).
+#     2. For each linked issue, reads its labels to find "mentor:<username>" tags.
+#     3. For each matched mentor/lead:
+#          a. Assigns them as a PR assignee.
+#          b. Requests them as a PR reviewer.
+#          c. Adds "mentor:<username>" label to the PR.
+#          d. Posts a comment mentioning the reviewer(s) and listing a pre-review
+#             checklist for the contributor (linting, types, design, testing).
+#
+# TRIGGERS:
+#   - Automatic : Issue opened (Job 1).
+#   - Automatic : PR opened, edited, reopened, or synchronized on main/web branch (Job 2).
+#
+# MENTOR / LEAD LIST:
+#   - SB2318
+# ──────────────────────────────────────────────────────────────────────────────
+
+name: Mentors & Reviewers Automation
+
+on:
+  issues:
+    types: [opened]
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize]
+    branches:
+      - main
+      - web
+
+jobs:
+  issue-automation:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'issues'
+    permissions:
+      issues: write
+    steps:
+      - name: Add labels for Mentors
+        uses: actions/github-script@v9
+        with:
+          script: |
+            // ADD ALL MENTOR / LEAD GITHUB USERNAMES HERE
+            const MENTORS = ['SB2318']; 
+            
+            const creator = context.payload.issue.user.login;
+            
+            if (MENTORS.includes(creator)) {
+              await github.rest.issues.addLabels({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: [`mentor:${creator}`]
+              });
+            }
+
+  pr-automation:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request_target'
+    permissions:
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Assign Mentor to PR
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const prBody = context.payload.pull_request.body || '';
+            const issueRegex = /(?:fix|fixes|fixed|resolve|resolves|resolved|close|closes|closed)\s+#(\d+)/ig;
+            let match;
+            let mentorsToAssign = new Set();
+            
+            while ((match = issueRegex.exec(prBody)) !== null) {
+              const issueNumber = parseInt(match[1], 10);
+              try {
+                const { data: issue } = await github.rest.issues.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber
+                });
+                
+                // Extract dynamic mentor usernames from 'mentor:<username>' labels
+                issue.labels.forEach(label => {
+                  const labelName = typeof label === 'string' ? label : label.name;
+                  if (labelName.startsWith('mentor:')) {
+                    const mentorName = labelName.split('mentor:')[1].trim();
+                    if (mentorName) {
+                      mentorsToAssign.add(mentorName);
+                    }
+                  }
+                });
+              } catch (err) {
+                console.log(`Could not fetch issue #${issueNumber}`);
+              }
+            }
+            
+            if (mentorsToAssign.size > 0) {
+              const mentorsArray = Array.from(mentorsToAssign);
+              
+              await github.rest.issues.addAssignees({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                assignees: mentorsArray
+              });
+              
+              await github.rest.pulls.requestReviewers({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.pull_request.number,
+                reviewers: mentorsArray
+              });
+              
+              const mentorLabels = mentorsArray.map(m => `mentor:${m}`);
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                labels: mentorLabels
+              });
+              
+              const mentorsMentions = mentorsArray.map(m => `@${m}`).join(', ');
+              
+              const commentBody = `Hello @${context.payload.pull_request.user.login} 👋! Thanks for your contribution to UltimateHealth.\n\nYour reviewer(s) **${mentorsMentions}** have been automatically assigned to review your PR. While you wait, please go through these **initial review points** to speed up the process:\n\n- [ ] **Clean Code & Linting**: Have you run \`yarn lint\` and resolved all errors?\n- [ ] **Type Safety**: Have you run \`yarn typecheck\` to ensure there are no TypeScript errors and avoided \`any\` types where possible?\n- [ ] **Design Alignment**: Does your implementation follow the UltimateHealth design system without hardcoding pure black/white hex values?\n- [ ] **Testing**: Have you tested your changes thoroughly on desktop and mobile web browsers to ensure responsiveness?\n\n${mentorsMentions} will get back to you with a detailed review soon!`;
+              
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: commentBody
+              });
+            }
