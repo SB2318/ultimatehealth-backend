@@ -141,6 +141,24 @@ const aiPlanLimiter = rateLimit({
 });
 
 /**
+ * AI chat messaging limiter (HIPAA DoS / brute-force protection)
+ */
+const aiChatLimiter = rateLimit({
+  ...baseConfig,
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 30, // max 30 chat messages per 15 mins per user
+  handler: (req, res) => {
+    res.status(429).json({
+      success: false,
+      error: {
+        code: 'RATE_LIMITED',
+        message: 'Too many chat messages sent. Please wait a few minutes before continuing.',
+      },
+    });
+  },
+});
+
+/**
  * download/report generation
  */
 const heavyOperationLimiter = rateLimit({
@@ -161,4 +179,5 @@ module.exports = {
   uploadLimiter,
   heavyOperationLimiter,
   aiPlanLimiter,
+  aiChatLimiter,
 };

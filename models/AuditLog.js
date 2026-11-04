@@ -29,13 +29,17 @@ const auditLogSchema = new mongoose.Schema({
             'CREATE_NOTE',
             'VIEW_NOTES',
             'EXPORT_DATA',
-            'BREAK_GLASS_ACCESS'
+            'BREAK_GLASS_ACCESS',
+            'CHAT_QUERY',
+            'VIEW_CHAT_HISTORY',
+            'DELETE_CHAT_HISTORY',
+            'EXPORT_CHAT_HISTORY'
         ],
         required: true
     },
     resourceType: {
         type: String,
-        enum: ['WellnessLog', 'CareTeam', 'CareInteraction', 'UserProfile'],
+        enum: ['WellnessLog', 'CareTeam', 'CareInteraction', 'UserProfile', 'Conversation', 'Message', 'AIChat'],
         required: true
     },
     resourceId: {
