@@ -1,6 +1,14 @@
 const express = require("express");
 const authToken = require("../middleware/authentcatetoken");
-const { logMetrics, getWeeklyMetrics, generateAIPlan, getLatestPlan, getPlanHistory } = require("../controllers/wellnessController");
+const {
+    logMetrics,
+    getWeeklyMetrics,
+    getPatientLogsForDoctor,
+    exportHealthData,
+    generateAIPlan,
+    getLatestPlan,
+    getPlanHistory
+} = require("../controllers/wellnessController");
 const { aiPlanLimiter } = require("../middleware/ratelimit");
 
 const router = express.Router();
@@ -32,6 +40,11 @@ const router = express.Router();
  *               type: number
  *             breathingSessionMinutes:
  *               type: number
+ *         sharedWithCareTeam:
+ *           type: boolean
+ *         sharedAt:
+ *           type: string
+ *           format: date-time
  *         createdAt:
  *           type: string
  *           format: date-time
@@ -66,7 +79,7 @@ const router = express.Router();
  * @swagger
  * /wellness/log:
  *   post:
- *     summary: Log or update daily wellness metrics
+ *     summary: Log or update daily wellness metrics with HIPAA sharing consent
  *     tags: [Wellness]
  *     security:
  *       - bearerAuth: []
@@ -82,6 +95,9 @@ const router = express.Router();
  *               date:
  *                 type: string
  *                 example: "2026-07-08"
+ *               sharedWithCareTeam:
+ *                 type: boolean
+ *                 example: true
  *               metrics:
  *                 type: object
  *                 properties:
@@ -138,6 +154,42 @@ router.post("/log", authToken, logMetrics);
  *                     $ref: '#/components/schemas/WellnessLog'
  */
 router.get("/weekly", authToken, getWeeklyMetrics);
+
+/**
+ * @swagger
+ * /wellness/patient/{patientId}:
+ *   get:
+ *     summary: View shared personal health logs for an assigned patient (Doctor role with active consent)
+ *     tags: [Wellness]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: patientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Shared patient logs retrieved with audit logging
+ *       403:
+ *         description: Forbidden - active consent or care team assignment required
+ */
+router.get("/patient/:patientId", authToken, getPatientLogsForDoctor);
+
+/**
+ * @swagger
+ * /wellness/export:
+ *   get:
+ *     summary: HIPAA Right of Access (§ 164.524) patient record export
+ *     tags: [Wellness]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Machine-readable export of patient health records, logs, and clinical interactions
+ */
+router.get("/export", authToken, exportHealthData);
 
 /**
  * @swagger

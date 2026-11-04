@@ -21,6 +21,7 @@ const analyticsRoute = require('./routes/analyticsRoute');
 const uploadRoute = require('./routes/uploadRoute');
 const glossaryRoutes = require('./routes/glossaryRoutes');
 const wellnessRoutes = require('./routes/wellnessRoute');
+const careTeamRoutes = require('./routes/careTeamRoutes');
 require('./controllers/commentController');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
@@ -60,6 +61,7 @@ app.use("/api", uploadRoute);
 app.use("/api/analytics", analyticsRoute);
 app.use("/api/glossary", glossaryRoutes);
 app.use("/api/wellness", wellnessRoutes);
+app.use("/api/care-team", careTeamRoutes);
 
 // Swagger
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));

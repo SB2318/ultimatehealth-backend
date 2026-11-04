@@ -50,6 +50,7 @@ const shareRoute = require('./routes/shareRoute');
 const contactRoutes = require('./routes/contactRoutes');
 const newsletterRoutes = require('./routes/newsletterRoutes');
 const wellnessRoutes = require('./routes/wellnessRoute');
+const careTeamRoutes = require('./routes/careTeamRoutes');
 const { publishSocialNotificationEvent, publishBroadcastNotificationEvent, NOTIFICATION_EVENT_TYPES } = require('./services/mqueue/producers/notificationProducer');
 const {verifyRefreshToken } = require("./services/security/tokenService");
 const swaggerUi = require('swagger-ui-express');
@@ -139,6 +140,7 @@ app.use("/api", shareRoute );
 app.use("/api", contactRoutes);
 app.use("/api", newsletterRoutes);
 app.use("/api/wellness", wellnessRoutes);
+app.use("/api/care-team", careTeamRoutes);
 
 // Swagger
 //app.use('/docs/swagger.json', express.static('./swagger.json'));

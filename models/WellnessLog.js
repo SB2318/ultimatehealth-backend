@@ -8,7 +8,7 @@ const wellnessLogSchema = new mongoose.Schema({
         required: true,
     },
     date: {
-        type: String, // Format: YYYY-MM-DD
+        type: String,
         required: true,
     },
     metrics: {
@@ -37,6 +37,15 @@ const wellnessLogSchema = new mongoose.Schema({
             default: 0
         }
     },
+    sharedWithCareTeam: {
+        type: Boolean,
+        default: false,
+        index: true
+    },
+    sharedAt: {
+        type: Date,
+        default: null
+    },
     createdAt: {
         type: Date,
         default: Date.now
@@ -47,12 +56,14 @@ const wellnessLogSchema = new mongoose.Schema({
     }
 });
 
-// Ensure only one log per user per day
 wellnessLogSchema.index({ userId: 1, date: 1 }, { unique: true });
+wellnessLogSchema.index({ userId: 1, sharedWithCareTeam: 1, date: -1 });
 
-// Update timestamp before saving
-wellnessLogSchema.pre('save', function(next) {
+wellnessLogSchema.pre('save', function (next) {
     this.updatedAt = Date.now();
+    if (this.isModified('sharedWithCareTeam') && this.sharedWithCareTeam && !this.sharedAt) {
+        this.sharedAt = Date.now();
+    }
     next();
 });
 
