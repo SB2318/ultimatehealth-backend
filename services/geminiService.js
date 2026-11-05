@@ -104,14 +104,14 @@ async function invokeGeminiWithKey({ apiKey, model, systemInstruction, history, 
  * - Fallback Tier 2: 5 Free Keys automatically engaged if Tier 1 is exhausted or fails.
  *
  * @param {Object} options
- * @param {string} options.model - Gemini model name (default: gemini-1.5-flash)
+ * @param {string} options.model - Gemini model name (default: gemini-3.5-flash)
  * @param {string} options.systemInstruction - System prompt for the model
  * @param {Array} options.history - Prior chat turns in Gemini's { role, parts } shape
  * @param {string} options.message - The message to send for this turn
  * @returns {Promise<string>} The model's text response
  */
 async function generateWithKeyRotation({
-    model = process.env.GEMINI_MODEL || "gemini-1.5-flash",
+    model = process.env.GEMINI_MODEL || "gemini-3.5-flash",
     systemInstruction,
     history = [],
     message,
