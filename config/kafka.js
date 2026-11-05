@@ -1,11 +1,26 @@
 const { Kafka } = require('kafkajs');
 
 // Create a Kafka client instance with the specified configuration
-const kafkaBrokers = process.env.KAFKA_BROKERS ? process.env.KAFKA_BROKERS.split(',') : ['kafka1:9092', 'kafka2:9092', 'kafka3:9092'];
+const parseBrokers = () => {
+  if (process.env.KAFKA_BROKERS) {
+    return process.env.KAFKA_BROKERS.split(',').map(b => b.trim()).filter(Boolean);
+  }
+  return ['kafka1:9092'];
+};
+
+const kafkaBrokers = parseBrokers();
 
 const kafkaClient = new Kafka({
   clientId: 'ultimatehealth-backend',
-  brokers: kafkaBrokers // Apache Kafka cluster
+  brokers: kafkaBrokers, // Apache Kafka cluster
+  retry: {
+    retries: 8,
+    initialRetryTime: 1000,
+    maxRetryTime: 30000,
+    factor: 2
+  },
+  connectionTimeout: 10000,
+  requestTimeout: 30000
 });
 
 const globalProducer = kafkaClient.producer({
