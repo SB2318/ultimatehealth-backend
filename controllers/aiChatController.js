@@ -14,7 +14,7 @@ dotenv.config();
 const PPLX_URL = "https://api.perplexity.ai/chat/completions";
 const MODEL = "sonar-pro";
 
-const MAX_DAY_LIMIT = parseInt(process.env.AI_MAX_DAILY_MESSAGES || "50", 10);
+const MAX_DAY_LIMIT = parseInt(process.env.AI_MAX_DAILY_MESSAGES || "5", 10);
 
 // HIPAA Compliance Statements & Clinical Safety Disclaimers (45 CFR § 164.530 & Clinical Decision Support)
 const HIPAA_CLINICAL_DISCLAIMER = "UltimateHealth AI provides educational health and wellness guidance only. It does not provide medical diagnosis, treatment, or clinical prescriptions. Always consult a licensed healthcare professional for clinical decisions. In an emergency, dial 911 or visit the nearest emergency department immediately.";
@@ -69,7 +69,10 @@ const startConversation = expressAsyncHandler(
             const messages = await Message.find({
                 conversationId: conversationId,
                 role: 'model',
-                createdAt: { $gte: startOfDay, $lte: endOfDay }
+                $or: [
+                    { timestamp: { $gte: startOfDay.getTime(), $lte: endOfDay.getTime() } },
+                    { createdAt: { $gte: startOfDay, $lte: endOfDay } }
+                ]
             });
 
             if (messages.length >= MAX_DAY_LIMIT) {
@@ -237,7 +240,10 @@ const startPPLXConversation = expressAsyncHandler(async (req, res) => {
         const modelMessagesToday = await Message.find({
             conversationId,
             role: "model",
-            createdAt: { $gte: startOfDay, $lte: endOfDay }
+            $or: [
+                { timestamp: { $gte: startOfDay.getTime(), $lte: endOfDay.getTime() } },
+                { createdAt: { $gte: startOfDay, $lte: endOfDay } }
+            ]
         });
 
         if (modelMessagesToday.length >= MAX_DAY_LIMIT) {
