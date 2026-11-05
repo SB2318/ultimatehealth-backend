@@ -108,12 +108,17 @@ Using the clinical rules provided in your system instructions, generate a person
 }
 
 function parsePlanResponse(rawText) {
-    const cleaned = rawText
-        .trim()
-        .replace(/^```json\s*/i, '')
-        .replace(/^```\s*/i, '')
-        .replace(/```$/, '')
-        .trim();
+    if (!rawText || typeof rawText !== 'string') {
+        throw new Error("Empty raw response from AI.");
+    }
+    let cleaned = rawText.trim();
+    cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace >= firstBrace) {
+        cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+    }
 
     const parsed = JSON.parse(cleaned);
 
@@ -122,6 +127,59 @@ function parsePlanResponse(rawText) {
     }
 
     return parsed;
+}
+
+function getDeterministicFallbackPlan(logs) {
+    let steps = 6000;
+    let activeMinutes = 20;
+    let sleepHours = 7.5;
+    let waterMl = 2200;
+    let caloriesBurned = 250;
+    let breathingMinutes = 10;
+
+    if (logs && logs.length > 0) {
+        const totals = logs.reduce((acc, log) => {
+            const m = log.metrics || {};
+            acc.steps += m.steps || 0;
+            acc.activeMinutes += m.activeMinutes || 0;
+            acc.sleepHours += m.sleepHours || 0;
+            acc.waterMl += m.waterMl || 0;
+            acc.caloriesBurned += m.caloriesBurned || 0;
+            acc.breathingMinutes += m.breathingSessionMinutes || 0;
+            return acc;
+        }, { steps: 0, activeMinutes: 0, sleepHours: 0, waterMl: 0, caloriesBurned: 0, breathingMinutes: 0 });
+
+        const days = logs.length;
+        steps = Math.min(12000, Math.max(5000, Math.round((totals.steps / days) * 1.1) || 6000));
+        activeMinutes = Math.min(60, Math.max(15, Math.round((totals.activeMinutes / days) * 1.1) || 20));
+        sleepHours = Math.min(8.5, Math.max(7.0, parseFloat(((totals.sleepHours / days) || 7.5).toFixed(1))));
+        waterMl = Math.min(3500, Math.max(2000, Math.round((totals.waterMl / days) * 1.1) || 2200));
+        caloriesBurned = Math.min(600, Math.max(150, Math.round((totals.caloriesBurned / days) * 1.1) || 250));
+        breathingMinutes = Math.min(20, Math.max(5, Math.round((totals.breathingMinutes / days) * 1.1) || 10));
+    }
+
+    return {
+        goals: {
+            dailySteps: steps,
+            dailyActiveMinutes: activeMinutes,
+            dailyCaloriesBurned: caloriesBurned,
+            dailySleepHours: sleepHours,
+            dailyBreathingMinutes: breathingMinutes,
+            dailyWaterMl: waterMl
+        },
+        dailyTasks: [
+            "Hydrate with 500 ml of water upon waking up to jumpstart metabolism.",
+            "Take a brisk 15-20 minute walk outdoors or after a meal.",
+            "Maintain a consistent sleep schedule by setting a relaxing bedtime alarm.",
+            "Practice 5 minutes of mindful belly breathing to reduce stress.",
+            "Keep a water bottle near you and reach your hydration target throughout the day.",
+            "Spend 15 minutes screen-free before sleep with light reading or stretching.",
+            "Take periodic 2-minute movement breaks during long sedentary hours."
+        ],
+        focusAreas: ["Sleep & Recovery", "Physical Movement"],
+        weeklyInsight: "Consistency in daily sleep and gentle activity increments creates sustainable metabolic progress without burnout.",
+        warnings: []
+    };
 }
 
 const logMetrics = expressAsyncHandler(async (req, res) => {
@@ -314,15 +372,15 @@ const generateAIPlan = expressAsyncHandler(async (req, res) => {
         try {
             const rawText = await generateWithKeyRotation({
                 systemInstruction: PLAN_SYSTEM_INSTRUCTION,
-                message: prompt
+                message: prompt,
+                generationConfig: {
+                    responseMimeType: "application/json"
+                }
             });
             parsedPlan = parsePlanResponse(rawText);
         } catch (aiErr) {
-            console.error("Error generating or parsing AI wellness plan:", aiErr);
-            return res.status(502).json({
-                success: false,
-                message: "Failed to generate a wellness plan. Please try again."
-            });
+            console.warn("AI generation failed, engaging clinical fallback plan:", aiErr.message);
+            parsedPlan = getDeterministicFallbackPlan(logs);
         }
 
         await WellnessPlan.updateMany(

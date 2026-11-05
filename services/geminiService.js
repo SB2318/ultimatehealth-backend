@@ -86,12 +86,16 @@ const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 /**
  * Attempts calling Gemini with a single key
  */
-async function invokeGeminiWithKey({ apiKey, model, systemInstruction, history, message }) {
+async function invokeGeminiWithKey({ apiKey, model, systemInstruction, history, message, generationConfig }) {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const generativeModel = genAI.getGenerativeModel({
+    const modelParams = {
         model,
         systemInstruction,
-    });
+    };
+    if (generationConfig) {
+        modelParams.generationConfig = generationConfig;
+    }
+    const generativeModel = genAI.getGenerativeModel(modelParams);
 
     const chat = generativeModel.startChat({ history });
     const result = await chat.sendMessage(message);
@@ -111,10 +115,11 @@ async function invokeGeminiWithKey({ apiKey, model, systemInstruction, history, 
  * @returns {Promise<string>} The model's text response
  */
 async function generateWithKeyRotation({
-    model = process.env.GEMINI_MODEL || "gemini-3.5-flash",
+    model = process.env.GEMINI_MODEL || "gemini-2.5-flash",
     systemInstruction,
     history = [],
     message,
+    generationConfig,
 }) {
     return await geminiBreaker.execute(
         async () => {
@@ -142,7 +147,8 @@ async function generateWithKeyRotation({
                             model,
                             systemInstruction,
                             history,
-                            message
+                            message,
+                            generationConfig
                         });
                         return reply;
                     } catch (err) {
@@ -160,7 +166,8 @@ async function generateWithKeyRotation({
                                     model,
                                     systemInstruction,
                                     history,
-                                    message
+                                    message,
+                                    generationConfig
                                 });
                             } catch (retryErr) {
                                 lastError = retryErr;
@@ -188,7 +195,8 @@ async function generateWithKeyRotation({
                             model,
                             systemInstruction,
                             history,
-                            message
+                            message,
+                            generationConfig
                         });
                         return reply;
                     } catch (err) {
