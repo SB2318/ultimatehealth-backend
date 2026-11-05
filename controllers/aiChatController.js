@@ -7,13 +7,14 @@ const Message = require('../models/ai/Message');
 const { generateWithKeyRotation } = require('../services/geminiService');
 const { getClientIp, recordAuditLog } = require('../middleware/hipaaAudit');
 const { sanitizePhi, sanitizeForAI } = require('../utils/phiSanitizer');
+const { evaluateGuardrails, HARDENED_CHARACTER_PROMPTS } = require('../utils/aiGuardrails');
 
 dotenv.config();
 
 const PPLX_URL = "https://api.perplexity.ai/chat/completions";
 const MODEL = "sonar-pro";
 
-const MAX_DAY_LIMIT = 5;
+const MAX_DAY_LIMIT = parseInt(process.env.AI_MAX_DAILY_MESSAGES || "50", 10);
 
 // HIPAA Compliance Statements & Clinical Safety Disclaimers (45 CFR § 164.530 & Clinical Decision Support)
 const HIPAA_CLINICAL_DISCLAIMER = "UltimateHealth AI provides educational health and wellness guidance only. It does not provide medical diagnosis, treatment, or clinical prescriptions. Always consult a licensed healthcare professional for clinical decisions. In an emergency, dial 911 or visit the nearest emergency department immediately.";
@@ -28,12 +29,12 @@ const HIPAA_SYSTEM_DIRECTIVE = `
 5. Emphasize evidence-based lifestyle, nutrition, hydration, and exercise habits while recommending discussion with their primary care physician.
 `;
 
-// Character configurations with embedded HIPAA clinical guardrails
+// Character configurations with embedded HIPAA clinical guardrails & strict domain bounds
 const characterPrompts = {
-    general: `You are the official personalized health assistant for UltimateHealth. Provide concise, actionable personal health suggestion tips. Keep your answers short, friendly, and medically cautious.${HIPAA_SYSTEM_DIRECTIVE}`,
-    fitness_coach: `You are an expert Fitness Coach for UltimateHealth. Motivate the user, provide workout tips, and focus on physical fitness, strength, and endurance. Keep answers energetic and actionable.${HIPAA_SYSTEM_DIRECTIVE}`,
-    nutritionist: `You are a professional Nutritionist for UltimateHealth. Provide dietary advice, healthy recipes, and tips for balanced eating. Do not provide medical diagnoses. Keep answers concise.${HIPAA_SYSTEM_DIRECTIVE}`,
-    mental_wellness: `You are a Mental Wellness Guide for UltimateHealth. Provide calming, supportive advice on stress management, mindfulness, and mental well-being. Keep answers empathetic and soothing.${HIPAA_SYSTEM_DIRECTIVE}`
+    general: `${HARDENED_CHARACTER_PROMPTS.general}\n${HIPAA_SYSTEM_DIRECTIVE}`,
+    fitness_coach: `${HARDENED_CHARACTER_PROMPTS.fitness_coach}\n${HIPAA_SYSTEM_DIRECTIVE}`,
+    nutritionist: `${HARDENED_CHARACTER_PROMPTS.nutritionist}\n${HIPAA_SYSTEM_DIRECTIVE}`,
+    mental_wellness: `${HARDENED_CHARACTER_PROMPTS.mental_wellness}\n${HIPAA_SYSTEM_DIRECTIVE}`
 };
 
 const startConversation = expressAsyncHandler(
@@ -85,6 +86,46 @@ const startConversation = expressAsyncHandler(
                 text: text.trim(),
                 conversationId
             });
+
+            // Evaluate AI Guardrails & Character Boundaries
+            const guardResult = evaluateGuardrails(text, character);
+            if (!guardResult.passed) {
+                // Save guardrail refusal / emergency response
+                const guardMsg = await Message.create({
+                    role: "model",
+                    text: guardResult.fallbackReply,
+                    conversationId
+                });
+
+                await recordAuditLog({
+                    actorId: userId,
+                    actorRole: user.isDoctor ? 'doctor' : 'patient',
+                    patientId: userId,
+                    action: 'CHAT_QUERY_GUARDRAIL_BLOCKED',
+                    resourceType: 'Conversation',
+                    resourceId: conversationId,
+                    ipAddress,
+                    userAgent,
+                    severity: guardResult.isEmergency ? 'critical' : 'warning',
+                    status: 'blocked',
+                    details: {
+                        character,
+                        category: guardResult.category,
+                        reason: guardResult.reason,
+                        isEmergency: Boolean(guardResult.isEmergency)
+                    }
+                });
+
+                return res.status(200).json({
+                    success: true,
+                    guardrailBlocked: true,
+                    category: guardResult.category,
+                    complianceNotice: HIPAA_COMPLIANCE_NOTICE,
+                    disclaimer: HIPAA_CLINICAL_DISCLAIMER,
+                    phiSanitized: false,
+                    message: guardMsg
+                });
+            }
 
             const history = await Message.find({ conversationId }).sort({ _id: 1 });
 
@@ -212,6 +253,46 @@ const startPPLXConversation = expressAsyncHandler(async (req, res) => {
             text: text.trim(),
             conversationId
         });
+
+        // Evaluate AI Guardrails & Character Boundaries
+        const guardResult = evaluateGuardrails(text, character);
+        if (!guardResult.passed) {
+            const guardMsg = await Message.create({
+                role: "model",
+                text: guardResult.fallbackReply,
+                conversationId
+            });
+
+            await recordAuditLog({
+                actorId: userId,
+                actorRole: user.isDoctor ? 'doctor' : 'patient',
+                patientId: userId,
+                action: 'CHAT_QUERY_GUARDRAIL_BLOCKED',
+                resourceType: 'Conversation',
+                resourceId: conversationId,
+                ipAddress,
+                userAgent,
+                severity: guardResult.isEmergency ? 'critical' : 'warning',
+                status: 'blocked',
+                details: {
+                    character,
+                    category: guardResult.category,
+                    reason: guardResult.reason,
+                    isEmergency: Boolean(guardResult.isEmergency),
+                    provider: 'perplexity'
+                }
+            });
+
+            return res.status(200).json({
+                success: true,
+                guardrailBlocked: true,
+                category: guardResult.category,
+                complianceNotice: HIPAA_COMPLIANCE_NOTICE,
+                disclaimer: HIPAA_CLINICAL_DISCLAIMER,
+                phiSanitized: false,
+                message: guardMsg
+            });
+        }
 
         const history = await Message.find({ conversationId }).sort({ _id: 1 });
         const { hasRedactedPhi } = sanitizePhi(text);
