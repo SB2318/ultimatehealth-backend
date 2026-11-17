@@ -66,7 +66,6 @@ const {
   generateHashPassword,
 } = require("../services/security/encryptService");
 
-const { verifyUser } = require("../middleware/authMiddleware");
 
 const { throwError } = require("../utils/throwError");
 const { sendSuccess } = require("../utils/response");

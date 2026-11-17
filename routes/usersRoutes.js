@@ -99,10 +99,6 @@ const enforceMinDuration = (minDuration = 700) => {
     }
 }
 
-router.get('/hello', (req, res) => {
-    console.log('Hello World Route Executed')
-    res.send('Hello World')
-})
 
 router.get("/checkTokenStatus", getTokenStatus);
 router.post("/checkTokenStatus", getTokenStatus);

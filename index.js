@@ -52,7 +52,7 @@ const newsletterRoutes = require('./routes/newsletterRoutes');
 const wellnessRoutes = require('./routes/wellnessRoute');
 const careTeamRoutes = require('./routes/careTeamRoutes');
 const { publishSocialNotificationEvent, publishBroadcastNotificationEvent, NOTIFICATION_EVENT_TYPES } = require('./services/mqueue/producers/notificationProducer');
-const {verifyRefreshToken } = require("./services/security/tokenService");
+const { verifyAnyToken, verifyRefreshToken } = require("./services/security/tokenService");
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
 const { errorHandler } = require('./middleware/errorHandler');
@@ -154,16 +154,14 @@ app.use('/docs', swaggerUi.serve, swaggerUi.setup(null, {
 
 
 
-app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-
-
-
-// Test route (can be removed later)
-app.get("/hello", (req, res) => {
-    console.log("Hello World");
-    res.send('Hello World');
-});
+if (process.env.NODE_ENV?.toLowerCase() !== 'production' || process.env.ENABLE_SWAGGER === 'true') {
+    app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+    app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+} else {
+    app.use(['/api/docs', '/docs'], (req, res) => {
+        res.status(404).json({ error: "Documentation not available in production" });
+    });
+}
 app.get('/', (req, res) => {
     res.redirect(302, 'https://ultimatehealth.blog/web/en');
 });
@@ -200,30 +198,24 @@ let io = require('socket.io')(server, {
     }
 });
 
-// Optional Authentication Middleware
+// WebSocket Authentication Middleware
 io.use(async (socket, next) => {
-    const token = socket.handshake.auth.token;
+    const token = socket.handshake.auth?.token || 
+                  socket.handshake.headers?.authorization?.split(' ')[1] || 
+                  socket.handshake.query?.token;
 
     if (token) {
         try {
-            // Verify JWT token
-
-            const decoded = await verifyRefreshToken(token);
+            const decoded = await verifyAnyToken(token);
             socket.userId = decoded.userId || decoded.id;
             socket.isAuthenticated = true;
-            console.log(` Authenticated user connected: ${socket.userId} (Socket: ${socket.id})`);
         } catch (err) {
-            // Invalid token - log but still allow connection (backward compatible)
-            console.log(`  Invalid token provided, proceeding without authentication (Socket: ${socket.id})`);
             socket.isAuthenticated = false;
         }
     } else {
-        // No token - allow connection as of now
         socket.isAuthenticated = false;
-        console.log(`ℹ  Unauthenticated connection allowed (Socket: ${socket.id})`);
     }
 
-    // as of now
     next();
 });
 
@@ -277,6 +269,12 @@ io.on('connection', (socket) => {
        */
 
     socket.on("notification", async (data) => {
+        if (!socket.isAuthenticated || !socket.userId) {
+            return socket.emit('error', { message: 'Authentication required to emit notifications' });
+        }
+        if (data && typeof data === 'object') {
+            data.userId = socket.userId;
+        }
         // Save notification to database AND broadcast to user's notification room
 
 
@@ -1474,15 +1472,14 @@ io.on('connection', (socket) => {
 
     );
 
-    // User notification room - join when user connects
+    // User notification room - join when user connects (enforces authenticated ownership)
     socket.on('join-user-notifications', (data) => {
-        const { userId } = data;
-        if (userId) {
-            const userRoom = `user:${userId}`;
-            socket.join(userRoom);
-            console.log(`Socket ${socket.id} joined notification room: ${userRoom}`);
-            socket.emit('notification-room-joined', { room: userRoom, userId });
+        if (!socket.isAuthenticated || !socket.userId) {
+            return socket.emit('error', { message: 'Authentication required to join private notification room' });
         }
+        const userRoom = 'user:' + socket.userId;
+        socket.join(userRoom);
+        socket.emit('notification-room-joined', { room: userRoom, userId: socket.userId });
     });
 
     // Manual join room listener (optional - for explicit room joining)

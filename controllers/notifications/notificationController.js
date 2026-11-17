@@ -8,19 +8,30 @@ const User = require('../../models/UserModel');
 
 module.exports.createNotification = expressAsyncHandler(
     async (req, res) => {
-        const { title, message, userId } = req.body;
+        const { title, message, userId, type } = req.body;
 
         if (!title || !message || !userId) {
             res.status(400).json({ message: "Insufficient field" });
             return;
         }
 
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            res.status(400).json({ message: "Invalid user ID" });
+            return;
+        }
+
         try {
+            const targetUser = await User.findById(userId);
+            if (!targetUser) {
+                res.status(404).json({ message: "Target user not found" });
+                return;
+            }
 
             const notification = new Notification({
                 title: title,
                 message: message,
                 userId: userId,
+                type: type || 'article',
             });
 
             await notification.save();

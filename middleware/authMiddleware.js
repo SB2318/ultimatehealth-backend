@@ -1,8 +1,10 @@
-const jwt = require('jsonwebtoken');
-require('dotenv').config();
 const User = require("../models/UserModel");
 const Admin = require("../models/admin/adminModel");
+const { verifyAnyToken } = require("../services/security/tokenService");
 
+/**
+ * @deprecated Legacy auth middleware. Use middleware/authentcatetoken.js or middleware/authenticate.js instead.
+ */
 const verifyToken = async (req, res, next) => {
     let token;
 
@@ -17,7 +19,7 @@ const verifyToken = async (req, res, next) => {
     }
 
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const decoded = await verifyAnyToken(token);
         const [user, admin] = await Promise.all(
           [
             User.findById(decoded.userId),
@@ -25,29 +27,25 @@ const verifyToken = async (req, res, next) => {
           ]
         );
 
-        if(!admin || !admin.isVerified){
-
+        if (!admin || !admin.isVerified) {
             if (!user || !user.isVerified) {
                 return res.status(403).json({ error: 'Email not verified' });
-            }else{
-
+            } else {
                 req.userId = user._id;
                 next();
             }
-        }else{
+        } else {
             req.userId = admin._id;
             next();
         }
-        
     } catch (err) {
-        console.error('Error verifying token:', err);
         return res.status(403).json({ error: 'Invalid or expired token' });
     }
 };
 
 const verifyUser = async (token) => {
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const decoded = await verifyAnyToken(token);
         const user = await User.findById(decoded.userId);
 
         if (!user || !user.isVerified) {

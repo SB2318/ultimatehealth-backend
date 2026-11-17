@@ -608,6 +608,10 @@ const getFile = async (req, res) => {
         }
         const key = decodeURIComponent(rawKey);
 
+        if (key.includes('..') || key.includes('\\') || key.startsWith('/')) {
+            return res.status(400).json({ message: "Invalid file key" });
+        }
+
         const isApplicantDocument = key.startsWith("applicant-resumes/") || key.includes("applicant-resumes");
 
         const isAgreement = !isApplicantDocument && (

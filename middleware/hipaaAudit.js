@@ -1,11 +1,15 @@
 const AuditLog = require('../models/AuditLog');
 
 const getClientIp = (req) => {
-    const forwarded = req.headers['x-forwarded-for'];
-    if (forwarded) {
-        return forwarded.split(',')[0].trim();
+    if (req.ip) {
+        return req.ip;
     }
-    return req.socket?.remoteAddress || req.ip || '0.0.0.0';
+    const forwarded = req.headers['x-forwarded-for'];
+    if (forwarded && typeof forwarded === 'string') {
+        const ips = forwarded.split(',').map(s => s.trim()).filter(Boolean);
+        return ips[ips.length - 1] || '0.0.0.0';
+    }
+    return req.socket?.remoteAddress || '0.0.0.0';
 };
 
 const recordAuditLog = async ({
