@@ -104,12 +104,12 @@ const mutationLimiter = rateLimit({
 });
 
 /**
- * Search endpoints
+ * Search endpoints - allows smooth typing with debouncing while preventing scraping
  */
 const searchLimiter = rateLimit({
   ...baseConfig,
   windowMs: 1 * 60 * 1000,
-  max: 20,
+  max: 60,
 });
 
 /**
@@ -118,7 +118,27 @@ const searchLimiter = rateLimit({
 const uploadLimiter = rateLimit({
   ...baseConfig,
   windowMs: 10 * 60 * 1000,
+  max: 15,
+});
+
+/**
+ * Public contact form submissions (SMTP spam protection)
+ */
+const contactLimiter = rateLimit({
+  ...baseConfig,
+  windowMs: 15 * 60 * 1000, // 15 mins
+  max: 5,
+  keyGenerator: (req) => `ip:${ipKeyGenerator(req.ip)}`,
+});
+
+/**
+ * Newsletter subscriptions
+ */
+const newsletterLimiter = rateLimit({
+  ...baseConfig,
+  windowMs: 60 * 60 * 1000, // 1 hour
   max: 10,
+  keyGenerator: (req) => `ip:${ipKeyGenerator(req.ip)}`,
 });
 
 /**
@@ -180,4 +200,6 @@ module.exports = {
   heavyOperationLimiter,
   aiPlanLimiter,
   aiChatLimiter,
+  contactLimiter,
+  newsletterLimiter,
 };

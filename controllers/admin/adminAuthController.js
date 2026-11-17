@@ -301,6 +301,10 @@ module.exports.updateAdminPassword = expressAsyncHandler(
         return res.status(404).json({ error: "User not found" });
       }
 
+      if (req.userId && user._id.toString() !== req.userId.toString()) {
+        return res.status(403).json({ error: "Forbidden: Cannot update password for another account" });
+      }
+
 
       // Ensure the new password is not the same as the old password
       const isSameAsOldPassword = await bcrypt.compare(

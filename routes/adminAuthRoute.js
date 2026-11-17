@@ -29,6 +29,11 @@ const {
 const {
   forgotPasswordLimiter,
   otpLimiter,
+  registerLimiter,
+  loginLimiter,
+  uploadLimiter,
+  resendOtpLimiter,
+  mutationLimiter,
 } = require("../middleware/ratelimit");
 
 const enforceMinDuration = (minDuration = 700) => {
@@ -64,13 +69,13 @@ const { uploadAgreementPDF } = require("../controllers/uploadController");
 
 
 
-router.post("/admin/register", register);
+router.post("/admin/register", registerLimiter, register);
 
 
 
 
-router.post("/admin/login", login);
-router.post("/admin/upload-agreement",  uploadAgreementPDF);
+router.post("/admin/login", enforceMinDuration(700), loginLimiter, login);
+router.post("/admin/upload-agreement", uploadLimiter, uploadAgreementPDF);
 
 
 
@@ -86,7 +91,7 @@ router.get("/admin/verifyEmail", verifyEmail);
 router.post("/admin/verifyEmail", Sendverifymail);
 
 
-router.post("/admin/resend-verification-mail", resendVerificationEmail);
+router.post("/admin/resend-verification-mail", resendOtpLimiter, resendVerificationEmail);
 
 
 router.get('/admin/getprofile', authenticateToken, getprofile);
@@ -126,7 +131,7 @@ router.post(
   resetAdminPassword
 );
 
-router.post('/admin/update-password', updateAdminPassword);
+router.post('/admin/update-password', authenticateToken, mutationLimiter, updateAdminPassword);
 
 
 router.post('/admin/update-profile', authenticateToken, editProfile);

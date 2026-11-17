@@ -9,7 +9,7 @@ const {
     getLatestPlan,
     getPlanHistory
 } = require("../controllers/wellnessController");
-const { aiPlanLimiter } = require("../middleware/ratelimit");
+const { aiPlanLimiter, mutationLimiter, heavyOperationLimiter } = require("../middleware/ratelimit");
 
 const router = express.Router();
 
@@ -128,7 +128,7 @@ const router = express.Router();
  *                 data:
  *                   $ref: '#/components/schemas/WellnessLog'
  */
-router.post("/log", authToken, logMetrics);
+router.post("/log", authToken, mutationLimiter, logMetrics);
 
 /**
  * @swagger
@@ -189,7 +189,7 @@ router.get("/patient/:patientId", authToken, getPatientLogsForDoctor);
  *       200:
  *         description: Machine-readable export of patient health records, logs, and clinical interactions
  */
-router.get("/export", authToken, exportHealthData);
+router.get("/export", authToken, heavyOperationLimiter, exportHealthData);
 
 /**
  * @swagger

@@ -64,6 +64,8 @@ const {
 const {
     registerLimiter,
     loginLimiter,
+    resendOtpLimiter,
+    mutationLimiter,
 } = require('../middleware/ratelimit')
 
 const enforceMinDuration = (minDuration = 700) => {
@@ -164,6 +166,7 @@ router.post(
     '/user/follow',
     authenticate,
     authorize(ROLES.USER, ROLES.DOCTOR),
+    mutationLimiter,
     validateBody(followUnfollowSchema),
     follow
 )
@@ -209,6 +212,7 @@ router.post('/user/verifyEmail', Sendverifymail)
 
 router.post(
     '/user/resend-verification-mail',
+    resendOtpLimiter,
     validateBody(resendVerificationSchema),
     resendVerificationEmail
 )

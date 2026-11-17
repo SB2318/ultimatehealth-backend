@@ -1,6 +1,6 @@
 const express = require("express");
 const authToken = require("../middleware/authentcatetoken");
-const { aiChatLimiter } = require("../middleware/ratelimit");
+const { aiChatLimiter, heavyOperationLimiter } = require("../middleware/ratelimit");
 const router = express.Router();
 
 const {
@@ -162,7 +162,7 @@ router.delete("/messages", authToken, clearConversation);
  *                 chatHistory:
  *                   type: array
  */
-router.get("/export", authToken, exportChatHistory);
+router.get("/export", authToken, heavyOperationLimiter, exportChatHistory);
 
 /**
  * @swagger

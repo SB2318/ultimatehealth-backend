@@ -1,5 +1,6 @@
 const express = require("express");
 const authToken = require("../middleware/authentcatetoken");
+const { mutationLimiter } = require('../middleware/ratelimit');
 const {
     assignDoctor,
     getMyDoctors,
@@ -231,7 +232,7 @@ router.get("/interactions/:patientId", authToken, getInteractions);
  *       200:
  *         description: Emergency access granted and logged as critical audit event
  */
-router.post("/break-glass", authToken, emergencyBreakGlass);
+router.post("/break-glass", authToken, mutationLimiter, emergencyBreakGlass);
 
 /**
  * @swagger

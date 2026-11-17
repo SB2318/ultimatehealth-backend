@@ -10,6 +10,7 @@ const {
   getRelatedArticlesParamsSchema,
   getRelatedArticlesQuerySchema,
 } = require('../validators/article.schema');
+const { searchLimiter, mutationLimiter } = require('../middleware/ratelimit');
 
 /**** For Article Tags */
 /**
@@ -444,7 +445,7 @@ router.delete('/articles/tags/:id', adminAuthenticateToken, articleController.de
  *                   type: string
  *                   example: "Error creating article"
  */
-router.post('/articles', publisherMiddleware, articleController.createArticle);
+router.post('/articles', publisherMiddleware, mutationLimiter, articleController.createArticle);
 
 router.get('/articles', articleController.getAllArticles); // auth removed for guest profile, purpose: user can view articles in unauthenticated state
 
@@ -720,7 +721,7 @@ router.get('/articles/pb/:pb_recordId', articleController.getArticleByPbRecordId
  *       '500':
  *         description: Internal server error
  */
-router.get('/articles/search', articleController.searchArticles);
+router.get('/articles/search', searchLimiter, articleController.searchArticles);
 
 router.get('/articles/:id', articleController.getArticleById); // auth removed for guest profile, purpose: user can view article in unauthenticated state
 
@@ -823,7 +824,7 @@ router.delete('/articles/:id', authenticateToken, checkArticleOwnership, article
  *                   example: "Error saving article"
  */
 
-router.post('/articles/saveArticle', authenticateToken, articleController.saveArticle);
+router.post('/articles/saveArticle', authenticateToken, mutationLimiter, articleController.saveArticle);
 
 /**
  * @openapi
@@ -913,7 +914,7 @@ router.post('/articles/saveArticle', authenticateToken, articleController.saveAr
  *         description: Server error during like/unlike operation
  */
 
-router.post('/articles/likeArticle', authenticateToken, articleController.likeArticle);
+router.post('/articles/likeArticle', authenticateToken, mutationLimiter, articleController.likeArticle);
 
 /**
  * @openapi
@@ -1185,7 +1186,7 @@ router.get('/article/write-status', authenticateToken, articleController.getWrit
  *                   type: string
  *                   example: Internal server error
  */
-router.post('/article/repost', authenticateToken, articleController.repostArticle);
+router.post('/article/repost', authenticateToken, mutationLimiter, articleController.repostArticle);
 
 /**
  * @openapi

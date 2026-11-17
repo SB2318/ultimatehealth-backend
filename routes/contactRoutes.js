@@ -1,5 +1,6 @@
 const express = require('express');
 const { submitContactForm } = require('../controllers/contactController');
+const { contactLimiter } = require('../middleware/ratelimit');
 
 const router = express.Router();
 
@@ -54,6 +55,6 @@ const router = express.Router();
  *       '500':
  *         description: Internal server error
  */
-router.post('/contact', submitContactForm);
+router.post('/contact', contactLimiter, submitContactForm);
 
 module.exports = router;

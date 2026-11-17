@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const authenticateToken = require('../middleware/authentcatetoken');
+const { mutationLimiter } = require('../middleware/ratelimit');
 
 const notificationController = require('../controllers/notifications/notificationController');
 
@@ -53,7 +54,7 @@ const notificationController = require('../controllers/notifications/notificatio
  *         description: Internal server error
  */
 
-router.post('/notification', authenticateToken, notificationController.createNotification);
+router.post('/notification', authenticateToken, mutationLimiter, notificationController.createNotification);
 
 /**
  * @openapi

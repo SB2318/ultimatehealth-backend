@@ -6,6 +6,7 @@ const authenticateToken = require('../middleware/authentcatetoken');
 const publisherMiddleware = require('../middleware/publisherMiddleware');
 const adminAuthenticateToken = require("../middleware/adminAuthenticateToken");
 const requireSuperAdmin = require("../middleware/superAdminMiddleware");
+const { uploadLimiter } = require('../middleware/ratelimit');
 const uploadRoute = express.Router();
 
 const storageUpload = multer({ dest: 'uploads/' }).fields([
@@ -21,6 +22,7 @@ const storageUpload = multer({ dest: 'uploads/' }).fields([
 uploadRoute.post(
     '/upload-storage',
     authenticateToken,
+    uploadLimiter,
     (req, res, next) => {
         storageUpload(req, res, (err) => {
             if (err) return next(err);

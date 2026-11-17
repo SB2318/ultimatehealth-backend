@@ -1,7 +1,8 @@
 const express = require("express");
 const authenticateToken = require("../middleware/authentcatetoken");
 const adminAuthenticateToken = require("../middleware/adminAuthenticateToken");
-const controller = require("../controllers/reportController")
+const controller = require("../controllers/reportController");
+const { mutationLimiter } = require('../middleware/ratelimit');
 const router = express.Router();
 
 router.post('/report/add-reason', adminAuthenticateToken, controller.addReason);
@@ -12,7 +13,7 @@ router.delete('/report/reason/:id', adminAuthenticateToken, controller.deleteRea
 router.get('/report/reasons', authenticateToken, controller.getAllReasons);
 router.get('/report/reasons/metrics', authenticateToken, controller.getReasonsWithMetrics);
 
-router.post('/report/submit', authenticateToken, controller.submitReport);
+router.post('/report/submit', authenticateToken, mutationLimiter, controller.submitReport);
 
 router.get('/report/pending-reports', adminAuthenticateToken, controller.getAllPendingReports);
 
