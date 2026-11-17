@@ -24,3 +24,6 @@ local_mongodb_data/
 
 __pycache__/
 *.py[cod]
+
+# Security audit reports — kept locally only, never committed to version control
+security-audit/
