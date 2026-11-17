@@ -77,7 +77,8 @@ function errorHandler(err, req, res, _next) {
   }
   
   //  Production Safety
-  if (process.env.NODE_ENV === "PRODUCTION" && !isAppError(err)) {
+  const isProduction = (process.env.NODE_ENV || "").toLowerCase() === "production";
+  if (isProduction && !isAppError(err)) {
     message = "Internal server error";
     details = undefined;
   }

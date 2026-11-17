@@ -16,7 +16,10 @@ module.exports.getTotalReadCountOfUser = expressAsyncHandler(
     const userId = req.params.userId;
 
     if (!userId) {
-      res.status(400).json({ message: 'user id is required' });
+      return res.status(400).json({ message: 'user id is required' });
+    }
+    if (req.userId && req.userId.toString() !== userId.toString() && req.userRole !== 'admin') {
+      return res.status(403).json({ message: "Access denied: Cannot access another user's analytics" });
     }
     try {
 
@@ -48,7 +51,10 @@ module.exports.getTotalWriteCountOfUser = expressAsyncHandler(
     const userId = req.params.userId;
 
     if (!userId) {
-      res.status(400).json({ message: 'user id is required' });
+      return res.status(400).json({ message: 'user id is required' });
+    }
+    if (req.userId && req.userId.toString() !== userId.toString() && req.userRole !== 'admin') {
+      return res.status(403).json({ message: "Access denied: Cannot access another user's analytics" });
     }
     try {
 
@@ -80,7 +86,10 @@ module.exports.getTotalLikeAndViewReceivedByUser = expressAsyncHandler(
     const { userId } = req.params;
 
     if (!userId) {
-      res.status(400).json({ message: 'user id is required' });
+      return res.status(400).json({ message: 'user id is required' });
+    }
+    if (req.userId && req.userId.toString() !== userId.toString() && req.userRole !== 'admin') {
+      return res.status(403).json({ message: "Access denied: Cannot access another user's analytics" });
     }
 
     try {

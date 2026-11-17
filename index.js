@@ -101,9 +101,9 @@ app.use(express.static('public'));
 
 app.use(cookieParser()); 
 app.use(compression()); 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
-app.use(express.urlencoded({ extended: true }));
+const bodyLimit = process.env.REQUEST_BODY_LIMIT || '2mb';
+app.use(express.json({ limit: bodyLimit }));
+app.use(express.urlencoded({ limit: bodyLimit, extended: true }));
 app.use(mongoSanitize());
 app.use(xss());
 app.use(helmet({

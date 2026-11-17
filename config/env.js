@@ -1,5 +1,13 @@
+const isProduction = (process.env.NODE_ENV || '').toLowerCase() === 'production';
+
 const requiredEnvVars = [
     'MONGODB_URL',
+    ...(isProduction ? [
+        'JWT_ACCESS_SECRET',
+        'JWT_REFRESH_SECRET',
+        'JWT_VERIFICATION_SECRET',
+        'TOKEN_SECRET'
+    ] : [])
 ];
 
 const recommendedEnvVars = [
@@ -7,13 +15,15 @@ const recommendedEnvVars = [
     'NODE_ENV',
     'JWT_PRIVATE_KEY',
     'JWT_PUBLIC_KEY',
-    'JWT_ACCESS_SECRET',
-    'JWT_REFRESH_SECRET',
-    'JWT_VERIFICATION_SECRET',
+    ...(!isProduction ? [
+        'JWT_ACCESS_SECRET',
+        'JWT_REFRESH_SECRET',
+        'JWT_VERIFICATION_SECRET',
+        'TOKEN_SECRET'
+    ] : []),
     'REDIS_HOST',
     'REDIS_PORT',
     'REDIS_PASSWORD',
-    'TOKEN_SECRET',
     'EMAIL_USER',
     'EMAIL_PASS',
     'SMTP_HOST',

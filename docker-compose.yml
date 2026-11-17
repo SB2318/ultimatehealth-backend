@@ -68,7 +68,7 @@ services:
     container_name: ultimatehealth-mongo
     restart: unless-stopped
     ports:
-      - "27017:27017"
+      - "127.0.0.1:27017:27017"
     volumes:
       - mongodb_data:/data/db
     healthcheck:
@@ -83,7 +83,7 @@ services:
     container_name: kafka1-ultimatehealth
     restart: unless-stopped
     ports:
-      - "9092:9092"
+      - "127.0.0.1:9092:9092"
     volumes:
       - kafka1-data:/var/lib/kafka/data
     ulimits:
@@ -167,7 +167,7 @@ services:
     container_name: ultimatehealth-pocketbase
     restart: unless-stopped
     ports:
-      - "8090:8090"
+      - "127.0.0.1:8090:8090"
     volumes:
       - pb_data:/pb/pb_data
       - ./pb_migrations:/pb/pb_migrations
@@ -177,7 +177,7 @@ services:
     container_name: ultimatehealth-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:

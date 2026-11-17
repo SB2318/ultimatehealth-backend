@@ -20,6 +20,7 @@ const storageUpload = multer({ dest: 'uploads/' }).fields([
 
 uploadRoute.post(
     '/upload-storage',
+    authenticateToken,
     (req, res, next) => {
         storageUpload(req, res, (err) => {
             if (err) return next(err);

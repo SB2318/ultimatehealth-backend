@@ -37,6 +37,7 @@ const {
     resendVerificationEmail,
 } = require('../controllers/emailservice')
 const authenticateToken = require('../middleware/authentcatetoken')
+const adminAuthenticateToken = require('../middleware/adminAuthenticateToken')
 const { authenticate } = require('../middleware/authenticate')
 const { authorize } = require('../middleware/authorization')
 const { ROLES } = require('../constants/roles')
@@ -199,7 +200,7 @@ router.get('/delete-account', (req, res) => {
 /**
  * @deprecated
  */
-router.post('/admin/deleteUser', deleteByAdmin)
+router.post('/admin/deleteUser', adminAuthenticateToken, deleteByAdmin)
 
 router.get('/user/verifyEmail', verifyEmail)
 

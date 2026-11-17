@@ -40,10 +40,16 @@ loadKeys();
 
 const getSignSecret = (type = "access") => {
     if (privateKey) return { key: privateKey, algorithm: "RS256" };
-    if (type === "access") return { key: process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || "fallback_access_secret", algorithm: "HS256" };
-    if (type === "refresh") return { key: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || "fallback_refresh_secret", algorithm: "HS256" };
-    if (type === "verification") return { key: process.env.JWT_VERIFICATION_SECRET || process.env.JWT_SECRET || "fallback_verification_secret", algorithm: "HS256" };
-    return { key: process.env.JWT_SECRET || "fallback_secret", algorithm: "HS256" };
+    let key;
+    if (type === "access") key = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET;
+    else if (type === "refresh") key = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
+    else if (type === "verification") key = process.env.JWT_VERIFICATION_SECRET || process.env.JWT_SECRET;
+    else key = process.env.JWT_SECRET;
+
+    if (!key) {
+        throw new Error(`CRITICAL: Missing JWT signing secret for type "${type}". Configure JWT_ACCESS_SECRET / JWT_REFRESH_SECRET / JWT_SECRET or provide RSA keypair.`);
+    }
+    return { key, algorithm: "HS256" };
 };
 
 const getVerifySecret = (type = "access") => {
@@ -354,7 +360,10 @@ const verifyAnyToken = async (token) => {
 };
 
 const hashToken = (token) => {
-    const secret = process.env.TOKEN_SECRET || "fallback_default_secret_key_123";
+    const secret = process.env.TOKEN_SECRET || process.env.JWT_SECRET;
+    if (!secret) {
+        throw new Error("CRITICAL: Missing TOKEN_SECRET / JWT_SECRET environment variable for token hashing.");
+    }
     return crypto
         .createHmac('sha256', secret)
         .update(token)

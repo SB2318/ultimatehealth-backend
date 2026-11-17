@@ -226,7 +226,7 @@ module.exports.login = expressAsyncHandler(async (req, res) => {
   }
 
   if (user.refreshToken && user.refreshToken.hashedRefreshToken) {
-    console.log("Blacklisting existing refresh token for user:", user);
+    console.log("Blacklisting existing refresh token for userId:", user._id);
     await logoutUser(user._id);
   }
 
@@ -242,7 +242,7 @@ module.exports.login = expressAsyncHandler(async (req, res) => {
 
   await loginUser(user._id, refreshToken, jti, fcmToken);
 
-  console.log("Login Request Headers:", req.headers);
+  // Sanitized log: only client-type without auth headers
   console.log("X-Client-Type received:", req.headers['x-client-type']);
 
   const userAgent = req.headers['user-agent']?.toLowerCase() || '';
@@ -600,7 +600,7 @@ module.exports.sendOTPForForgotPassword = expressAsyncHandler(
     // Message expected by frontend
     const successMessage = "OTP sent to your email.";
 
-    console.log("Account found:", user);
+    console.log("Account lookup completed for email request");
     if (!user) {
       return sendSuccess(res, HTTP_STATUS.OK, successMessage);
     }

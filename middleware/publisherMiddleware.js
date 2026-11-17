@@ -11,7 +11,11 @@ const publisherMiddleware = async (req, res, next) => {
 
     try {
         // First try to verify as a publisher/contributor token
-        const secret = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || "sb2318@ultimatehealth_refresh";
+        const secret = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
+        if (!secret) {
+            console.warn("⚠️ Warning: JWT_REFRESH_SECRET/JWT_SECRET not set for publisher verification");
+            return authenticateToken(req, res, next);
+        }
         const decoded = jwt.verify(accessToken, secret);
         
         if (decoded && decoded.isContributor) {
