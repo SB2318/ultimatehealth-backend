@@ -8,6 +8,7 @@ const { generateWithKeyRotation } = require('../services/geminiService');
 const { getClientIp, recordAuditLog } = require('../middleware/hipaaAudit');
 const { sanitizePhi, sanitizeForAI } = require('../utils/phiSanitizer');
 const { evaluateGuardrails, HARDENED_CHARACTER_PROMPTS } = require('../utils/aiGuardrails');
+const { findRelevantArticles, formatArticlesForPrompt } = require('../services/articleRagService');
 
 dotenv.config();
 
@@ -132,9 +133,11 @@ const startConversation = expressAsyncHandler(
 
             const history = await Message.find({ conversationId }).sort({ _id: 1 });
 
-            // HIPAA Safe Harbor de-identification: sanitize prompt history before transmission to external AI API
+            const relatedArticles = await findRelevantArticles(text, 2);
+            const articleContext = formatArticlesForPrompt(relatedArticles);
+
             const { hasRedactedPhi } = sanitizePhi(text);
-            const reply = await generateReplyWithRotation(history, character);
+            const reply = await generateReplyWithRotation(history, character, articleContext);
 
             // Save assistant reply
             const newMsg = await Message.create({
@@ -160,7 +163,8 @@ const startConversation = expressAsyncHandler(
                     userMessageId: userMsg._id,
                     modelMessageId: newMsg._id,
                     phiSanitized: hasRedactedPhi,
-                    provider: 'gemini'
+                    provider: 'gemini',
+                    matchedArticlesCount: relatedArticles.length
                 }
             });
 
@@ -169,7 +173,8 @@ const startConversation = expressAsyncHandler(
                 complianceNotice: HIPAA_COMPLIANCE_NOTICE,
                 disclaimer: HIPAA_CLINICAL_DISCLAIMER,
                 phiSanitized: hasRedactedPhi,
-                message: newMsg
+                message: newMsg,
+                relatedArticles
             });
 
         } catch (err) {
@@ -193,14 +198,16 @@ const startConversation = expressAsyncHandler(
     }
 );
 
-async function generateReplyWithRotation(history, character) {
-    // Sanitize historical message parts to ensure no ePHI leakage to Google Gemini
+async function generateReplyWithRotation(history, character, extraContext = '') {
     const formattedMessages = history.map(m => ({
         role: m.role === "user" ? "user" : "model",
         parts: [{ text: sanitizeForAI(m.text) }]
     }));
 
-    const systemInstruction = characterPrompts[character] || characterPrompts['general'];
+    let systemInstruction = characterPrompts[character] || characterPrompts['general'];
+    if (extraContext) {
+        systemInstruction = `${systemInstruction}\n\n${extraContext}`;
+    }
 
     return generateWithKeyRotation({
         systemInstruction,

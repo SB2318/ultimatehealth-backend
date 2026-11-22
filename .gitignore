@@ -27,3 +27,13 @@ __pycache__/
 
 # Security audit reports — kept locally only, never committed to version control
 security-audit/
+
+# Temporary test scripts & runners
+scripts/test*
+scripts/check*
+scripts/find*
+scripts/temp*
+scripts/verify*
+scripts/publish*
+scripts/refine*
+scripts/*.tmp.js
