@@ -51,6 +51,7 @@ const contactRoutes = require('./routes/contactRoutes');
 const newsletterRoutes = require('./routes/newsletterRoutes');
 const wellnessRoutes = require('./routes/wellnessRoute');
 const careTeamRoutes = require('./routes/careTeamRoutes');
+const healthResourceRoutes = require('./routes/healthResourceRoutes');
 const { publishSocialNotificationEvent, publishBroadcastNotificationEvent, NOTIFICATION_EVENT_TYPES } = require('./services/mqueue/producers/notificationProducer');
 const { verifyAnyToken, verifyRefreshToken } = require("./services/security/tokenService");
 const swaggerUi = require('swagger-ui-express');
@@ -141,6 +142,7 @@ app.use("/api", contactRoutes);
 app.use("/api", newsletterRoutes);
 app.use("/api/wellness", wellnessRoutes);
 app.use("/api/care-team", careTeamRoutes);
+app.use("/api/v1/health-resources", healthResourceRoutes);
 
 // Swagger
 //app.use('/docs/swagger.json', express.static('./swagger.json'));

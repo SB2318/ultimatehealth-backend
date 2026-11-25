@@ -805,7 +805,7 @@ const options = {
       }
     }
   },
-  apis: ['./routes/*.js'],
+  apis: ['./routes/*.js', './routes/healthResourceRoutes.js'],
 };
 
 
