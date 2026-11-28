@@ -24,6 +24,7 @@ const getPublicHealthResources = async (req, res) => {
             page = 1,
             limit = 10,
             category,
+            country,
             region,
             language,
             sourceType,
@@ -39,6 +40,14 @@ const getPublicHealthResources = async (req, res) => {
         const skip = (pageNum - 1) * limitNum;
 
         const queryConditions = {};
+
+        const detectedCountry = country
+            ? country.trim().toUpperCase()
+            : (req.headers['cf-ipcountry'] || req.headers['x-country-code'] || req.user?.country || null);
+
+        if (detectedCountry && detectedCountry !== 'ALL') {
+            queryConditions.country = { $in: [detectedCountry, 'GLOBAL'] };
+        }
 
         if (category) {
             queryConditions.category = { $regex: new RegExp(`^${category.trim()}$`, 'i') };
@@ -93,6 +102,7 @@ const getPublicHealthResources = async (req, res) => {
             page: pageNum,
             limit: limitNum,
             totalPages: Math.ceil(total / limitNum) || 1,
+            detectedCountry: detectedCountry || 'GLOBAL',
             data: resources
         });
     } catch (err) {
@@ -212,6 +222,7 @@ const createAdminHealthResource = async (req, res) => {
             category,
             provider,
             officialUrl,
+            country,
             region,
             languages,
             eligibility,
@@ -251,6 +262,7 @@ const createAdminHealthResource = async (req, res) => {
             category,
             provider,
             officialUrl,
+            country: country ? String(country).trim().toUpperCase() : 'GLOBAL',
             region: region || 'National',
             languages: Array.isArray(languages) && languages.length > 0 ? languages : ['en'],
             eligibility: eligibility || 'Open to all eligible citizens',
@@ -350,6 +362,7 @@ const updateAdminHealthResource = async (req, res) => {
             'category',
             'provider',
             'officialUrl',
+            'country',
             'region',
             'languages',
             'eligibility',

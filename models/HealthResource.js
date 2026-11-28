@@ -57,6 +57,13 @@ const healthResourceSchema = new mongoose.Schema(
             trim: true,
             index: true
         },
+        country: {
+            type: String,
+            default: 'GLOBAL',
+            uppercase: true,
+            trim: true,
+            index: true
+        },
         languages: {
             type: [String],
             default: ['en']
@@ -168,6 +175,7 @@ healthResourceSchema.pre('save', function () {
 
 healthResourceSchema.index({ status: 1, 'verification.verified': 1, expiresAt: 1 });
 healthResourceSchema.index({ category: 1, status: 1, 'verification.verified': 1 });
+healthResourceSchema.index({ country: 1, status: 1, 'verification.verified': 1 });
 healthResourceSchema.index({ region: 1, status: 1, 'verification.verified': 1 });
 
 healthResourceSchema.index({
