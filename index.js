@@ -156,14 +156,8 @@ app.use('/docs', swaggerUi.serve, swaggerUi.setup(null, {
 
 
 
-if (process.env.NODE_ENV?.toLowerCase() !== 'production' || process.env.ENABLE_SWAGGER === 'true') {
-    app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-    app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-} else {
-    app.use(['/api/docs', '/docs'], (req, res) => {
-        res.status(404).json({ error: "Documentation not available in production" });
-    });
-}
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.get('/', (req, res) => {
     res.redirect(302, 'https://ultimatehealth.blog/web/en');
 });
